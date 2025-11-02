@@ -1,0 +1,15 @@
+### Task 9: Pie chart input UI with expand animations
+- [ ] Create circular/square container divided into 3 equal sections (thirds of a pie)
+- [ ] Section 1: Image upload (camera/image icon)
+- [ ] Section 2: Text input (text/keyboard icon)
+- [ ] Section 3: Voice/microphone input (microphone icon)
+- [ ] Implement click handler to expand selected section to full size
+- [ ] Add smooth expand/collapse animations (scale, opacity, rotation)
+- [ ] Show inactive sections as small indicators when one is expanded
+- [ ] Add collapse/back button to return to pie chart view
+- [ ] Integrate voice recording functionality (new feature)
+- [ ] Convert voice to text using Web Speech API or similar
+- [ ] Maintain black & white minimal aesthetic
+- [ ] Add hover effects and visual feedback for each section
+- [ ] Ensure responsive design (mobile and desktop)
+- [ ] Location: `src/app/page.tsx`, `src/components/PieInputSelector.tsx`, `src/hooks/useVoiceRecording.ts`
