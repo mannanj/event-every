@@ -25,3 +25,15 @@ export interface ParsedEvent {
   description?: string;
   confidence: number;
 }
+
+export interface BatchParsedEvents {
+  events: ParsedEvent[];
+  totalCount: number;
+  confidence: number;
+}
+
+export interface StreamedEventChunk {
+  events: ParsedEvent[];
+  chunkIndex: number;
+  isComplete: boolean;
+}

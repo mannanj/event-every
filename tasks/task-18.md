@@ -1,11 +1,11 @@
 ### Task 18: API & Parser for Batch Event Processing
-- [ ] Update `ParsedEvent` type to support batch results with event arrays
-- [ ] Modify Claude prompt in parser.ts to detect multiple events (max 50)
-- [ ] Implement streaming response to return events progressively (3 at a time)
-- [ ] Update /api/parse route to handle async batch parsing
-- [ ] Add batch count detection and validation
-- [ ] Add error handling for batch limits and malformed responses
-- [ ] Test with multi-event images (conference schedules, calendars)
+- [x] Update `ParsedEvent` type to support batch results with event arrays
+- [x] Modify Claude prompt in parser.ts to detect multiple events (max 50)
+- [x] Implement streaming response to return events progressively (3 at a time)
+- [x] Update /api/parse route to handle async batch parsing
+- [x] Add batch count detection and validation
+- [x] Add error handling for batch limits and malformed responses
+- [x] Test with multi-event images (conference schedules, calendars)
 - Location: `src/services/parser.ts`, `src/app/api/parse/route.ts`, `src/types/event.ts`
 
 **Priority**: High Impact, High Effort (8-10 hours)
