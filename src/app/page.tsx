@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
-import ImageUpload from '@/components/ImageUpload';
-import TextInput from '@/components/TextInput';
+import { useState, useRef } from 'react';
+import ImageUpload, { ImageUploadHandle } from '@/components/ImageUpload';
+import TextInput, { TextInputHandle } from '@/components/TextInput';
 import EventEditor from '@/components/EventEditor';
 import { CalendarEvent, ParsedEvent } from '@/types/event';
 import { exportToICS } from '@/services/exporter';
@@ -20,6 +20,8 @@ export default function Home() {
   const [processingEvents, setProcessingEvents] = useState<ProcessingEvent[]>([]);
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
   const { events, addEvent, deleteEvent } = useHistory();
+  const imageUploadRef = useRef<ImageUploadHandle>(null);
+  const textInputRef = useRef<TextInputHandle>(null);
 
   const convertParsedToCalendarEvent = (
     parsed: ParsedEvent,
@@ -92,6 +94,7 @@ export default function Home() {
       setTimeout(() => {
         setProcessingEvents(prev => prev.filter(p => p.id !== processingId));
         addEvent(event);
+        imageUploadRef.current?.clear();
       }, 2000);
     } catch (err) {
       const errorMessage = err instanceof Error
@@ -139,6 +142,7 @@ export default function Home() {
       setTimeout(() => {
         setProcessingEvents(prev => prev.filter(p => p.id !== processingId));
         addEvent(event);
+        textInputRef.current?.clear();
       }, 2000);
     } catch (err) {
       const errorMessage = err instanceof Error
@@ -203,35 +207,28 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-white">
-      <div className="max-w-6xl mx-auto px-4 py-12">
+      <div className="w-full px-[14.28%] py-12">
         <header className="text-center mb-12">
           <h1 className="text-5xl font-bold text-black mb-3">Event Every</h1>
           <p className="text-gray-600">Transform images and text into calendar events</p>
         </header>
 
         {/* Single card input section */}
-        <div className="border-2 border-black p-6 mb-12">
-          <h2 className="text-xl font-bold mb-6 text-black">Add an image or enter text</h2>
-          <div className="flex flex-col md:flex-row gap-6 md:gap-0">
+        <div className="border-2 border-black p-4 mb-12">
+          <h2 className="text-xl font-bold mb-4 text-black">Add an image or enter text</h2>
+          <div className="flex flex-col md:flex-row gap-4">
             <div className="flex-1">
               <ImageUpload
+                ref={imageUploadRef}
                 onImageSelect={handleImageSelect}
                 onError={handleError}
                 isLoading={false}
               />
             </div>
 
-            {/* Divider */}
-            <div className="flex items-center justify-center md:mx-6">
-              <div className="flex md:flex-col items-center gap-3 w-full md:w-auto">
-                <div className="flex-1 md:flex-none h-px md:h-16 md:w-px bg-gray-300" />
-                <span className="text-xs text-gray-400 font-medium px-2">OR</span>
-                <div className="flex-1 md:flex-none h-px md:h-16 md:w-px bg-gray-300" />
-              </div>
-            </div>
-
             <div className="flex-1">
               <TextInput
+                ref={textInputRef}
                 onTextSubmit={handleTextSubmit}
                 isLoading={false}
               />

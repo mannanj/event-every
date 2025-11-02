@@ -1,17 +1,29 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useImperativeHandle, forwardRef } from 'react';
 
 interface TextInputProps {
   onTextSubmit: (text: string) => void;
   isLoading?: boolean;
 }
 
+export interface TextInputHandle {
+  clear: () => void;
+}
+
 const MIN_TEXT_LENGTH = 3;
 
-export default function TextInput({ onTextSubmit, isLoading = false }: TextInputProps) {
-  const [text, setText] = useState('');
-  const [error, setError] = useState<string | null>(null);
+const TextInput = forwardRef<TextInputHandle, TextInputProps>(
+  function TextInput({ onTextSubmit, isLoading = false }, ref) {
+    const [text, setText] = useState('');
+    const [error, setError] = useState<string | null>(null);
+
+    useImperativeHandle(ref, () => ({
+      clear: () => {
+        setText('');
+        setError(null);
+      },
+    }));
 
   const handleSubmit = useCallback(() => {
     setError(null);
@@ -101,4 +113,6 @@ export default function TextInput({ onTextSubmit, isLoading = false }: TextInput
       </div>
     </div>
   );
-}
+});
+
+export default TextInput;

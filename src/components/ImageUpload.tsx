@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useImperativeHandle, forwardRef } from 'react';
 
 interface ImageUploadProps {
   onImageSelect: (file: File) => void;
@@ -8,13 +8,27 @@ interface ImageUploadProps {
   isLoading?: boolean;
 }
 
+export interface ImageUploadHandle {
+  clear: () => void;
+}
+
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const ACCEPTED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/heic'];
 
-export default function ImageUpload({ onImageSelect, onError, isLoading = false }: ImageUploadProps) {
-  const [isDragging, setIsDragging] = useState(false);
-  const [preview, setPreview] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+const ImageUpload = forwardRef<ImageUploadHandle, ImageUploadProps>(
+  function ImageUpload({ onImageSelect, onError, isLoading = false }, ref) {
+    const [isDragging, setIsDragging] = useState(false);
+    const [preview, setPreview] = useState<string | null>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    useImperativeHandle(ref, () => ({
+      clear: () => {
+        setPreview(null);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+      },
+    }));
 
   const validateFile = (file: File): string | null => {
     if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
@@ -168,4 +182,6 @@ export default function ImageUpload({ onImageSelect, onError, isLoading = false 
       </div>
     </div>
   );
-}
+});
+
+export default ImageUpload;
