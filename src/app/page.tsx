@@ -6,6 +6,7 @@ import TextInput from '@/components/TextInput';
 import EventConfirmation from '@/components/EventConfirmation';
 import EventEditor from '@/components/EventEditor';
 import { CalendarEvent, ParsedEvent } from '@/types/event';
+import { exportToICS } from '@/services/exporter';
 
 type InputMode = 'image' | 'text';
 type ViewMode = 'input' | 'confirmation' | 'editing';
@@ -16,6 +17,7 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [currentEvent, setCurrentEvent] = useState<CalendarEvent | null>(null);
+  const [exportStatus, setExportStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   const convertParsedToCalendarEvent = (
     parsed: ParsedEvent,
@@ -137,7 +139,17 @@ export default function Home() {
   };
 
   const handleExport = () => {
-    console.log('Export event:', currentEvent);
+    if (!currentEvent) return;
+
+    const result = exportToICS(currentEvent);
+
+    if (result.success) {
+      setExportStatus({ type: 'success', message: 'Event exported successfully! Check your downloads folder.' });
+      setTimeout(() => setExportStatus(null), 5000);
+    } else {
+      setExportStatus({ type: 'error', message: result.error || 'Failed to export event' });
+      setTimeout(() => setExportStatus(null), 5000);
+    }
   };
 
   const handleStartOver = () => {
@@ -244,6 +256,34 @@ export default function Home() {
               >
                 ← Start Over
               </button>
+              {exportStatus && (
+                <div
+                  role="alert"
+                  className={`p-4 border-2 mb-4 ${
+                    exportStatus.type === 'success'
+                      ? 'border-black bg-white'
+                      : 'border-black bg-white'
+                  }`}
+                >
+                  <div className="flex justify-between items-start">
+                    <div className="flex-1">
+                      <p className="font-semibold text-black mb-1">
+                        {exportStatus.type === 'success' ? '✓ Success' : 'Export Failed'}
+                      </p>
+                      <p className="text-sm text-gray-600">{exportStatus.message}</p>
+                    </div>
+                    <button
+                      onClick={() => setExportStatus(null)}
+                      className="ml-4 text-black hover:text-gray-600 focus:outline-none"
+                      aria-label="Dismiss notification"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              )}
               <EventConfirmation
                 event={currentEvent}
                 onEdit={handleEdit}
