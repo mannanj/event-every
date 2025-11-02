@@ -209,23 +209,33 @@ export default function Home() {
           <p className="text-gray-600">Transform images and text into calendar events</p>
         </header>
 
-        {/* Two-column input section */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
-          <div className="border-2 border-black p-6">
-            <h2 className="text-xl font-bold mb-4 text-black">Image Upload</h2>
-            <ImageUpload
-              onImageSelect={handleImageSelect}
-              onError={handleError}
-              isLoading={false}
-            />
-          </div>
+        {/* Single card input section */}
+        <div className="border-2 border-black p-6 mb-12">
+          <h2 className="text-xl font-bold mb-6 text-black">Add an image or enter text</h2>
+          <div className="flex flex-col md:flex-row gap-6 md:gap-0">
+            <div className="flex-1">
+              <ImageUpload
+                onImageSelect={handleImageSelect}
+                onError={handleError}
+                isLoading={false}
+              />
+            </div>
 
-          <div className="border-2 border-black p-6">
-            <h2 className="text-xl font-bold mb-4 text-black">Text Input</h2>
-            <TextInput
-              onTextSubmit={handleTextSubmit}
-              isLoading={false}
-            />
+            {/* Divider */}
+            <div className="flex items-center justify-center md:mx-6">
+              <div className="flex md:flex-col items-center gap-3 w-full md:w-auto">
+                <div className="flex-1 md:flex-none h-px md:h-16 md:w-px bg-gray-300" />
+                <span className="text-xs text-gray-400 font-medium px-2">OR</span>
+                <div className="flex-1 md:flex-none h-px md:h-16 md:w-px bg-gray-300" />
+              </div>
+            </div>
+
+            <div className="flex-1">
+              <TextInput
+                onTextSubmit={handleTextSubmit}
+                isLoading={false}
+              />
+            </div>
           </div>
         </div>
 
