@@ -4,7 +4,8 @@ import { useState, useRef } from 'react';
 import ImageUpload, { ImageUploadHandle } from '@/components/ImageUpload';
 import TextInput, { TextInputHandle } from '@/components/TextInput';
 import EventEditor from '@/components/EventEditor';
-import { CalendarEvent, ParsedEvent } from '@/types/event';
+import BatchEventList from '@/components/BatchEventList';
+import { CalendarEvent, ParsedEvent, StreamedEventChunk } from '@/types/event';
 import { exportToICS } from '@/services/exporter';
 import { useHistory } from '@/hooks/useHistory';
 
@@ -16,8 +17,16 @@ interface ProcessingEvent {
   error?: string;
 }
 
+interface BatchProcessing {
+  id: string;
+  events: CalendarEvent[];
+  isProcessing: boolean;
+  totalExpected?: number;
+}
+
 export default function Home() {
   const [processingEvents, setProcessingEvents] = useState<ProcessingEvent[]>([]);
+  const [batchProcessing, setBatchProcessing] = useState<BatchProcessing | null>(null);
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
   const { events, addEvent, deleteEvent } = useHistory();
   const imageUploadRef = useRef<ImageUploadHandle>(null);
@@ -33,7 +42,7 @@ export default function Home() {
     const endDate = parsed.endDate ? new Date(parsed.endDate) : new Date(startDate.getTime() + 60 * 60 * 1000);
 
     return {
-      id: `event-${Date.now()}`,
+      id: `event-${Date.now()}-${Math.random().toString(36).substring(7)}`,
       title: parsed.title || 'Untitled Event',
       startDate,
       endDate,
@@ -46,15 +55,98 @@ export default function Home() {
     };
   };
 
+  const handleBatchStream = async (
+    source: 'image' | 'text',
+    body: Record<string, unknown>,
+    originalInput?: string
+  ) => {
+    const batchId = `batch-${Date.now()}`;
+    setBatchProcessing({
+      id: batchId,
+      events: [],
+      isProcessing: true,
+    });
+
+    try {
+      const response = await fetch('/api/parse', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...body, batch: true }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to process batch');
+      }
+
+      const reader = response.body?.getReader();
+      if (!reader) {
+        throw new Error('No response stream');
+      }
+
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = JSON.parse(line.slice(6));
+
+            if (data.error) {
+              throw new Error(data.error);
+            }
+
+            const chunk = data as StreamedEventChunk;
+
+            if (chunk.isComplete) {
+              setBatchProcessing(prev => prev ? { ...prev, isProcessing: false } : null);
+              break;
+            }
+
+            if (chunk.events && chunk.events.length > 0) {
+              const newEvents = chunk.events.map(parsed =>
+                convertParsedToCalendarEvent(parsed, source, originalInput)
+              );
+
+              setBatchProcessing(prev => {
+                if (!prev) return null;
+                return {
+                  ...prev,
+                  events: [...prev.events, ...newEvents],
+                };
+              });
+            }
+          }
+        }
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error
+        ? err.message
+        : 'Failed to process batch';
+
+      const processingId = `error-${Date.now()}`;
+      setProcessingEvents(prev => [...prev, {
+        id: processingId,
+        type: source,
+        status: 'error',
+        error: errorMessage,
+      }]);
+
+      setBatchProcessing(null);
+
+      setTimeout(() => {
+        setProcessingEvents(prev => prev.filter(p => p.id !== processingId));
+      }, 5000);
+    }
+  };
+
   const handleImageSelect = async (file: File) => {
-    const processingId = `processing-${Date.now()}`;
-
-    setProcessingEvents(prev => [...prev, {
-      id: processingId,
-      type: 'image',
-      status: 'processing',
-    }]);
-
     try {
       const reader = new FileReader();
       const base64Promise = new Promise<string>((resolve, reject) => {
@@ -70,40 +162,24 @@ export default function Home() {
       const base64 = await base64Promise;
       const mimeType = file.type;
 
-      const response = await fetch('/api/parse', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          imageBase64: base64,
-          imageMimeType: mimeType,
-        }),
-      });
+      await handleBatchStream('image', {
+        imageBase64: base64,
+        imageMimeType: mimeType,
+      }, URL.createObjectURL(file));
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Failed to parse event from image' }));
-        throw new Error(errorData.error || 'Failed to parse event from image');
-      }
-
-      const parsed: ParsedEvent = await response.json();
-      const event = convertParsedToCalendarEvent(parsed, 'image', URL.createObjectURL(file));
-
-      setProcessingEvents(prev =>
-        prev.map(p => p.id === processingId ? { ...p, status: 'success', event } : p)
-      );
-
-      setTimeout(() => {
-        setProcessingEvents(prev => prev.filter(p => p.id !== processingId));
-        addEvent(event);
-        imageUploadRef.current?.clear();
-      }, 2000);
+      imageUploadRef.current?.clear();
     } catch (err) {
       const errorMessage = err instanceof Error
         ? err.message
         : 'Unable to extract event details from this image.';
 
-      setProcessingEvents(prev =>
-        prev.map(p => p.id === processingId ? { ...p, status: 'error', error: errorMessage } : p)
-      );
+      const processingId = `error-${Date.now()}`;
+      setProcessingEvents(prev => [...prev, {
+        id: processingId,
+        type: 'image',
+        status: 'error',
+        error: errorMessage,
+      }]);
 
       setTimeout(() => {
         setProcessingEvents(prev => prev.filter(p => p.id !== processingId));
@@ -190,13 +266,66 @@ export default function Home() {
   };
 
   const handleSaveEdit = (updatedEvent: CalendarEvent) => {
-    deleteEvent(editingEvent!.id);
+    if (!editingEvent) return;
+
+    if (batchProcessing) {
+      const isInBatch = batchProcessing.events.some(e => e.id === editingEvent.id);
+      if (isInBatch) {
+        setBatchProcessing(prev => {
+          if (!prev) return null;
+          return {
+            ...prev,
+            events: prev.events.map(e => e.id === editingEvent.id ? updatedEvent : e),
+          };
+        });
+        setEditingEvent(null);
+        return;
+      }
+    }
+
+    deleteEvent(editingEvent.id);
     addEvent(updatedEvent);
     setEditingEvent(null);
   };
 
   const handleCancelEdit = () => {
     setEditingEvent(null);
+  };
+
+  const handleBatchEventEdit = (event: CalendarEvent) => {
+    setEditingEvent(event);
+    setTimeout(() => {
+      const editSection = document.getElementById('edit-section');
+      editSection?.scrollIntoView({ behavior: 'smooth' });
+    }, 100);
+  };
+
+  const handleBatchEventDelete = (eventId: string) => {
+    setBatchProcessing(prev => {
+      if (!prev) return null;
+      return {
+        ...prev,
+        events: prev.events.filter(e => e.id !== eventId),
+      };
+    });
+  };
+
+  const handleBatchEventExport = (event: CalendarEvent) => {
+    exportToICS(event);
+  };
+
+  const handleSaveBatch = () => {
+    if (!batchProcessing) return;
+
+    batchProcessing.events.forEach(event => {
+      addEvent(event);
+    });
+
+    setBatchProcessing(null);
+  };
+
+  const handleCancelBatch = () => {
+    setBatchProcessing(null);
   };
 
   const formatDate = (date: Date) => {
@@ -239,6 +368,37 @@ export default function Home() {
             </div>
           </div>
         </div>
+
+        {/* Batch processing section */}
+        {batchProcessing && (
+          <div className="mb-12">
+            <BatchEventList
+              events={batchProcessing.events}
+              isProcessing={batchProcessing.isProcessing}
+              totalExpected={batchProcessing.totalExpected}
+              onEdit={handleBatchEventEdit}
+              onDelete={handleBatchEventDelete}
+              onExport={handleBatchEventExport}
+            />
+
+            {!batchProcessing.isProcessing && batchProcessing.events.length > 0 && (
+              <div className="flex gap-3 mt-4">
+                <button
+                  onClick={handleCancelBatch}
+                  className="flex-1 py-3 px-6 bg-white border-2 border-black text-black font-medium hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-black"
+                >
+                  Cancel Batch
+                </button>
+                <button
+                  onClick={handleSaveBatch}
+                  className="flex-1 py-3 px-6 bg-black text-white border-2 border-black font-medium hover:bg-gray-800 transition-colors focus:outline-none focus:ring-2 focus:ring-black"
+                >
+                  Save All to History ({batchProcessing.events.length})
+                </button>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Processing queue section */}
         {processingEvents.length > 0 && (
