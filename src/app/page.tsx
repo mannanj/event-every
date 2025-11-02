@@ -3,24 +3,23 @@
 import { useState } from 'react';
 import ImageUpload from '@/components/ImageUpload';
 import TextInput from '@/components/TextInput';
-import EventConfirmation from '@/components/EventConfirmation';
 import EventEditor from '@/components/EventEditor';
-import HistoryPanel from '@/components/HistoryPanel';
 import { CalendarEvent, ParsedEvent } from '@/types/event';
 import { exportToICS } from '@/services/exporter';
 import { useHistory } from '@/hooks/useHistory';
 
-type InputMode = 'image' | 'text';
-type ViewMode = 'input' | 'confirmation' | 'editing';
+interface ProcessingEvent {
+  id: string;
+  type: 'image' | 'text';
+  status: 'processing' | 'success' | 'error';
+  event?: CalendarEvent;
+  error?: string;
+}
 
 export default function Home() {
-  const [inputMode, setInputMode] = useState<InputMode>('image');
-  const [viewMode, setViewMode] = useState<ViewMode>('input');
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [currentEvent, setCurrentEvent] = useState<CalendarEvent | null>(null);
-  const [exportStatus, setExportStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
-  const { addEvent } = useHistory();
+  const [processingEvents, setProcessingEvents] = useState<ProcessingEvent[]>([]);
+  const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
+  const { events, addEvent, deleteEvent } = useHistory();
 
   const convertParsedToCalendarEvent = (
     parsed: ParsedEvent,
@@ -46,8 +45,13 @@ export default function Home() {
   };
 
   const handleImageSelect = async (file: File) => {
-    setError(null);
-    setIsLoading(true);
+    const processingId = `processing-${Date.now()}`;
+
+    setProcessingEvents(prev => [...prev, {
+      id: processingId,
+      type: 'image',
+      status: 'processing',
+    }]);
 
     try {
       const reader = new FileReader();
@@ -80,22 +84,38 @@ export default function Home() {
 
       const parsed: ParsedEvent = await response.json();
       const event = convertParsedToCalendarEvent(parsed, 'image', URL.createObjectURL(file));
-      setCurrentEvent(event);
-      setViewMode('confirmation');
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : 'Unable to extract event details from this image. Please try a different image or enter the details manually.'
+
+      setProcessingEvents(prev =>
+        prev.map(p => p.id === processingId ? { ...p, status: 'success', event } : p)
       );
-    } finally {
-      setIsLoading(false);
+
+      setTimeout(() => {
+        setProcessingEvents(prev => prev.filter(p => p.id !== processingId));
+        addEvent(event);
+      }, 2000);
+    } catch (err) {
+      const errorMessage = err instanceof Error
+        ? err.message
+        : 'Unable to extract event details from this image.';
+
+      setProcessingEvents(prev =>
+        prev.map(p => p.id === processingId ? { ...p, status: 'error', error: errorMessage } : p)
+      );
+
+      setTimeout(() => {
+        setProcessingEvents(prev => prev.filter(p => p.id !== processingId));
+      }, 5000);
     }
   };
 
   const handleTextSubmit = async (text: string) => {
-    setError(null);
-    setIsLoading(true);
+    const processingId = `processing-${Date.now()}`;
+
+    setProcessingEvents(prev => [...prev, {
+      id: processingId,
+      type: 'text',
+      status: 'processing',
+    }]);
 
     try {
       const response = await fetch('/api/parse', {
@@ -111,213 +131,231 @@ export default function Home() {
 
       const parsed: ParsedEvent = await response.json();
       const event = convertParsedToCalendarEvent(parsed, 'text', text);
-      setCurrentEvent(event);
-      setViewMode('confirmation');
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : 'Unable to extract event details from this text. Please check the format and try again.'
+
+      setProcessingEvents(prev =>
+        prev.map(p => p.id === processingId ? { ...p, status: 'success', event } : p)
       );
-    } finally {
-      setIsLoading(false);
+
+      setTimeout(() => {
+        setProcessingEvents(prev => prev.filter(p => p.id !== processingId));
+        addEvent(event);
+      }, 2000);
+    } catch (err) {
+      const errorMessage = err instanceof Error
+        ? err.message
+        : 'Unable to extract event details from this text.';
+
+      setProcessingEvents(prev =>
+        prev.map(p => p.id === processingId ? { ...p, status: 'error', error: errorMessage } : p)
+      );
+
+      setTimeout(() => {
+        setProcessingEvents(prev => prev.filter(p => p.id !== processingId));
+      }, 5000);
     }
   };
 
   const handleError = (errorMessage: string) => {
-    setError(errorMessage);
+    const processingId = `error-${Date.now()}`;
+    setProcessingEvents(prev => [...prev, {
+      id: processingId,
+      type: 'image',
+      status: 'error',
+      error: errorMessage,
+    }]);
+
+    setTimeout(() => {
+      setProcessingEvents(prev => prev.filter(p => p.id !== processingId));
+    }, 5000);
   };
 
-  const handleEdit = () => {
-    setViewMode('editing');
+  const handleExportFromHistory = (event: CalendarEvent) => {
+    exportToICS(event);
   };
 
-  const handleSave = (updatedEvent: CalendarEvent) => {
-    setCurrentEvent(updatedEvent);
-    setViewMode('confirmation');
+  const handleEditFromHistory = (event: CalendarEvent) => {
+    setEditingEvent(event);
+    setTimeout(() => {
+      const editSection = document.getElementById('edit-section');
+      editSection?.scrollIntoView({ behavior: 'smooth' });
+    }, 100);
   };
 
-  const handleCancel = () => {
-    setViewMode('confirmation');
+  const handleSaveEdit = (updatedEvent: CalendarEvent) => {
+    deleteEvent(editingEvent!.id);
+    addEvent(updatedEvent);
+    setEditingEvent(null);
   };
 
-  const handleExport = () => {
-    if (!currentEvent) return;
-
-    const result = exportToICS(currentEvent);
-
-    if (result.success) {
-      addEvent(currentEvent);
-      setExportStatus({ type: 'success', message: 'Event exported successfully! Check your downloads folder.' });
-      setTimeout(() => setExportStatus(null), 5000);
-    } else {
-      setExportStatus({ type: 'error', message: result.error || 'Failed to export event' });
-      setTimeout(() => setExportStatus(null), 5000);
-    }
+  const handleCancelEdit = () => {
+    setEditingEvent(null);
   };
 
-  const handleEventSelect = (event: CalendarEvent) => {
-    setCurrentEvent(event);
-    setViewMode('editing');
-  };
-
-  const handleStartOver = () => {
-    setCurrentEvent(null);
-    setViewMode('input');
-    setError(null);
+  const formatDate = (date: Date) => {
+    return new Intl.DateTimeFormat('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    }).format(date);
   };
 
   return (
     <main className="min-h-screen bg-white">
-      <HistoryPanel onEventSelect={handleEventSelect} />
-      <div className="max-w-2xl mx-auto px-4 py-12">
+      <div className="max-w-6xl mx-auto px-4 py-12">
         <header className="text-center mb-12">
           <h1 className="text-5xl font-bold text-black mb-3">Event Every</h1>
           <p className="text-gray-600">Transform images and text into calendar events</p>
         </header>
 
-        <div className="space-y-6">
-          {viewMode === 'input' && (
-            <>
-              <div className="flex gap-2 border-b-2 border-gray-200">
-                <button
-                  onClick={() => setInputMode('image')}
-                  disabled={isLoading}
-                  aria-label="Switch to image upload mode"
-                  aria-pressed={inputMode === 'image'}
-                  className={`
-                    flex-1 py-3 px-6 font-medium transition-all
-                    focus:outline-none focus:ring-2 focus:ring-black focus:ring-offset-2
-                    ${
-                      inputMode === 'image'
-                        ? 'text-black border-b-2 border-black -mb-0.5'
-                        : 'text-gray-500 hover:text-black'
-                    }
-                    ${isLoading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
-                  `}
-                >
-                  Image Upload
-                </button>
-                <button
-                  onClick={() => setInputMode('text')}
-                  disabled={isLoading}
-                  aria-label="Switch to text input mode"
-                  aria-pressed={inputMode === 'text'}
-                  className={`
-                    flex-1 py-3 px-6 font-medium transition-all
-                    focus:outline-none focus:ring-2 focus:ring-black focus:ring-offset-2
-                    ${
-                      inputMode === 'text'
-                        ? 'text-black border-b-2 border-black -mb-0.5'
-                        : 'text-gray-500 hover:text-black'
-                    }
-                    ${isLoading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
-                  `}
-                >
-                  Text Input
-                </button>
-              </div>
+        {/* Two-column input section */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
+          <div className="border-2 border-black p-6">
+            <h2 className="text-xl font-bold mb-4 text-black">Image Upload</h2>
+            <ImageUpload
+              onImageSelect={handleImageSelect}
+              onError={handleError}
+              isLoading={false}
+            />
+          </div>
 
-              {error && (
+          <div className="border-2 border-black p-6">
+            <h2 className="text-xl font-bold mb-4 text-black">Text Input</h2>
+            <TextInput
+              onTextSubmit={handleTextSubmit}
+              isLoading={false}
+            />
+          </div>
+        </div>
+
+        {/* Processing queue section */}
+        {processingEvents.length > 0 && (
+          <div className="mb-12">
+            <h2 className="text-2xl font-bold mb-4 text-black">Processing</h2>
+            <div className="space-y-4">
+              {processingEvents.map((item) => (
                 <div
-                  role="alert"
-                  className="p-4 border-2 border-black bg-white"
-                >
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1">
-                      <p className="font-semibold text-black mb-1">Unable to Parse Event</p>
-                      <p className="text-sm text-gray-600">{error}</p>
-                    </div>
-                    <button
-                      onClick={() => setError(null)}
-                      className="ml-4 text-black hover:text-gray-600 focus:outline-none"
-                      aria-label="Dismiss error"
-                    >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              <div className="mt-8">
-                {inputMode === 'image' ? (
-                  <ImageUpload
-                    onImageSelect={handleImageSelect}
-                    onError={handleError}
-                    isLoading={isLoading}
-                  />
-                ) : (
-                  <TextInput
-                    onTextSubmit={handleTextSubmit}
-                    isLoading={isLoading}
-                  />
-                )}
-              </div>
-            </>
-          )}
-
-          {viewMode === 'confirmation' && currentEvent && (
-            <>
-              <button
-                onClick={handleStartOver}
-                className="mb-4 text-sm text-gray-600 hover:text-black focus:outline-none focus:underline"
-              >
-                ← Start Over
-              </button>
-              {exportStatus && (
-                <div
-                  role="alert"
-                  className={`p-4 border-2 mb-4 ${
-                    exportStatus.type === 'success'
-                      ? 'border-black bg-white'
-                      : 'border-black bg-white'
+                  key={item.id}
+                  className={`border-2 p-4 ${
+                    item.status === 'error' ? 'border-red-500 bg-red-50' :
+                    item.status === 'success' ? 'border-green-500 bg-green-50' :
+                    'border-black bg-white'
                   }`}
                 >
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1">
-                      <p className="font-semibold text-black mb-1">
-                        {exportStatus.type === 'success' ? '✓ Success' : 'Export Failed'}
-                      </p>
-                      <p className="text-sm text-gray-600">{exportStatus.message}</p>
+                  {item.status === 'processing' && (
+                    <div className="flex items-center gap-3">
+                      <div className="animate-spin rounded-full h-6 w-6 border-2 border-black border-t-transparent" />
+                      <span className="text-black">Processing {item.type} input...</span>
                     </div>
+                  )}
+
+                  {item.status === 'success' && item.event && (
+                    <div className="flex items-center gap-3">
+                      <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      <div className="flex-1">
+                        <span className="font-bold text-black">{item.event.title}</span>
+                        <span className="text-sm text-gray-600 ml-2">
+                          {formatDate(item.event.startDate)}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  {item.status === 'error' && (
+                    <div className="flex items-center gap-3">
+                      <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                      <span className="text-red-600">{item.error}</span>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Event editor section */}
+        {editingEvent && (
+          <div id="edit-section" className="mb-12">
+            <h2 className="text-2xl font-bold mb-4 text-black">Edit Event</h2>
+            <EventEditor
+              event={editingEvent}
+              onSave={handleSaveEdit}
+              onCancel={handleCancelEdit}
+            />
+          </div>
+        )}
+
+        {/* History section */}
+        {events.length > 0 && (
+          <div className="mb-12">
+            <h2 className="text-2xl font-bold mb-4 text-black">Event History</h2>
+            <div className="space-y-4">
+              {events.map((event) => (
+                <div
+                  key={event.id}
+                  className="border-2 border-black p-4 bg-white hover:bg-gray-50 transition-colors"
+                >
+                  <div className="flex justify-between items-start mb-2">
+                    <h3 className="font-bold text-lg flex-1">{event.title}</h3>
                     <button
-                      onClick={() => setExportStatus(null)}
-                      className="ml-4 text-black hover:text-gray-600 focus:outline-none"
-                      aria-label="Dismiss notification"
+                      onClick={() => deleteEvent(event.id)}
+                      className="ml-2 text-black hover:text-gray-600 focus:outline-none"
+                      aria-label={`Delete ${event.title}`}
                     >
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                       </svg>
                     </button>
                   </div>
-                </div>
-              )}
-              <EventConfirmation
-                event={currentEvent}
-                onEdit={handleEdit}
-                onExport={handleExport}
-              />
-            </>
-          )}
 
-          {viewMode === 'editing' && currentEvent && (
-            <>
-              <button
-                onClick={() => setViewMode('confirmation')}
-                className="mb-4 text-sm text-gray-600 hover:text-black focus:outline-none focus:underline"
-              >
-                ← Back to Preview
-              </button>
-              <EventEditor
-                event={currentEvent}
-                onSave={handleSave}
-                onCancel={handleCancel}
-              />
-            </>
-          )}
-        </div>
+                  <div className="space-y-1 mb-3 text-sm">
+                    <p className="text-gray-700">
+                      <span className="font-semibold">Start:</span> {formatDate(event.startDate)}
+                    </p>
+                    <p className="text-gray-700">
+                      <span className="font-semibold">End:</span> {formatDate(event.endDate)}
+                    </p>
+                    {event.location && (
+                      <p className="text-gray-700">
+                        <span className="font-semibold">Location:</span> {event.location}
+                      </p>
+                    )}
+                    {event.description && (
+                      <p className="text-gray-700 line-clamp-2">
+                        <span className="font-semibold">Description:</span> {event.description}
+                      </p>
+                    )}
+                    <p className="text-gray-500 text-xs mt-2">
+                      Created: {formatDate(event.created)}
+                    </p>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleExportFromHistory(event)}
+                      className="flex-1 px-4 py-2 bg-black text-white border-2 border-black hover:bg-white hover:text-black transition-colors focus:outline-none focus:ring-2 focus:ring-black"
+                      aria-label={`Export ${event.title}`}
+                    >
+                      Export
+                    </button>
+                    <button
+                      onClick={() => handleEditFromHistory(event)}
+                      className="flex-1 px-4 py-2 bg-white text-black border-2 border-black hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-black"
+                      aria-label={`Edit ${event.title}`}
+                    >
+                      Edit
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </main>
   );

@@ -50,7 +50,7 @@ export default function TextInput({ onTextSubmit, isLoading = false }: TextInput
           disabled={isLoading}
           placeholder="Paste event details here... (e.g., 'Team meeting tomorrow at 3pm in Conference Room A')"
           aria-label="Enter event details as text"
-          aria-describedby={error ? 'text-input-error' : 'text-input-hint'}
+          aria-describedby={error ? 'text-input-error' : undefined}
           aria-invalid={error ? 'true' : 'false'}
           rows={6}
           className={`
@@ -80,10 +80,7 @@ export default function TextInput({ onTextSubmit, isLoading = false }: TextInput
         </p>
       )}
 
-      <div className="flex items-center justify-between">
-        <p id="text-input-hint" className="text-sm text-gray-500">
-          Press {typeof navigator !== 'undefined' && navigator.platform.includes('Mac') ? 'Cmd' : 'Ctrl'} + Enter to parse
-        </p>
+      <div className="flex items-center justify-end">
         <button
           onClick={handleSubmit}
           disabled={isLoading || text.trim().length < MIN_TEXT_LENGTH}
