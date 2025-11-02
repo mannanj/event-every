@@ -25,6 +25,47 @@ export const eventStorage = {
     }
   },
 
+  saveEvents: (events: CalendarEvent[]): StorageResult<void> => {
+    try {
+      if (events.length === 0) {
+        return { success: true };
+      }
+
+      const existingEvents = eventStorage.getAllEvents().data || [];
+      const updatedEvents = [...events, ...existingEvents];
+
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedEvents));
+
+      return { success: true };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to save events',
+      };
+    }
+  },
+
+  updateEvent: (event: CalendarEvent): StorageResult<void> => {
+    try {
+      const result = eventStorage.getAllEvents();
+
+      if (!result.success || !result.data) {
+        return { success: false, error: result.error };
+      }
+
+      const updatedEvents = result.data.map((e) => (e.id === event.id ? event : e));
+
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedEvents));
+
+      return { success: true };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to update event',
+      };
+    }
+  },
+
   getAllEvents: (): StorageResult<CalendarEvent[]> => {
     try {
       const data = localStorage.getItem(STORAGE_KEY);

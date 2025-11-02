@@ -1,9 +1,14 @@
-import { createEvent, EventAttributes } from 'ics';
+import { createEvent, createEvents, EventAttributes } from 'ics';
 import { CalendarEvent } from '@/types/event';
 
 export interface ExportResult {
   success: boolean;
   error?: string;
+}
+
+export interface ValidationResult {
+  isValid: boolean;
+  errors: string[];
 }
 
 export function exportToICS(event: CalendarEvent): ExportResult {
@@ -72,4 +77,93 @@ function sanitizeFilename(name: string): string {
     .replace(/^-|-$/g, '')
     .toLowerCase()
     .slice(0, 50) || 'event';
+}
+
+export function validateEvent(event: CalendarEvent): ValidationResult {
+  const errors: string[] = [];
+
+  if (!event.title || event.title.trim() === '') {
+    errors.push('Event title is required');
+  }
+
+  if (!event.startDate || !(event.startDate instanceof Date) || isNaN(event.startDate.getTime())) {
+    errors.push('Valid start date is required');
+  }
+
+  if (!event.endDate || !(event.endDate instanceof Date) || isNaN(event.endDate.getTime())) {
+    errors.push('Valid end date is required');
+  }
+
+  if (event.startDate && event.endDate && event.startDate > event.endDate) {
+    errors.push('Start date must be before end date');
+  }
+
+  return {
+    isValid: errors.length === 0,
+    errors,
+  };
+}
+
+export function validateEvents(events: CalendarEvent[]): ValidationResult {
+  const allErrors: string[] = [];
+
+  events.forEach((event, index) => {
+    const result = validateEvent(event);
+    if (!result.isValid) {
+      result.errors.forEach((error) => {
+        allErrors.push(`Event ${index + 1} (${event.title || 'Untitled'}): ${error}`);
+      });
+    }
+  });
+
+  return {
+    isValid: allErrors.length === 0,
+    errors: allErrors,
+  };
+}
+
+export function exportMultipleToICS(events: CalendarEvent[], filename?: string): ExportResult {
+  try {
+    if (events.length === 0) {
+      return { success: false, error: 'No events to export' };
+    }
+
+    const validation = validateEvents(events);
+    if (!validation.isValid) {
+      return {
+        success: false,
+        error: `Validation failed:\n${validation.errors.join('\n')}`,
+      };
+    }
+
+    const eventAttributesArray: EventAttributes[] = events.map((event) => ({
+      start: dateToArray(event.startDate),
+      end: dateToArray(event.endDate),
+      title: event.title,
+      description: event.description,
+      location: event.location,
+      status: 'CONFIRMED',
+      busyStatus: 'BUSY',
+      productId: 'event-every/ics',
+    }));
+
+    const { error, value } = createEvents(eventAttributesArray);
+
+    if (error) {
+      return { success: false, error: error.message || 'Failed to create events' };
+    }
+
+    if (!value) {
+      return { success: false, error: 'No calendar data generated' };
+    }
+
+    const exportFilename = filename || `batch-events-${events.length}`;
+    downloadICS(value, exportFilename);
+    return { success: true };
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Unknown error occurred',
+    };
+  }
 }

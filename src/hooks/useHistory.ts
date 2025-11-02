@@ -7,6 +7,8 @@ export interface UseHistoryResult {
   isLoading: boolean;
   error: string | null;
   addEvent: (event: CalendarEvent) => void;
+  addEvents: (events: CalendarEvent[]) => void;
+  updateEvent: (event: CalendarEvent) => void;
   deleteEvent: (id: string) => void;
   clearHistory: () => void;
   searchEvents: (query: string) => void;
@@ -54,6 +56,32 @@ export const useHistory = (): UseHistoryResult => {
     [loadEvents]
   );
 
+  const addEvents = useCallback(
+    (events: CalendarEvent[]) => {
+      const result = eventStorage.saveEvents(events);
+
+      if (result.success) {
+        loadEvents();
+      } else {
+        setError(result.error || 'Failed to save events');
+      }
+    },
+    [loadEvents]
+  );
+
+  const updateEvent = useCallback(
+    (event: CalendarEvent) => {
+      const result = eventStorage.updateEvent(event);
+
+      if (result.success) {
+        loadEvents();
+      } else {
+        setError(result.error || 'Failed to update event');
+      }
+    },
+    [loadEvents]
+  );
+
   const deleteEvent = useCallback(
     (id: string) => {
       const result = eventStorage.deleteEvent(id);
@@ -91,6 +119,8 @@ export const useHistory = (): UseHistoryResult => {
     isLoading,
     error,
     addEvent,
+    addEvents,
+    updateEvent,
     deleteEvent,
     clearHistory,
     searchEvents,
