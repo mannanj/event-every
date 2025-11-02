@@ -65,3 +65,23 @@
 *Audio*:
 - Similar auto-processing behavior
 - Live transcription and event extraction
+
+## UX Philosophy
+
+**Fast. Simple. Sweet. Reactive.**
+
+**Intelligent Processing**:
+- No waiting for button presses
+- Smart detection of "enough data" to proceed
+- Instant feedback as users interact
+- Actions happen automatically when possible
+
+**Dual Editing**:
+- Edit generated event preview in real-time
+- Edit inputs simultaneously
+- Changes reflect instantly in both directions
+
+**Version Navigation**:
+- Slide back/forth between past generated versions
+- History of all input iterations
+- Never lose a variation
