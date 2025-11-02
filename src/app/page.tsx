@@ -215,7 +215,7 @@ export default function Home() {
 
         {/* Single card input section */}
         <div className="border-2 border-black p-4 mb-12">
-          <h2 className="text-xl font-bold mb-4 text-black">Add an image or enter text</h2>
+          <h2 className="text-lg font-medium mb-4 text-black">Add an image or enter text</h2>
           <div className="flex flex-col md:flex-row gap-4">
             <div className="flex-1">
               <ImageUpload
