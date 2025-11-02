@@ -5,8 +5,10 @@ import ImageUpload from '@/components/ImageUpload';
 import TextInput from '@/components/TextInput';
 import EventConfirmation from '@/components/EventConfirmation';
 import EventEditor from '@/components/EventEditor';
+import HistoryPanel from '@/components/HistoryPanel';
 import { CalendarEvent, ParsedEvent } from '@/types/event';
 import { exportToICS } from '@/services/exporter';
+import { useHistory } from '@/hooks/useHistory';
 
 type InputMode = 'image' | 'text';
 type ViewMode = 'input' | 'confirmation' | 'editing';
@@ -18,6 +20,7 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [currentEvent, setCurrentEvent] = useState<CalendarEvent | null>(null);
   const [exportStatus, setExportStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const { addEvent } = useHistory();
 
   const convertParsedToCalendarEvent = (
     parsed: ParsedEvent,
@@ -144,12 +147,18 @@ export default function Home() {
     const result = exportToICS(currentEvent);
 
     if (result.success) {
+      addEvent(currentEvent);
       setExportStatus({ type: 'success', message: 'Event exported successfully! Check your downloads folder.' });
       setTimeout(() => setExportStatus(null), 5000);
     } else {
       setExportStatus({ type: 'error', message: result.error || 'Failed to export event' });
       setTimeout(() => setExportStatus(null), 5000);
     }
+  };
+
+  const handleEventSelect = (event: CalendarEvent) => {
+    setCurrentEvent(event);
+    setViewMode('editing');
   };
 
   const handleStartOver = () => {
@@ -160,6 +169,7 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-white">
+      <HistoryPanel onEventSelect={handleEventSelect} />
       <div className="max-w-2xl mx-auto px-4 py-12">
         <header className="text-center mb-12">
           <h1 className="text-5xl font-bold text-black mb-3">Event Every</h1>
