@@ -173,6 +173,10 @@ export default function Home() {
     }, 5000);
   };
 
+  const handleRemoveFromQueue = (id: string) => {
+    setProcessingEvents(prev => prev.filter(p => p.id !== id));
+  };
+
   const handleExportFromHistory = (event: CalendarEvent) => {
     exportToICS(event);
   };
@@ -253,7 +257,16 @@ export default function Home() {
                   {item.status === 'processing' && (
                     <div className="flex items-center gap-3">
                       <div className="animate-spin rounded-full h-6 w-6 border-2 border-black border-t-transparent" />
-                      <span className="text-black">Processing {item.type} input...</span>
+                      <span className="text-black flex-1">Processing {item.type} input...</span>
+                      <button
+                        onClick={() => handleRemoveFromQueue(item.id)}
+                        className="ml-2 text-black hover:text-gray-600 focus:outline-none"
+                        aria-label="Cancel processing"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
                     </div>
                   )}
 
@@ -268,6 +281,15 @@ export default function Home() {
                           {formatDate(item.event.startDate)}
                         </span>
                       </div>
+                      <button
+                        onClick={() => handleRemoveFromQueue(item.id)}
+                        className="ml-2 text-black hover:text-gray-600 focus:outline-none"
+                        aria-label="Remove from queue"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
                     </div>
                   )}
 
@@ -276,7 +298,16 @@ export default function Home() {
                       <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                       </svg>
-                      <span className="text-red-600">{item.error}</span>
+                      <span className="text-red-600 flex-1">{item.error}</span>
+                      <button
+                        onClick={() => handleRemoveFromQueue(item.id)}
+                        className="ml-2 text-black hover:text-gray-600 focus:outline-none"
+                        aria-label="Remove from queue"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
                     </div>
                   )}
                 </div>
