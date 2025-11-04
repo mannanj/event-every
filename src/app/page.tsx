@@ -5,6 +5,7 @@ import ImageUpload, { ImageUploadHandle } from '@/components/ImageUpload';
 import TextInput, { TextInputHandle } from '@/components/TextInput';
 import EventEditor from '@/components/EventEditor';
 import BatchEventList from '@/components/BatchEventList';
+import RateLimitBanner from '@/components/RateLimitBanner';
 import { CalendarEvent, ParsedEvent, StreamedEventChunk } from '@/types/event';
 import { exportToICS } from '@/services/exporter';
 import { useHistory } from '@/hooks/useHistory';
@@ -28,9 +29,24 @@ export default function Home() {
   const [processingEvents, setProcessingEvents] = useState<ProcessingEvent[]>([]);
   const [batchProcessing, setBatchProcessing] = useState<BatchProcessing | null>(null);
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
+  const [rateLimitInfo, setRateLimitInfo] = useState<{ remaining: number; total: number; resetTime: number } | undefined>();
   const { events, addEvent, deleteEvent } = useHistory();
   const imageUploadRef = useRef<ImageUploadHandle>(null);
   const textInputRef = useRef<TextInputHandle>(null);
+
+  const updateRateLimitFromHeaders = (headers: Headers) => {
+    const remaining = parseInt(headers.get('X-RateLimit-Remaining') || '5');
+    const total = parseInt(headers.get('X-RateLimit-Limit') || '5');
+    const reset = parseInt(headers.get('X-RateLimit-Reset') || '0');
+
+    if (reset > 0) {
+      setRateLimitInfo({
+        remaining,
+        total,
+        resetTime: reset,
+      });
+    }
+  };
 
   const convertParsedToCalendarEvent = (
     parsed: ParsedEvent,
@@ -75,8 +91,11 @@ export default function Home() {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to process batch');
+        const errorData = await response.json().catch(() => ({ error: 'Failed to process batch' }));
+        throw new Error(errorData.error || 'Failed to process batch');
       }
+
+      updateRateLimitFromHeaders(response.headers);
 
       const reader = response.body?.getReader();
       if (!reader) {
@@ -208,6 +227,8 @@ export default function Home() {
         const errorData = await response.json().catch(() => ({ error: 'Failed to parse event from text' }));
         throw new Error(errorData.error || 'Failed to parse event from text');
       }
+
+      updateRateLimitFromHeaders(response.headers);
 
       const parsed: ParsedEvent = await response.json();
       const event = convertParsedToCalendarEvent(parsed, 'text', text);
@@ -341,6 +362,8 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-white">
+      <RateLimitBanner rateLimitInfo={rateLimitInfo} />
+
       <div className="w-full px-[14.28%] py-12">
         <header className="text-center mb-12">
           <h1 className="text-5xl font-bold text-black mb-3">Event Every</h1>

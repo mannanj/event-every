@@ -1,8 +1,50 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { parseEvent, parseEventsBatch } from '@/services/parser';
+import { checkRateLimit, incrementRateLimit } from '@/lib/ratelimit';
+
+function getClientIP(request: NextRequest): string {
+  const forwarded = request.headers.get('x-forwarded-for');
+  const realIP = request.headers.get('x-real-ip');
+
+  if (forwarded) {
+    return forwarded.split(',')[0].trim();
+  }
+
+  if (realIP) {
+    return realIP;
+  }
+
+  return 'unknown';
+}
 
 export async function POST(request: NextRequest) {
   try {
+    const clientIP = getClientIP(request);
+
+    const rateLimitResult = await checkRateLimit(clientIP);
+
+    if (!rateLimitResult.success) {
+      const resetDate = new Date(rateLimitResult.reset);
+      const hoursUntilReset = Math.ceil((rateLimitResult.reset - Date.now()) / (1000 * 60 * 60));
+
+      return NextResponse.json(
+        {
+          error: 'Daily limit of 5 events reached',
+          remaining: 0,
+          reset: resetDate.toISOString(),
+          hoursUntilReset
+        },
+        {
+          status: 429,
+          headers: {
+            'X-RateLimit-Limit': '5',
+            'X-RateLimit-Remaining': '0',
+            'X-RateLimit-Reset': rateLimitResult.reset.toString()
+          }
+        }
+      );
+    }
+
     const body = await request.json();
     const { text, imageBase64, imageMimeType, batch = false } = body;
 
@@ -21,6 +63,8 @@ export async function POST(request: NextRequest) {
     }
 
     if (batch) {
+      await incrementRateLimit(clientIP);
+
       const encoder = new TextEncoder();
       const stream = new ReadableStream({
         async start(controller) {
@@ -63,11 +107,16 @@ export async function POST(request: NextRequest) {
         },
       });
 
+      const updatedRateLimit = await checkRateLimit(clientIP);
+
       return new Response(stream, {
         headers: {
           'Content-Type': 'text/event-stream',
           'Cache-Control': 'no-cache',
           'Connection': 'keep-alive',
+          'X-RateLimit-Limit': '5',
+          'X-RateLimit-Remaining': updatedRateLimit.remaining.toString(),
+          'X-RateLimit-Reset': updatedRateLimit.reset.toString()
         },
       });
     }
@@ -78,7 +127,15 @@ export async function POST(request: NextRequest) {
       imageMimeType,
     });
 
-    return NextResponse.json(parsedEvent);
+    const updatedRateLimit = await incrementRateLimit(clientIP);
+
+    return NextResponse.json(parsedEvent, {
+      headers: {
+        'X-RateLimit-Limit': '5',
+        'X-RateLimit-Remaining': updatedRateLimit.remaining.toString(),
+        'X-RateLimit-Reset': updatedRateLimit.reset.toString()
+      }
+    });
   } catch (error) {
     console.error('Parse API error:', error);
 
