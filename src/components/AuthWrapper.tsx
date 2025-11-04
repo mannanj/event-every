@@ -5,31 +5,18 @@ import { useAuth } from '@/hooks/useAuth';
 import PatternLock from './PatternLock';
 
 export default function AuthWrapper({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, hasPattern, isLoading, setPattern, verifyPattern, logout } = useAuth();
+  const { isAuthenticated, isLoading, attempts, verifyPattern, logout } = useAuth();
   const [error, setError] = useState('');
-  const [confirmPattern, setConfirmPattern] = useState<string | null>(null);
 
-  const handleSetPattern = async (pattern: string) => {
-    if (!confirmPattern) {
-      setConfirmPattern(pattern);
-      setError('');
-      return;
-    }
+  const handleVerify = async (input: string) => {
+    const isValid = await verifyPattern(input);
 
-    if (pattern.toUpperCase() === confirmPattern.toUpperCase()) {
-      await setPattern(pattern);
-      setConfirmPattern(null);
-      setError('');
-    } else {
-      setError('Input does not match. Try again.');
-      setConfirmPattern(null);
-    }
-  };
-
-  const handleVerifyPattern = async (pattern: string) => {
-    const isValid = await verifyPattern(pattern);
     if (!isValid) {
-      setError('Incorrect input. Try again.');
+      if (attempts - 1 === 0) {
+        setError('No attempts remaining. Please refresh the page to try again.');
+      } else {
+        setError(`Incorrect. ${attempts - 1} attempt${attempts - 1 !== 1 ? 's' : ''} remaining.`);
+      }
     } else {
       setError('');
     }
@@ -47,28 +34,11 @@ export default function AuthWrapper({ children }: { children: React.ReactNode })
   }
 
   if (!isAuthenticated) {
-    if (!hasPattern) {
-      return (
-        <div>
-          <PatternLock
-            mode="set"
-            onPatternComplete={handleSetPattern}
-            error={error}
-          />
-          {confirmPattern && (
-            <div className="fixed top-4 left-1/2 transform -translate-x-1/2 bg-white border-2 border-black px-4 py-2 text-sm">
-              Confirm your input
-            </div>
-          )}
-        </div>
-      );
-    }
-
     return (
       <PatternLock
-        mode="verify"
-        onPatternComplete={handleVerifyPattern}
+        onSubmit={handleVerify}
         error={error}
+        attemptsLeft={attempts}
       />
     );
   }

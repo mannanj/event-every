@@ -1,40 +1,36 @@
 'use client';
 
-import { useState, KeyboardEvent } from 'react';
+import { useState } from 'react';
 
 interface PatternLockProps {
-  mode: 'set' | 'verify';
-  onPatternComplete: (pattern: string) => void;
+  onSubmit: (input: string) => Promise<void>;
   error?: string;
+  attemptsLeft: number;
 }
 
-export default function PatternLock({ mode, onPatternComplete, error }: PatternLockProps) {
+export default function PatternLock({ onSubmit, error, attemptsLeft }: PatternLockProps) {
   const [input, setInput] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (input.trim()) {
-      onPatternComplete(input);
+    if (input.trim() && !isSubmitting) {
+      setIsSubmitting(true);
+      await onSubmit(input.toUpperCase());
       setInput('');
-    }
-  };
-
-  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      handleSubmit(e);
+      setIsSubmitting(false);
     }
   };
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-white p-8">
       <div className="mb-8 text-center">
-        <h1 className="text-2xl font-bold mb-2">
-          {mode === 'set' ? 'Set Lock' : 'Unlock'}
-        </h1>
-        <p className="text-sm text-gray-600">
-          {mode === 'set'
-            ? 'Enter "L" to set your lock'
-            : 'Enter "L" to unlock'}
+        <h1 className="text-2xl font-bold mb-2">Unlock</h1>
+        <p className="text-sm text-gray-600 mb-2">
+          Enter the letter to unlock
+        </p>
+        <p className="text-xs text-gray-500">
+          Attempts remaining: {attemptsLeft}
         </p>
       </div>
 
@@ -42,19 +38,20 @@ export default function PatternLock({ mode, onPatternComplete, error }: PatternL
         <input
           type="text"
           value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={handleKeyDown}
-          className="w-full px-4 py-3 border-2 border-black text-center text-2xl focus:outline-none focus:ring-2 focus:ring-black uppercase"
+          onChange={(e) => setInput(e.target.value.toUpperCase())}
+          className="w-full px-4 py-3 border-2 border-black text-center text-4xl focus:outline-none focus:ring-2 focus:ring-black uppercase"
           placeholder="L"
           maxLength={1}
           autoFocus
+          autoComplete="off"
         />
 
         <button
           type="submit"
-          className="w-full mt-4 px-4 py-3 bg-black text-white hover:bg-white hover:text-black border-2 border-black transition-colors font-medium"
+          disabled={isSubmitting || attemptsLeft === 0}
+          className="w-full mt-4 px-4 py-3 bg-black text-white hover:bg-white hover:text-black border-2 border-black transition-colors font-medium disabled:bg-gray-300 disabled:text-gray-500 disabled:border-gray-300 disabled:cursor-not-allowed"
         >
-          {mode === 'set' ? 'Set Lock' : 'Unlock'}
+          {isSubmitting ? 'Verifying...' : 'Unlock'}
         </button>
       </form>
 

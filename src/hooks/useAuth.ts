@@ -2,73 +2,58 @@
 
 import { useState, useEffect } from 'react';
 
-const PATTERN_KEY = 'event-every-pattern';
 const AUTH_KEY = 'event-every-auth';
-
-async function hashPattern(pattern: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(pattern.toUpperCase());
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-}
 
 export function useAuth() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [hasPattern, setHasPattern] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [attempts, setAttempts] = useState(3);
 
   useEffect(() => {
-    const storedPattern = localStorage.getItem(PATTERN_KEY);
-    const authState = localStorage.getItem(AUTH_KEY);
-
-    setHasPattern(!!storedPattern);
+    const authState = sessionStorage.getItem(AUTH_KEY);
     setIsAuthenticated(authState === 'true');
     setIsLoading(false);
   }, []);
 
-  const setPattern = async (pattern: string) => {
-    const hash = await hashPattern(pattern);
-    localStorage.setItem(PATTERN_KEY, hash);
-    localStorage.setItem(AUTH_KEY, 'true');
-    setHasPattern(true);
-    setIsAuthenticated(true);
-  };
+  const verifyPattern = async (input: string): Promise<boolean> => {
+    try {
+      const response = await fetch('/api/auth/verify', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ pattern: input }),
+      });
 
-  const verifyPattern = async (pattern: string): Promise<boolean> => {
-    const storedHash = localStorage.getItem(PATTERN_KEY);
-    if (!storedHash) return false;
+      const data = await response.json();
+      const isValid = data.success;
 
-    const hash = await hashPattern(pattern);
-    const isValid = hash === storedHash;
-
-    if (isValid) {
-      localStorage.setItem(AUTH_KEY, 'true');
-      setIsAuthenticated(true);
+      if (isValid) {
+        sessionStorage.setItem(AUTH_KEY, 'true');
+        setIsAuthenticated(true);
+        setAttempts(3);
+        return true;
+      } else {
+        setAttempts((prev) => prev - 1);
+        return false;
+      }
+    } catch (error) {
+      setAttempts((prev) => prev - 1);
+      return false;
     }
-
-    return isValid;
   };
 
   const logout = () => {
-    localStorage.setItem(AUTH_KEY, 'false');
+    sessionStorage.setItem(AUTH_KEY, 'false');
     setIsAuthenticated(false);
-  };
-
-  const resetPattern = () => {
-    localStorage.removeItem(PATTERN_KEY);
-    localStorage.removeItem(AUTH_KEY);
-    setHasPattern(false);
-    setIsAuthenticated(false);
+    setAttempts(3);
   };
 
   return {
     isAuthenticated,
-    hasPattern,
     isLoading,
-    setPattern,
+    attempts,
     verifyPattern,
     logout,
-    resetPattern,
   };
 }
