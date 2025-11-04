@@ -379,24 +379,8 @@ export default function Home() {
               onEdit={handleBatchEventEdit}
               onDelete={handleBatchEventDelete}
               onExport={handleBatchEventExport}
+              onCancel={handleCancelBatch}
             />
-
-            {!batchProcessing.isProcessing && batchProcessing.events.length > 0 && (
-              <div className="flex gap-3 mt-4">
-                <button
-                  onClick={handleCancelBatch}
-                  className="flex-1 py-3 px-6 bg-white border-2 border-black text-black font-medium hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-black"
-                >
-                  Cancel Batch
-                </button>
-                <button
-                  onClick={handleSaveBatch}
-                  className="flex-1 py-3 px-6 bg-black text-white border-2 border-black font-medium hover:bg-gray-800 transition-colors focus:outline-none focus:ring-2 focus:ring-black"
-                >
-                  Save All to History ({batchProcessing.events.length})
-                </button>
-              </div>
-            )}
           </div>
         )}
 
