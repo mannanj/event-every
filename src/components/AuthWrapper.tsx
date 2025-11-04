@@ -3,11 +3,13 @@
 import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import PatternLock from './PatternLock';
+import EmailRequestModal from './EmailRequestModal';
 
 export default function AuthWrapper({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isLoading, attempts, verifyPattern, logout } = useAuth();
+  const { isAuthenticated, isLoading, attempts, isLockedOut, lockoutMinutes, verifyPattern, logout } = useAuth();
   const [error, setError] = useState('');
   const [showDevLock, setShowDevLock] = useState(false);
+  const [showEmailModal, setShowEmailModal] = useState(false);
 
   const isDevMode = process.env.NEXT_PUBLIC_DISABLE_AUTH === 'true';
 
@@ -15,10 +17,12 @@ export default function AuthWrapper({ children }: { children: React.ReactNode })
     const isValid = await verifyPattern(input);
 
     if (!isValid) {
-      if (attempts - 1 === 0) {
-        setError('No attempts remaining. Please refresh the page to try again.');
+      if (isLockedOut) {
+        setError(`Too many failed attempts. Locked out for ${lockoutMinutes} minute${lockoutMinutes !== 1 ? 's' : ''}.`);
+      } else if (attempts === 0) {
+        setError('No attempts remaining.');
       } else {
-        setError(`Incorrect pattern. ${attempts - 1} attempt${attempts - 1 !== 1 ? 's' : ''} remaining.`);
+        setError(`Incorrect pattern. ${attempts} attempt${attempts !== 1 ? 's' : ''} remaining.`);
       }
     } else {
       setError('');
@@ -31,14 +35,35 @@ export default function AuthWrapper({ children }: { children: React.ReactNode })
     setError('');
   };
 
+  const handleRequestAccess = () => {
+    setShowEmailModal(true);
+  };
+
+  const handleCloseModal = () => {
+    setShowEmailModal(false);
+  };
+
   if (isDevMode) {
     if (showDevLock) {
       return (
-        <PatternLock
-          onSubmit={handleVerify}
-          error={error}
-          attemptsLeft={attempts}
-        />
+        <>
+          <PatternLock
+            onSubmit={handleVerify}
+            error={error}
+            attemptsLeft={attempts}
+          />
+          {isLockedOut && (
+            <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2">
+              <button
+                onClick={handleRequestAccess}
+                className="px-6 py-3 bg-black text-white hover:bg-white hover:text-black border-2 border-black transition-colors font-medium"
+              >
+                Request Access
+              </button>
+            </div>
+          )}
+          {showEmailModal && <EmailRequestModal onClose={handleCloseModal} />}
+        </>
       );
     }
 
@@ -48,9 +73,9 @@ export default function AuthWrapper({ children }: { children: React.ReactNode })
         <button
           onClick={handleDevLock}
           className="fixed top-4 right-4 px-4 py-2 bg-white border-2 border-black hover:bg-black hover:text-white transition-colors text-sm z-50"
-          aria-label="Test pattern lock"
+          aria-label="Lock application"
         >
-          🔒 Test Lock
+          Lock
         </button>
       </>
     );
@@ -69,11 +94,24 @@ export default function AuthWrapper({ children }: { children: React.ReactNode })
 
   if (!isAuthenticated) {
     return (
-      <PatternLock
-        onSubmit={handleVerify}
-        error={error}
-        attemptsLeft={attempts}
-      />
+      <>
+        <PatternLock
+          onSubmit={handleVerify}
+          error={error}
+          attemptsLeft={attempts}
+        />
+        {isLockedOut && (
+          <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2">
+            <button
+              onClick={handleRequestAccess}
+              className="px-6 py-3 bg-black text-white hover:bg-white hover:text-black border-2 border-black transition-colors font-medium"
+            >
+              Request Access
+            </button>
+          </div>
+        )}
+        {showEmailModal && <EmailRequestModal onClose={handleCloseModal} />}
+      </>
     );
   }
 

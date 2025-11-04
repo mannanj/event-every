@@ -9,6 +9,8 @@ export function useAuth() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [attempts, setAttempts] = useState(3);
+  const [isLockedOut, setIsLockedOut] = useState(false);
+  const [lockoutMinutes, setLockoutMinutes] = useState(0);
 
   const checkAuthStatus = () => {
     const authTimestamp = localStorage.getItem(AUTH_TIMESTAMP_KEY);
@@ -46,19 +48,32 @@ export function useAuth() {
       });
 
       const data = await response.json();
-      const isValid = data.success;
 
-      if (isValid) {
+      if (response.status === 429) {
+        setIsLockedOut(true);
+        setLockoutMinutes(data.lockoutMinutes || 15);
+        setAttempts(0);
+        return false;
+      }
+
+      if (data.success) {
         localStorage.setItem(AUTH_TIMESTAMP_KEY, Date.now().toString());
         setIsAuthenticated(true);
         setAttempts(3);
+        setIsLockedOut(false);
+        setLockoutMinutes(0);
         return true;
-      } else {
-        setAttempts((prev) => prev - 1);
-        return false;
       }
+
+      setAttempts(data.attemptsLeft ?? 0);
+
+      if (data.lockedOut) {
+        setIsLockedOut(true);
+        setLockoutMinutes(data.lockoutMinutes || 15);
+      }
+
+      return false;
     } catch (error) {
-      setAttempts((prev) => prev - 1);
       return false;
     }
   };
@@ -67,12 +82,16 @@ export function useAuth() {
     localStorage.removeItem(AUTH_TIMESTAMP_KEY);
     setIsAuthenticated(false);
     setAttempts(3);
+    setIsLockedOut(false);
+    setLockoutMinutes(0);
   };
 
   return {
     isAuthenticated,
     isLoading,
     attempts,
+    isLockedOut,
+    lockoutMinutes,
     verifyPattern,
     logout,
   };
