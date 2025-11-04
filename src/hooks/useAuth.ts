@@ -15,7 +15,7 @@ export function useAuth() {
     setIsLoading(false);
   }, []);
 
-  const verifyPattern = async (input: string): Promise<boolean> => {
+  const verifyPattern = async (input: number[]): Promise<boolean> => {
     try {
       const response = await fetch('/api/auth/verify', {
         method: 'POST',

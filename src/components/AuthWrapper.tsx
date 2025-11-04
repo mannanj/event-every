@@ -8,19 +8,25 @@ export default function AuthWrapper({ children }: { children: React.ReactNode })
   const { isAuthenticated, isLoading, attempts, verifyPattern, logout } = useAuth();
   const [error, setError] = useState('');
 
-  const handleVerify = async (input: string) => {
+  const isAuthDisabled = process.env.NEXT_PUBLIC_DISABLE_AUTH === 'true';
+
+  const handleVerify = async (input: number[]) => {
     const isValid = await verifyPattern(input);
 
     if (!isValid) {
       if (attempts - 1 === 0) {
         setError('No attempts remaining. Please refresh the page to try again.');
       } else {
-        setError(`Incorrect. ${attempts - 1} attempt${attempts - 1 !== 1 ? 's' : ''} remaining.`);
+        setError(`Incorrect pattern. ${attempts - 1} attempt${attempts - 1 !== 1 ? 's' : ''} remaining.`);
       }
     } else {
       setError('');
     }
   };
+
+  if (isAuthDisabled) {
+    return <>{children}</>;
+  }
 
   if (isLoading) {
     return (
