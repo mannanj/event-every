@@ -9,9 +9,18 @@ interface EmailRequestModalProps {
 export default function EmailRequestModal({ onClose }: EmailRequestModalProps) {
   const [reason, setReason] = useState('');
   const [showEmail, setShowEmail] = useState(false);
+  const [honeypotWebsite, setHoneypotWebsite] = useState('');
+  const [honeypotPhone, setHoneypotPhone] = useState('');
+  const [honeypotEmail, setHoneypotEmail] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (honeypotWebsite || honeypotPhone || honeypotEmail) {
+      console.warn('Bot detected: honeypot field filled');
+      return;
+    }
+
     if (reason.trim()) {
       setShowEmail(true);
     }
@@ -43,6 +52,37 @@ export default function EmailRequestModal({ onClose }: EmailRequestModalProps) {
                 required
               />
             </div>
+
+            <input
+              type="text"
+              name="website"
+              value={honeypotWebsite}
+              onChange={(e) => setHoneypotWebsite(e.target.value)}
+              className="honeypot-field"
+              tabIndex={-1}
+              aria-hidden="true"
+              autoComplete="off"
+            />
+            <input
+              type="tel"
+              name="phone"
+              value={honeypotPhone}
+              onChange={(e) => setHoneypotPhone(e.target.value)}
+              className="honeypot-field"
+              tabIndex={-1}
+              aria-hidden="true"
+              autoComplete="off"
+            />
+            <input
+              type="email"
+              name="email_confirm"
+              value={honeypotEmail}
+              onChange={(e) => setHoneypotEmail(e.target.value)}
+              className="honeypot-field"
+              tabIndex={-1}
+              aria-hidden="true"
+              autoComplete="off"
+            />
 
             <button
               type="submit"
