@@ -195,10 +195,7 @@ export default function PatternLock({ onSubmit, error, attemptsLeft }: PatternLo
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-white p-8">
       <div className="mb-8 text-center">
-        <h1 className="text-2xl font-bold mb-2">Draw Pattern to Unlock</h1>
-        <p className="text-sm text-gray-600 mb-2">
-          Connect the dots to form an "L" shape
-        </p>
+        <h1 className="text-2xl font-bold mb-4">Draw Pattern to Unlock</h1>
         <p className="text-xs text-gray-500">
           Attempts remaining: {attemptsLeft}
         </p>

@@ -23,12 +23,14 @@ export default function AuthWrapper({ children }: { children: React.ReactNode })
       if (result.isLockedOut) {
         setError('Whoa there! Too many tries. Take a breather.');
       } else if (result.attemptsLeft === 0) {
-        setError('No attempts remaining.');
+        setError('Not quite! No attempts remaining.');
+      } else if (result.attemptsLeft === 1) {
+        setError('Nope! Last chance—make it count.');
       } else {
-        setError(`Incorrect pattern. ${result.attemptsLeft} attempt${result.attemptsLeft !== 1 ? 's' : ''} remaining.`);
+        setError(`Not quite! ${result.attemptsLeft} attempts left.`);
       }
     } else {
-      setError('Incorrect pattern.');
+      setError('Not quite! Try again.');
     }
   };
 
