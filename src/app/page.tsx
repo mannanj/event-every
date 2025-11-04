@@ -106,6 +106,9 @@ export default function Home() {
 
             if (chunk.isComplete) {
               setBatchProcessing(prev => prev ? { ...prev, isProcessing: false } : null);
+              if (source === 'image') {
+                imageUploadRef.current?.clear();
+              }
               break;
             }
 
@@ -166,8 +169,6 @@ export default function Home() {
         imageBase64: base64,
         imageMimeType: mimeType,
       }, URL.createObjectURL(file));
-
-      imageUploadRef.current?.clear();
     } catch (err) {
       const errorMessage = err instanceof Error
         ? err.message
@@ -355,7 +356,7 @@ export default function Home() {
                 ref={imageUploadRef}
                 onImageSelect={handleImageSelect}
                 onError={handleError}
-                isLoading={false}
+                isLoading={batchProcessing?.isProcessing || false}
               />
             </div>
 

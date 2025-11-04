@@ -175,7 +175,7 @@ const ImageUpload = forwardRef<ImageUploadHandle, ImageUploadProps>(
           <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-90 rounded-lg">
             <div className="text-center space-y-2">
               <div className="animate-spin rounded-full h-8 w-8 border-2 border-black border-t-transparent mx-auto" />
-              <p className="text-sm text-gray-600">Processing image...</p>
+              <p className="text-sm text-gray-600">Uploading...</p>
             </div>
           </div>
         )}

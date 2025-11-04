@@ -108,12 +108,22 @@ export default function BatchEventList({
             Cancel
           </button>
 
-          <div className="flex items-center gap-2">
-            <span className="text-lg font-bold text-black">
-              {currentCount} Event{currentCount !== 1 ? 's' : ''}
-            </span>
-            {isProcessing && (
-              <div className="animate-spin rounded-full h-5 w-5 border-2 border-black border-t-transparent" />
+          <div className="flex items-center gap-2 transition-all duration-300">
+            {isProcessing ? (
+              <>
+                {currentCount === 0 ? (
+                  <span className="text-lg font-bold text-black transition-opacity duration-300">Processing image...</span>
+                ) : (
+                  <span className="text-lg font-bold text-black transition-opacity duration-300">
+                    Extracting events... ({currentCount} found)
+                  </span>
+                )}
+                <div className="animate-spin rounded-full h-5 w-5 border-2 border-black border-t-transparent" />
+              </>
+            ) : (
+              <span className="text-lg font-bold text-black transition-opacity duration-300">
+                {currentCount} Event{currentCount !== 1 ? 's' : ''}
+              </span>
             )}
           </div>
         </div>
@@ -128,13 +138,13 @@ export default function BatchEventList({
           return (
             <div
               key={event.id}
-              className={`transition-all ${
-                isNew ? 'bg-green-50 animate-pulse' : 'bg-white'
+              className={`transition-all duration-500 ${
+                isNew ? 'bg-green-50' : 'bg-white'
               } ${index < events.length - 1 ? 'border-b-2 border-black' : ''}`}
             >
               {/* Compact card view */}
               <div
-                className="p-3 hover:bg-gray-50"
+                className={`p-3 transition-colors duration-200 ${!isNew ? 'hover:bg-gray-50' : ''}`}
               >
                 <div className="flex justify-between items-start gap-3">
                   <div className="flex items-center gap-3 flex-1 min-w-0">
