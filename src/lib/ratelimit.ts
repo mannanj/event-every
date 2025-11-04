@@ -7,7 +7,7 @@ export interface RateLimitResult {
   error?: string;
 }
 
-const DAILY_LIMIT = 5;
+const DAILY_LIMIT = 10;
 const WINDOW_DURATION = 24 * 60 * 60; // 24 hours in seconds
 
 export async function checkRateLimit(identifier: string): Promise<RateLimitResult> {
