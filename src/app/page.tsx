@@ -380,6 +380,9 @@ export default function Home() {
               onDelete={handleBatchEventDelete}
               onExport={handleBatchEventExport}
               onCancel={handleCancelBatch}
+              onSaveToHistory={(events) => {
+                events.forEach(event => addEvent(event));
+              }}
             />
           </div>
         )}

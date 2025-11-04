@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { CalendarEvent } from '@/types/event';
 import { exportToICS, exportMultipleToICS } from '@/services/exporter';
-import { eventStorage } from '@/services/storage';
 
 interface BatchEventListProps {
   events: CalendarEvent[];
@@ -13,6 +12,7 @@ interface BatchEventListProps {
   onDelete: (eventId: string) => void;
   onExport: (event: CalendarEvent) => void;
   onCancel: () => void;
+  onSaveToHistory: (events: CalendarEvent[]) => void;
 }
 
 export default function BatchEventList({
@@ -23,6 +23,7 @@ export default function BatchEventList({
   onDelete,
   onExport,
   onCancel,
+  onSaveToHistory,
 }: BatchEventListProps) {
   const [expandedEventIds, setExpandedEventIds] = useState<Set<string>>(new Set());
   const [selectedEventIds, setSelectedEventIds] = useState<Set<string>>(new Set());
@@ -84,7 +85,7 @@ export default function BatchEventList({
     const result = exportMultipleToICS(selectedEvents);
 
     if (result.success) {
-      eventStorage.saveEvents(selectedEvents);
+      onSaveToHistory(selectedEvents);
       onCancel();
     } else {
       alert(`Export failed: ${result.error}`);
