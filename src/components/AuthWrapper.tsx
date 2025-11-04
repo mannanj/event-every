@@ -14,19 +14,21 @@ export default function AuthWrapper({ children }: { children: React.ReactNode })
   const isDevMode = process.env.NEXT_PUBLIC_DISABLE_AUTH === 'true';
 
   const handleVerify = async (input: number[]) => {
-    const isValid = await verifyPattern(input);
+    const result = await verifyPattern(input);
 
-    if (!isValid) {
-      if (isLockedOut) {
-        setError(`Too many failed attempts. Locked out for ${lockoutMinutes} minute${lockoutMinutes !== 1 ? 's' : ''}.`);
-      } else if (attempts === 0) {
-        setError('No attempts remaining.');
-      } else {
-        setError(`Incorrect pattern. ${attempts} attempt${attempts !== 1 ? 's' : ''} remaining.`);
-      }
-    } else {
+    if (result === true) {
       setError('');
       setShowDevLock(false);
+    } else if (typeof result === 'object') {
+      if (result.isLockedOut) {
+        setError('Whoa there! Too many tries. Take a breather.');
+      } else if (result.attemptsLeft === 0) {
+        setError('No attempts remaining.');
+      } else {
+        setError(`Incorrect pattern. ${result.attemptsLeft} attempt${result.attemptsLeft !== 1 ? 's' : ''} remaining.`);
+      }
+    } else {
+      setError('Incorrect pattern.');
     }
   };
 
@@ -53,7 +55,7 @@ export default function AuthWrapper({ children }: { children: React.ReactNode })
             attemptsLeft={attempts}
           />
           {isLockedOut && (
-            <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2">
+            <div className="fixed bottom-32 left-1/2 transform -translate-x-1/2">
               <button
                 onClick={handleRequestAccess}
                 className="px-6 py-3 bg-black text-white hover:bg-white hover:text-black border-2 border-black transition-colors font-medium"
@@ -101,7 +103,7 @@ export default function AuthWrapper({ children }: { children: React.ReactNode })
           attemptsLeft={attempts}
         />
         {isLockedOut && (
-          <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2">
+          <div className="fixed bottom-32 left-1/2 transform -translate-x-1/2">
             <button
               onClick={handleRequestAccess}
               className="px-6 py-3 bg-black text-white hover:bg-white hover:text-black border-2 border-black transition-colors font-medium"

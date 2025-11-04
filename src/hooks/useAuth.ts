@@ -37,7 +37,7 @@ export function useAuth() {
     setIsLoading(false);
   }, []);
 
-  const verifyPattern = async (input: number[]): Promise<boolean> => {
+  const verifyPattern = async (input: number[]): Promise<boolean | { success: false; attemptsLeft: number; isLockedOut: boolean; lockoutMinutes: number }> => {
     try {
       const response = await fetch('/api/auth/verify', {
         method: 'POST',
@@ -53,7 +53,12 @@ export function useAuth() {
         setIsLockedOut(true);
         setLockoutMinutes(data.lockoutMinutes || 15);
         setAttempts(0);
-        return false;
+        return {
+          success: false,
+          attemptsLeft: 0,
+          isLockedOut: true,
+          lockoutMinutes: data.lockoutMinutes || 15
+        };
       }
 
       if (data.success) {
@@ -72,7 +77,12 @@ export function useAuth() {
         setLockoutMinutes(data.lockoutMinutes || 15);
       }
 
-      return false;
+      return {
+        success: false,
+        attemptsLeft: data.attemptsLeft ?? 0,
+        isLockedOut: data.lockedOut || false,
+        lockoutMinutes: data.lockoutMinutes || 0
+      };
     } catch (error) {
       return false;
     }

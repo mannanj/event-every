@@ -18,58 +18,55 @@ export default function EmailRequestModal({ onClose }: EmailRequestModalProps) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white border-4 border-black p-8 max-w-md w-full">
-        <div className="flex justify-between items-start mb-6">
-          <h2 className="text-2xl font-bold">Request Access</h2>
-          <button
-            onClick={onClose}
-            className="text-2xl leading-none hover:opacity-50 transition-opacity"
-            aria-label="Close modal"
-          >
-            ×
-          </button>
-        </div>
+    <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center p-4 z-50">
+      <div className="bg-white border-2 border-black p-8 max-w-md w-full shadow-lg">
+        <button
+          onClick={onClose}
+          className="float-right text-xl leading-none hover:opacity-50 transition-opacity -mt-2 -mr-2"
+          aria-label="Close modal"
+        >
+          ×
+        </button>
 
         {!showEmail ? (
           <form onSubmit={handleSubmit}>
             <div className="mb-6">
-              <label htmlFor="reason" className="block text-sm font-medium mb-2">
-                Why do you need access?
+              <label htmlFor="reason" className="block text-base mb-3">
+                Mind sharing why you'd like access?
               </label>
               <textarea
                 id="reason"
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
-                className="w-full border-2 border-black p-3 min-h-[120px] focus:outline-none focus:ring-2 focus:ring-black"
-                placeholder="Please provide a brief reason..."
+                className="w-full border border-gray-300 p-3 min-h-[100px] focus:outline-none focus:border-black transition-colors"
+                placeholder="Just curious! Would love to try it out..."
                 required
               />
             </div>
 
             <button
               type="submit"
-              className="w-full bg-black text-white py-3 px-6 hover:bg-white hover:text-black border-2 border-black transition-colors font-medium"
+              className="w-full bg-black text-white py-2.5 px-6 hover:bg-gray-800 transition-colors"
             >
-              Submit Request
+              Continue
             </button>
           </form>
         ) : (
-          <div className="text-center">
-            <p className="mb-4 text-gray-600">
-              Thank you for your request. Please contact:
+          <div className="text-center pt-2">
+            <p className="mb-2 text-base">
+              Thanks! Drop me a line:
             </p>
             <a
               href="mailto:hello@mannan.is"
-              className="text-2xl font-bold hover:underline block mb-6"
+              className="text-xl font-medium hover:underline block mb-6 mt-4"
             >
               hello@mannan.is
             </a>
             <button
               onClick={onClose}
-              className="w-full bg-black text-white py-3 px-6 hover:bg-white hover:text-black border-2 border-black transition-colors font-medium"
+              className="w-full bg-black text-white py-2.5 px-6 hover:bg-gray-800 transition-colors"
             >
-              Close
+              Got it
             </button>
           </div>
         )}
