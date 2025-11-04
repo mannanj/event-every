@@ -2,16 +2,36 @@
 
 import { useState, useEffect } from 'react';
 
-const AUTH_KEY = 'event-every-auth';
+const AUTH_TIMESTAMP_KEY = 'event-every-auth-timestamp';
+const AUTH_DURATION_MS = 48 * 60 * 60 * 1000; // 48 hours
 
 export function useAuth() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [attempts, setAttempts] = useState(3);
 
+  const checkAuthStatus = () => {
+    const authTimestamp = localStorage.getItem(AUTH_TIMESTAMP_KEY);
+
+    if (!authTimestamp) {
+      return false;
+    }
+
+    const timestamp = parseInt(authTimestamp, 10);
+    const now = Date.now();
+    const hasExpired = now - timestamp > AUTH_DURATION_MS;
+
+    if (hasExpired) {
+      localStorage.removeItem(AUTH_TIMESTAMP_KEY);
+      return false;
+    }
+
+    return true;
+  };
+
   useEffect(() => {
-    const authState = sessionStorage.getItem(AUTH_KEY);
-    setIsAuthenticated(authState === 'true');
+    const isAuth = checkAuthStatus();
+    setIsAuthenticated(isAuth);
     setIsLoading(false);
   }, []);
 
@@ -29,7 +49,7 @@ export function useAuth() {
       const isValid = data.success;
 
       if (isValid) {
-        sessionStorage.setItem(AUTH_KEY, 'true');
+        localStorage.setItem(AUTH_TIMESTAMP_KEY, Date.now().toString());
         setIsAuthenticated(true);
         setAttempts(3);
         return true;
@@ -44,7 +64,7 @@ export function useAuth() {
   };
 
   const logout = () => {
-    sessionStorage.setItem(AUTH_KEY, 'false');
+    localStorage.removeItem(AUTH_TIMESTAMP_KEY);
     setIsAuthenticated(false);
     setAttempts(3);
   };

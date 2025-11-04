@@ -7,8 +7,9 @@ import PatternLock from './PatternLock';
 export default function AuthWrapper({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading, attempts, verifyPattern, logout } = useAuth();
   const [error, setError] = useState('');
+  const [showDevLock, setShowDevLock] = useState(false);
 
-  const isAuthDisabled = process.env.NEXT_PUBLIC_DISABLE_AUTH === 'true';
+  const isDevMode = process.env.NEXT_PUBLIC_DISABLE_AUTH === 'true';
 
   const handleVerify = async (input: number[]) => {
     const isValid = await verifyPattern(input);
@@ -21,11 +22,38 @@ export default function AuthWrapper({ children }: { children: React.ReactNode })
       }
     } else {
       setError('');
+      setShowDevLock(false);
     }
   };
 
-  if (isAuthDisabled) {
-    return <>{children}</>;
+  const handleDevLock = () => {
+    setShowDevLock(true);
+    setError('');
+  };
+
+  if (isDevMode) {
+    if (showDevLock) {
+      return (
+        <PatternLock
+          onSubmit={handleVerify}
+          error={error}
+          attemptsLeft={attempts}
+        />
+      );
+    }
+
+    return (
+      <>
+        {children}
+        <button
+          onClick={handleDevLock}
+          className="fixed top-4 right-4 px-4 py-2 bg-white border-2 border-black hover:bg-black hover:text-white transition-colors text-sm z-50"
+          aria-label="Test pattern lock"
+        >
+          🔒 Test Lock
+        </button>
+      </>
+    );
   }
 
   if (isLoading) {
@@ -49,16 +77,5 @@ export default function AuthWrapper({ children }: { children: React.ReactNode })
     );
   }
 
-  return (
-    <>
-      {children}
-      <button
-        onClick={logout}
-        className="fixed top-4 right-4 px-4 py-2 bg-white border-2 border-black hover:bg-black hover:text-white transition-colors text-sm z-50"
-        aria-label="Lock app"
-      >
-        Lock
-      </button>
-    </>
-  );
+  return <>{children}</>;
 }
