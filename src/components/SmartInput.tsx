@@ -191,67 +191,77 @@ const SmartInput = forwardRef<SmartInputHandle, SmartInputProps>(
     const isButtonEnabled = text.trim().length >= MIN_TEXT_LENGTH || images.length > 0;
 
     return (
-      <div className="w-full space-y-4">
+      <div className="w-full h-full flex flex-col">
         <div
-          className={`relative border-2 rounded-lg transition-all duration-200 ${
-            isDragging
-              ? 'border-black bg-gray-50'
-              : error
-                ? 'border-red-500'
-                : 'border-gray-300 hover:border-black'
+          className={`relative flex-1 flex flex-col transition-all duration-200 ${
+            isDragging ? 'bg-gray-50' : ''
           }`}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
         >
-          {/* Image thumbnails at top-left */}
+          {/* Images row at top - scrollable horizontally up to attach icon */}
           {images.length > 0 && (
-            <div className="absolute top-3 left-3 flex gap-1.5 z-10">
-              {images.map((img, index) => (
-                <div
-                  key={index}
-                  className="relative group"
-                  onMouseEnter={() => setHoveredImageIndex(index)}
-                  onMouseLeave={() => setHoveredImageIndex(null)}
-                >
+            <div className="flex-shrink-0 pr-12 pb-2">
+              <div className="flex gap-1.5 overflow-x-auto pb-1">
+                {images.map((img, index) => (
                   <div
-                    onClick={(e) => handleImageClick(e, img.preview)}
-                    className="w-12 h-12 border-2 border-black bg-white rounded cursor-pointer overflow-hidden"
+                    key={index}
+                    className="relative group flex-shrink-0"
+                    onMouseEnter={() => setHoveredImageIndex(index)}
+                    onMouseLeave={() => setHoveredImageIndex(null)}
                   >
-                    <img
-                      src={img.preview}
-                      alt={`Uploaded ${index + 1}`}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                  <button
-                    onClick={(e) => handleRemoveImage(e, index)}
-                    className="absolute -top-1 -right-1 w-4 h-4 bg-black text-white rounded-full flex items-center justify-center hover:bg-gray-800 focus:outline-none"
-                    aria-label={`Remove image ${index + 1}`}
-                  >
-                    <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-
-                  {/* Tooltip preview */}
-                  {hoveredImageIndex === index && (
-                    <div className="absolute top-full left-0 mt-2 z-50 pointer-events-none">
-                      <div className="bg-black p-2 rounded shadow-lg">
-                        <img
-                          src={img.preview}
-                          alt={`Preview ${index + 1}`}
-                          className="w-48 h-48 object-cover rounded"
-                        />
-                        <p className="text-white text-xs mt-1 text-center">{img.file.name}</p>
-                      </div>
+                    <div
+                      onClick={(e) => handleImageClick(e, img.preview)}
+                      className="w-12 h-12 border-2 border-black bg-white cursor-pointer overflow-hidden"
+                    >
+                      <img
+                        src={img.preview}
+                        alt={`Uploaded ${index + 1}`}
+                        className="w-full h-full object-cover"
+                      />
                     </div>
-                  )}
-                </div>
-              ))}
+                    <button
+                      onClick={(e) => handleRemoveImage(e, index)}
+                      className="absolute -top-1 -right-1 w-4 h-4 bg-black text-white rounded-full flex items-center justify-center hover:bg-gray-800 focus:outline-none"
+                      aria-label={`Remove image ${index + 1}`}
+                    >
+                      <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+
+                    {/* Tooltip preview */}
+                    {hoveredImageIndex === index && (
+                      <div className="absolute top-full left-0 mt-2 z-50 pointer-events-none">
+                        <div className="bg-black p-2 rounded shadow-lg">
+                          <img
+                            src={img.preview}
+                            alt={`Preview ${index + 1}`}
+                            className="w-48 h-48 object-cover"
+                          />
+                          <p className="text-white text-xs mt-1 text-center">{img.file.name}</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
+          {/* Attach icon button at top-right - floating */}
+          <button
+            onClick={handleUploadClick}
+            className="absolute top-2 right-2 z-20 p-2 text-gray-600 hover:text-black transition-colors focus:outline-none focus:ring-2 focus:ring-black rounded bg-white"
+            aria-label="Attach images"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+            </svg>
+          </button>
+
+          {/* Text area - takes remaining space */}
           <textarea
             ref={textareaRef}
             value={text}
@@ -261,16 +271,51 @@ const SmartInput = forwardRef<SmartInputHandle, SmartInputProps>(
             aria-label="Enter event details as text or drop images"
             aria-describedby={error ? 'smart-input-error' : undefined}
             aria-invalid={error ? 'true' : 'false'}
-            rows={6}
             className={`
-              w-full px-4 py-3 rounded-lg
+              flex-1 w-full px-3 py-2
               text-black placeholder-gray-400 bg-transparent
               resize-none
               transition-all duration-200
-              focus:outline-none focus:ring-2 focus:ring-black focus:ring-offset-2
-              ${images.length > 0 ? 'pt-[60px]' : ''}
+              focus:outline-none
+              ${detectedUrls.length > 0 ? 'pb-20 sm:pb-12' : 'pb-14'}
             `}
           />
+
+          {/* URL pills at bottom - scrollable row up to Transform button */}
+          {detectedUrls.length > 0 && (
+            <div className="absolute bottom-12 left-0 right-20 px-2">
+              <div className="flex gap-1.5 overflow-x-auto pb-1 max-h-20 sm:max-h-12 flex-wrap sm:flex-nowrap">
+                {detectedUrls.map((url, index) => (
+                  <div key={`${url}-${index}`} className="flex-shrink-0">
+                    <URLPill
+                      url={url}
+                      onRemove={() => handleRemoveUrl(url)}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Transform button at bottom-right - floating */}
+          <button
+            onClick={handleSubmit}
+            disabled={!isButtonEnabled}
+            aria-label="Transform content to events"
+            className={`
+              absolute bottom-2 right-2 z-20
+              px-6 py-2 rounded font-medium
+              transition-all duration-200
+              focus:outline-none focus:ring-2 focus:ring-black focus:ring-offset-2
+              ${
+                !isButtonEnabled
+                  ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                  : 'bg-black text-white hover:bg-gray-800'
+              }
+            `}
+          >
+            Transform
+          </button>
 
           {/* Hidden file input */}
           <input
@@ -285,72 +330,10 @@ const SmartInput = forwardRef<SmartInputHandle, SmartInputProps>(
         </div>
 
         {error && (
-          <p id="smart-input-error" className="text-sm text-red-600" role="alert">
+          <p id="smart-input-error" className="text-sm text-red-600 mt-2" role="alert">
             {error}
           </p>
         )}
-
-        {/* Image count label */}
-        {images.length > 0 && (
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-600">
-              {images.length} image{images.length !== 1 ? 's' : ''} added
-            </span>
-            <button
-              onClick={handleUploadClick}
-              className="text-sm text-black underline hover:no-underline focus:outline-none"
-            >
-              Add more
-            </button>
-          </div>
-        )}
-
-        {/* URL pills */}
-        {detectedUrls.length > 0 && (
-          <div
-            className="flex flex-wrap gap-1.5 items-center"
-            aria-label="Detected URLs"
-          >
-            {detectedUrls.map((url, index) => (
-              <URLPill
-                key={`${url}-${index}`}
-                url={url}
-                onRemove={() => handleRemoveUrl(url)}
-              />
-            ))}
-          </div>
-        )}
-
-        {/* Action buttons */}
-        <div className="flex items-center justify-between gap-2">
-          {images.length === 0 && (
-            <button
-              onClick={handleUploadClick}
-              className="px-4 py-2 text-sm border-2 border-gray-300 text-gray-600 rounded-lg hover:border-black hover:text-black transition-colors focus:outline-none focus:ring-2 focus:ring-black focus:ring-offset-2"
-              aria-label="Add images"
-            >
-              Add Images
-            </button>
-          )}
-
-          <button
-            onClick={handleSubmit}
-            disabled={!isButtonEnabled}
-            aria-label="Transform content to events"
-            className={`
-              ml-auto px-6 py-2 rounded-lg font-medium
-              transition-all duration-200
-              focus:outline-none focus:ring-2 focus:ring-black focus:ring-offset-2
-              ${
-                !isButtonEnabled
-                  ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                  : 'bg-black text-white hover:bg-gray-800'
-              }
-            `}
-          >
-            Transform
-          </button>
-        </div>
       </div>
     );
   }
