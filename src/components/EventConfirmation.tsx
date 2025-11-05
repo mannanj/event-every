@@ -1,6 +1,7 @@
 'use client';
 
 import { CalendarEvent } from '@/types/event';
+import { downloadAttachment } from '@/utils/downloadAttachment';
 
 interface EventConfirmationProps {
   event: CalendarEvent;
@@ -84,11 +85,20 @@ export default function EventConfirmation({ event, onEdit, onExport }: EventConf
         {event.attachments && event.attachments.length > 0 && (
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">ATTACHMENTS</label>
-            <div className="space-y-1">
+            <div className="space-y-2">
               {event.attachments.map((attachment, index) => (
-                <p key={attachment.id} className="text-base text-black">
-                  [{attachment.type === 'original-image' ? 'Image' : attachment.type === 'original-text' ? 'Text' : 'Metadata'} #{index + 1}] {attachment.filename} ({(attachment.size / 1024).toFixed(1)} KB)
-                </p>
+                <div key={attachment.id} className="flex items-center justify-between border border-black p-2">
+                  <span className="text-sm text-black">
+                    [{attachment.type === 'original-image' ? 'Image' : attachment.type === 'original-text' ? 'Text' : 'Metadata'} #{index + 1}] {attachment.filename} ({(attachment.size / 1024).toFixed(1)} KB)
+                  </span>
+                  <button
+                    onClick={() => downloadAttachment(attachment)}
+                    className="ml-2 px-3 py-1 bg-black text-white hover:bg-gray-800 transition-colors focus:outline-none focus:ring-2 focus:ring-black"
+                    aria-label={`Download ${attachment.filename}`}
+                  >
+                    Download
+                  </button>
+                </div>
               ))}
             </div>
           </div>

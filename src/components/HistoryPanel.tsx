@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { CalendarEvent } from '@/types/event';
 import { useHistory } from '@/hooks/useHistory';
 import { exportToICS } from '@/services/exporter';
+import { downloadAttachment } from '@/utils/downloadAttachment';
 
 interface HistoryPanelProps {
   onEventSelect?: (event: CalendarEvent) => void;
@@ -183,11 +184,22 @@ export default function HistoryPanel({ onEventSelect }: HistoryPanelProps) {
                     {event.attachments && event.attachments.length > 0 && (
                       <div>
                         <p className="font-semibold text-gray-700">Attachments:</p>
-                        {event.attachments.map((attachment, index) => (
-                          <p key={attachment.id} className="text-gray-700 text-xs">
-                            [{attachment.type === 'original-image' ? 'Image' : attachment.type === 'original-text' ? 'Text' : 'Metadata'} #{index + 1}] {attachment.filename} ({(attachment.size / 1024).toFixed(1)} KB)
-                          </p>
-                        ))}
+                        <div className="space-y-1">
+                          {event.attachments.map((attachment, index) => (
+                            <div key={attachment.id} className="flex items-center justify-between text-xs">
+                              <span className="text-gray-700">
+                                [{attachment.type === 'original-image' ? 'Image' : attachment.type === 'original-text' ? 'Text' : 'Metadata'} #{index + 1}] {attachment.filename} ({(attachment.size / 1024).toFixed(1)} KB)
+                              </span>
+                              <button
+                                onClick={() => downloadAttachment(attachment)}
+                                className="ml-2 px-2 py-1 bg-black text-white text-xs hover:bg-gray-800 transition-colors focus:outline-none focus:ring-1 focus:ring-black"
+                                aria-label={`Download ${attachment.filename}`}
+                              >
+                                ↓
+                              </button>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     )}
                     <p className="text-gray-500 text-xs mt-2">
