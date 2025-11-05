@@ -46,6 +46,9 @@ export default function RateLimitBanner({ rateLimitInfo }: RateLimitBannerProps)
   if (!rateLimitInfo) return null;
 
   const { remaining, total } = rateLimitInfo;
+
+  if (remaining >= 10) return null;
+
   const percentage = (remaining / total) * 100;
 
   const isLow = remaining <= 1;

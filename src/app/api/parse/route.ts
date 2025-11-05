@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { parseEvent, parseEventsBatch } from '@/services/parser';
-import { checkRateLimit, incrementRateLimit } from '@/lib/ratelimit';
+import { checkRateLimit, incrementRateLimit, DAILY_LIMIT } from '@/lib/ratelimit';
 
 function getClientIP(request: NextRequest): string {
   const forwarded = request.headers.get('x-forwarded-for');
@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json(
         {
-          error: 'Daily limit of 10 events reached',
+          error: `Daily limit of ${DAILY_LIMIT} events reached`,
           remaining: 0,
           reset: resetDate.toISOString(),
           hoursUntilReset
@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
         {
           status: 429,
           headers: {
-            'X-RateLimit-Limit': '10',
+            'X-RateLimit-Limit': DAILY_LIMIT.toString(),
             'X-RateLimit-Remaining': '0',
             'X-RateLimit-Reset': rateLimitResult.reset.toString()
           }
@@ -114,7 +114,7 @@ export async function POST(request: NextRequest) {
           'Content-Type': 'text/event-stream',
           'Cache-Control': 'no-cache',
           'Connection': 'keep-alive',
-          'X-RateLimit-Limit': '10',
+          'X-RateLimit-Limit': DAILY_LIMIT.toString(),
           'X-RateLimit-Remaining': updatedRateLimit.remaining.toString(),
           'X-RateLimit-Reset': updatedRateLimit.reset.toString()
         },
@@ -131,7 +131,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(parsedEvent, {
       headers: {
-        'X-RateLimit-Limit': '10',
+        'X-RateLimit-Limit': DAILY_LIMIT.toString(),
         'X-RateLimit-Remaining': updatedRateLimit.remaining.toString(),
         'X-RateLimit-Reset': updatedRateLimit.reset.toString()
       }
