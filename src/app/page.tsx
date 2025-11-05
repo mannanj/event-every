@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import SmartInput, { SmartInputHandle } from '@/components/SmartInput';
 import EventEditor from '@/components/EventEditor';
 import ProcessingSection from '@/components/ProcessingSection';
@@ -14,6 +14,7 @@ import { deduplicateEvents } from '@/utils/deduplication';
 import { detectURLs } from '@/services/urlDetector';
 import { scrapeURLsBatch } from '@/services/webScraper';
 import { QueueItem } from '@/services/processingQueue';
+import { eventStorage } from '@/services/storage';
 
 interface ProcessingEvent {
   id: string;
@@ -56,6 +57,28 @@ export default function Home() {
   const { events, addEvent, deleteEvent } = useHistory();
   const { addToQueue, updateProgress } = useProcessingQueue();
   const smartInputRef = useRef<SmartInputHandle>(null);
+
+  useEffect(() => {
+    const result = eventStorage.getTempUnsavedEvents();
+    if (result.success && result.data && result.data.length > 0) {
+      const firstEventSource = result.data[0]?.source;
+      const batchSource: 'image' | 'text' = (firstEventSource === 'image' || firstEventSource === 'text') ? firstEventSource : 'text';
+      setBatchProcessing({
+        id: `batch-restored-${Date.now()}`,
+        events: result.data,
+        isProcessing: false,
+        source: batchSource,
+      });
+    }
+  }, []);
+
+  useEffect(() => {
+    if (batchProcessing && batchProcessing.events.length > 0) {
+      eventStorage.saveTempUnsavedEvents(batchProcessing.events);
+    } else if (!batchProcessing) {
+      eventStorage.clearTempUnsavedEvents();
+    }
+  }, [batchProcessing]);
 
   const updateRateLimitFromHeaders = (headers: Headers) => {
     const remaining = parseInt(headers.get('X-RateLimit-Remaining') || '5');
@@ -110,12 +133,12 @@ export default function Home() {
     attachments?: EventAttachment[]
   ) => {
     const batchId = `batch-${Date.now()}`;
-    setBatchProcessing({
+    setBatchProcessing(prev => ({
       id: batchId,
-      events: [],
+      events: prev?.events || [],
       isProcessing: true,
       source,
-    });
+    }));
 
     try {
       const response = await fetch('/api/parse', {
@@ -210,12 +233,12 @@ export default function Home() {
         const allEvents: CalendarEvent[] = [];
 
         const batchId = `batch-${Date.now()}`;
-        setBatchProcessing({
+        setBatchProcessing(prev => ({
           id: batchId,
-          events: [],
+          events: prev?.events || [],
           isProcessing: true,
           source: 'image',
-        });
+        }));
 
         const initialStatuses: ImageProcessingStatus[] = imageFiles.map((file, index) => ({
           id: `image-${Date.now()}-${index}`,
@@ -434,12 +457,12 @@ export default function Home() {
           };
 
           const batchId = `batch-${Date.now()}`;
-          setBatchProcessing({
+          setBatchProcessing(prev => ({
             id: batchId,
-            events: [],
+            events: prev?.events || [],
             isProcessing: true,
             source: 'text',
-          });
+          }));
 
           const response = await fetch('/api/parse', {
             method: 'POST',
@@ -692,6 +715,18 @@ export default function Home() {
           onCancelBatch={handleCancelBatch}
           onExportComplete={(events) => {
             events.forEach(event => addEvent(event));
+            setBatchProcessing(prev => {
+              if (!prev) return null;
+              const savedEventIds = new Set(events.map(e => e.id));
+              const remainingEvents = prev.events.filter(e => !savedEventIds.has(e.id));
+              if (remainingEvents.length === 0) {
+                return null;
+              }
+              return {
+                ...prev,
+                events: remainingEvents,
+              };
+            });
           }}
         />
 

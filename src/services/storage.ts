@@ -1,6 +1,7 @@
 import { CalendarEvent } from '@/types/event';
 
 const STORAGE_KEY = 'event_every_history';
+const TEMP_UNSAVED_EVENTS_KEY = 'event_every_temp_unsaved';
 
 export interface StorageResult<T> {
   success: boolean;
@@ -173,6 +174,57 @@ export const eventStorage = {
         success: false,
         error: error instanceof Error ? error.message : 'Failed to search events',
         data: [],
+      };
+    }
+  },
+
+  saveTempUnsavedEvents: (events: CalendarEvent[]): StorageResult<void> => {
+    try {
+      localStorage.setItem(TEMP_UNSAVED_EVENTS_KEY, JSON.stringify(events));
+      return { success: true };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to save temporary events',
+      };
+    }
+  },
+
+  getTempUnsavedEvents: (): StorageResult<CalendarEvent[]> => {
+    try {
+      const data = localStorage.getItem(TEMP_UNSAVED_EVENTS_KEY);
+
+      if (!data) {
+        return { success: true, data: [] };
+      }
+
+      const events = JSON.parse(data) as CalendarEvent[];
+
+      const parsedEvents = events.map((event) => ({
+        ...event,
+        startDate: new Date(event.startDate),
+        endDate: new Date(event.endDate),
+        created: new Date(event.created),
+      }));
+
+      return { success: true, data: parsedEvents };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to load temporary events',
+        data: [],
+      };
+    }
+  },
+
+  clearTempUnsavedEvents: (): StorageResult<void> => {
+    try {
+      localStorage.removeItem(TEMP_UNSAVED_EVENTS_KEY);
+      return { success: true };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to clear temporary events',
       };
     }
   },

@@ -99,9 +99,7 @@ export default function BatchEventList({
     const result = exportMultipleToICS(selectedEvents);
 
     if (result.success) {
-      // Export succeeded: save events to history and clear batch UI
       onExportComplete(selectedEvents);
-      onCancel();
     } else {
       alert(`Export failed: ${result.error}`);
     }
@@ -111,39 +109,10 @@ export default function BatchEventList({
   const selectedCount = selectedEventIds.size;
 
   return (
-    <div className="border-2 border-black">
-      {/* Simplified header */}
-      <div className="p-4 border-b-2 border-black">
-        <div className="flex justify-between items-center">
-          <button
-            onClick={onCancel}
-            className="text-sm text-black hover:underline focus:outline-none"
-            aria-label="Cancel batch"
-          >
-            Cancel
-          </button>
-
-          <div className="flex items-center gap-2 transition-all duration-300">
-            {isProcessing ? (
-              <>
-                {currentCount === 0 ? (
-                  <span className="text-lg font-bold text-black transition-opacity duration-300">
-                    Processing {source === 'image' ? 'image' : 'text'}...
-                  </span>
-                ) : (
-                  <span className="text-lg font-bold text-black transition-opacity duration-300">
-                    Extracting events... ({currentCount} found)
-                  </span>
-                )}
-                <div className="animate-spin rounded-full h-5 w-5 border-2 border-black border-t-transparent" />
-              </>
-            ) : (
-              <span className="text-lg font-bold text-black transition-opacity duration-300">
-                {currentCount} Event{currentCount !== 1 ? 's' : ''}
-              </span>
-            )}
-          </div>
-        </div>
+    <>
+      {/* Header */}
+      <div className="p-4">
+        <h2 className="text-lg text-black">Made up events</h2>
       </div>
 
       {/* Event list */}
@@ -155,9 +124,9 @@ export default function BatchEventList({
           return (
             <div
               key={event.id}
-              className={`transition-all duration-500 ${
+              className={`transition-all duration-500 border-t-2 border-black ${
                 isNew ? 'bg-green-50' : 'bg-white'
-              } ${index < events.length - 1 ? 'border-b-2 border-black' : ''}`}
+              }`}
             >
               {/* Compact card view */}
               <div
@@ -263,19 +232,27 @@ export default function BatchEventList({
         })}
       </div>
 
-      {/* Export button */}
+      {/* Save button */}
       {events.length > 0 && !isProcessing && (
-        <div className="p-4 border-t-2 border-black">
+        <div className="px-4 pt-4 pb-1 border-t-2 border-black">
           <button
             onClick={handleExport}
             disabled={selectedCount === 0}
             className="w-full py-3 px-6 bg-black text-white border-2 border-black hover:bg-white hover:text-black transition-colors focus:outline-none focus:ring-2 focus:ring-black disabled:bg-gray-300 disabled:text-gray-500 disabled:border-gray-300 disabled:cursor-not-allowed"
-            aria-label={`Export ${selectedCount} event${selectedCount !== 1 ? 's' : ''}`}
+            aria-label={`Save ${selectedCount} event${selectedCount !== 1 ? 's' : ''}`}
           >
-            Export {selectedCount > 0 && `(${selectedCount})`}
+            Save {selectedCount > 0 && `(${selectedCount})`}
           </button>
+          <div className="text-xs text-center mt-1">
+            <p className="text-black">Pick what you want to keep</p>
+            {selectedCount < events.length && selectedCount > 0 && (
+              <p className="text-red-400">
+                {events.length - selectedCount} event{events.length - selectedCount !== 1 ? 's' : ''} will be lost
+              </p>
+            )}
+          </div>
         </div>
       )}
-    </div>
+    </>
   );
 }

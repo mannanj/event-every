@@ -1,0 +1,11 @@
+### Task 100: Preserve Unsaved Events During New Processing
+- [x] Save unsaved events to local storage (temporary storage separate from history)
+- [x] Modify batch processing state to preserve existing unsaved events when new processing starts
+- [x] Update event list to append new events to existing ones instead of replacing
+- [x] Load temporary unsaved events from local storage on page load
+- [x] Only clear events from the "Made up events" section when user presses "Save" button
+- [x] When saving: clear temporary storage for unselected events, add selected events to history
+- [x] Ensure async/background processing doesn't interfere with unsaved events
+- [x] Add real-time dynamic updates as new events are processed and added to the list
+- [x] Keep existing history system untouched - only add newly saved events to it
+- Location: `src/app/page.tsx`, `src/components/ProcessingSection.tsx`, `src/components/BatchEventList.tsx`, `src/services/storage.ts`
