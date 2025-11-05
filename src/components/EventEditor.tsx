@@ -25,6 +25,7 @@ export default function EventEditor({ event, onSave, onCancel }: EventEditorProp
     location: event.location || '',
     description: event.description || '',
     allDay: event.allDay,
+    attachments: event.attachments || [],
   });
 
   const [errors, setErrors] = useState<ValidationErrors>({});
@@ -83,6 +84,13 @@ export default function EventEditor({ event, onSave, onCancel }: EventEditorProp
     }
   };
 
+  const handleRemoveAttachment = (attachmentId: string) => {
+    setFormData({
+      ...formData,
+      attachments: formData.attachments.filter((att) => att.id !== attachmentId),
+    });
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -112,6 +120,7 @@ export default function EventEditor({ event, onSave, onCancel }: EventEditorProp
       location: formData.location.trim() || undefined,
       description: formData.description.trim() || undefined,
       allDay: formData.allDay,
+      attachments: formData.attachments.length > 0 ? formData.attachments : undefined,
     };
 
     onSave(updatedEvent);
@@ -269,6 +278,32 @@ export default function EventEditor({ event, onSave, onCancel }: EventEditorProp
             placeholder="Additional details"
           />
         </div>
+
+        {formData.attachments.length > 0 && (
+          <div>
+            <label className="block text-xs font-medium text-black mb-2">ATTACHMENTS</label>
+            <div className="space-y-2">
+              {formData.attachments.map((attachment, index) => (
+                <div
+                  key={attachment.id}
+                  className="flex items-center justify-between p-3 border-2 border-black"
+                >
+                  <p className="text-sm text-black">
+                    [{attachment.type === 'original-image' ? 'Image' : attachment.type === 'original-text' ? 'Text' : 'Metadata'} #{index + 1}] {attachment.filename} ({(attachment.size / 1024).toFixed(1)} KB)
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveAttachment(attachment.id)}
+                    className="px-3 py-1 text-sm bg-white border-2 border-black text-black hover:bg-black hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-black"
+                    aria-label={`Remove ${attachment.filename}`}
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="flex gap-3 pt-4 border-t-2 border-black">
           <button

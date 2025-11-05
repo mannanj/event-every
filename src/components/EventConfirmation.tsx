@@ -80,6 +80,19 @@ export default function EventConfirmation({ event, onEdit, onExport }: EventConf
             <p className="text-base text-black whitespace-pre-wrap">{event.description}</p>
           </div>
         )}
+
+        {event.attachments && event.attachments.length > 0 && (
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">ATTACHMENTS</label>
+            <div className="space-y-1">
+              {event.attachments.map((attachment, index) => (
+                <p key={attachment.id} className="text-base text-black">
+                  [{attachment.type === 'original-image' ? 'Image' : attachment.type === 'original-text' ? 'Text' : 'Metadata'} #{index + 1}] {attachment.filename} ({(attachment.size / 1024).toFixed(1)} KB)
+                </p>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="flex gap-3 pt-4 border-t-2 border-black">
