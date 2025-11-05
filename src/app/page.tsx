@@ -382,6 +382,14 @@ export default function Home() {
         ]
           .filter(t => t.trim())
           .join('\n\n');
+
+        if (!combinedText.trim()) {
+          throw new Error('Unable to extract content from the provided URLs. Please check the URLs and try again.');
+        }
+      }
+
+      if (!combinedText.trim()) {
+        throw new Error('Please enter some text or URLs to process.');
       }
 
       setUrlProcessingStatus({
