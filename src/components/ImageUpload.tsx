@@ -148,7 +148,7 @@ const ImageUpload = forwardRef<ImageUploadHandle, ImageUploadProps>(
             : 'border-gray-300 hover:border-black hover:bg-gray-50'
           }
           ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}
-          ${preview ? 'border-solid' : ''}
+          ${fileCount > 0 ? 'border-solid' : ''}
           focus:outline-none focus:ring-2 focus:ring-black focus:ring-offset-2
         `}
         onDragOver={handleDragOver}
