@@ -180,6 +180,16 @@ export default function HistoryPanel({ onEventSelect }: HistoryPanelProps) {
                         <span className="font-semibold">Description:</span> {event.description}
                       </p>
                     )}
+                    {event.attachments && event.attachments.length > 0 && (
+                      <div>
+                        <p className="font-semibold text-gray-700">Attachments:</p>
+                        {event.attachments.map((attachment, index) => (
+                          <p key={attachment.id} className="text-gray-700 text-xs">
+                            [{attachment.type === 'original-image' ? 'Image' : attachment.type === 'original-text' ? 'Text' : 'Metadata'} #{index + 1}] {attachment.filename} ({(attachment.size / 1024).toFixed(1)} KB)
+                          </p>
+                        ))}
+                      </div>
+                    )}
                     <p className="text-gray-500 text-xs mt-2">
                       Created: {formatDate(event.created)}
                     </p>
