@@ -14,41 +14,27 @@ export interface BatchScrapedContent {
 
 async function scrapeURL(url: string): Promise<ScrapedContent> {
   try {
-    const response = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; EventEvery/1.0; +https://event-every.com)',
-      },
+    const response = await fetch('/api/scrape-url', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url }),
     });
 
     if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      const errorData = await response.json().catch(() => ({ error: 'Failed to scrape URL' }));
+      throw new Error(errorData.error || 'Failed to scrape URL');
     }
 
-    const html = await response.text();
+    const result = await response.json();
 
-    const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
-    const title = titleMatch ? titleMatch[1].trim() : undefined;
-
-    const bodyMatch = html.match(/<body[^>]*>([\s\S]*)<\/body>/i);
-    const bodyContent = bodyMatch ? bodyMatch[1] : html;
-
-    const text = bodyContent
-      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
-      .replace(/<[^>]+>/g, ' ')
-      .replace(/&nbsp;/g, ' ')
-      .replace(/&amp;/g, '&')
-      .replace(/&lt;/g, '<')
-      .replace(/&gt;/g, '>')
-      .replace(/&quot;/g, '"')
-      .replace(/&#39;/g, "'")
-      .replace(/\s+/g, ' ')
-      .trim();
+    if (result.status === 'error') {
+      throw new Error(result.error || 'Failed to scrape URL');
+    }
 
     return {
-      url,
-      text,
-      title,
+      url: result.url,
+      text: result.text,
+      title: result.title,
       status: 'success',
     };
   } catch (error) {
