@@ -1,5 +1,5 @@
 import { createEvent, createEvents, EventAttributes } from 'ics';
-import { CalendarEvent } from '@/types/event';
+import { CalendarEvent, EventAttachment } from '@/types/event';
 
 export interface ExportResult {
   success: boolean;
@@ -9,6 +9,28 @@ export interface ExportResult {
 export interface ValidationResult {
   isValid: boolean;
   errors: string[];
+}
+
+function addAttachmentsToICS(icsContent: string, attachments?: EventAttachment[]): string {
+  if (!attachments || attachments.length === 0) {
+    return icsContent;
+  }
+
+  const lines = icsContent.split('\n');
+  const modifiedLines: string[] = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    modifiedLines.push(lines[i]);
+
+    if (lines[i].trim() === 'END:VEVENT') {
+      attachments.forEach(attachment => {
+        const dataUri = `data:${attachment.mimeType};base64,${attachment.data}`;
+        modifiedLines.push(`ATTACH;FILENAME=${attachment.filename}:${dataUri}`);
+      });
+    }
+  }
+
+  return modifiedLines.join('\n');
 }
 
 export function exportToICS(event: CalendarEvent): ExportResult {
@@ -34,7 +56,8 @@ export function exportToICS(event: CalendarEvent): ExportResult {
       return { success: false, error: 'No calendar data generated' };
     }
 
-    downloadICS(value, event.title);
+    const icsWithAttachments = addAttachmentsToICS(value, event.attachments);
+    downloadICS(icsWithAttachments, event.title);
     return { success: true };
   } catch (err) {
     return {
@@ -157,8 +180,15 @@ export function exportMultipleToICS(events: CalendarEvent[], filename?: string):
       return { success: false, error: 'No calendar data generated' };
     }
 
+    let icsContent = value;
+    events.forEach((event) => {
+      if (event.attachments && event.attachments.length > 0) {
+        icsContent = addAttachmentsToICS(icsContent, event.attachments);
+      }
+    });
+
     const exportFilename = filename || `batch-events-${events.length}`;
-    downloadICS(value, exportFilename);
+    downloadICS(icsContent, exportFilename);
     return { success: true };
   } catch (err) {
     return {

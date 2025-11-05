@@ -1,3 +1,12 @@
+export interface EventAttachment {
+  id: string;
+  filename: string;
+  mimeType: string;
+  data: string;
+  type: 'original-image' | 'original-text' | 'llm-metadata';
+  size: number;
+}
+
 export interface CalendarEvent {
   id: string;
   title: string;
@@ -9,6 +18,7 @@ export interface CalendarEvent {
   created: Date;
   source: 'image' | 'text';
   originalInput?: string;
+  attachments?: EventAttachment[];
 }
 
 export interface OCRResult {

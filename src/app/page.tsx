@@ -6,7 +6,7 @@ import TextInput, { TextInputHandle } from '@/components/TextInput';
 import EventEditor from '@/components/EventEditor';
 import BatchEventList from '@/components/BatchEventList';
 import RateLimitBanner from '@/components/RateLimitBanner';
-import { CalendarEvent, ParsedEvent, StreamedEventChunk } from '@/types/event';
+import { CalendarEvent, ParsedEvent, StreamedEventChunk, EventAttachment } from '@/types/event';
 import { exportToICS } from '@/services/exporter';
 import { useHistory } from '@/hooks/useHistory';
 
@@ -51,7 +51,8 @@ export default function Home() {
   const convertParsedToCalendarEvent = (
     parsed: ParsedEvent,
     source: 'image' | 'text',
-    originalInput?: string
+    originalInput?: string,
+    attachments?: EventAttachment[]
   ): CalendarEvent => {
     const now = new Date();
     const startDate = parsed.startDate ? new Date(parsed.startDate) : now;
@@ -68,13 +69,15 @@ export default function Home() {
       created: now,
       source,
       originalInput,
+      attachments,
     };
   };
 
   const handleBatchStream = async (
     source: 'image' | 'text',
     body: Record<string, unknown>,
-    originalInput?: string
+    originalInput?: string,
+    attachments?: EventAttachment[]
   ) => {
     const batchId = `batch-${Date.now()}`;
     setBatchProcessing({
@@ -133,7 +136,7 @@ export default function Home() {
 
             if (chunk.events && chunk.events.length > 0) {
               const newEvents = chunk.events.map(parsed =>
-                convertParsedToCalendarEvent(parsed, source, originalInput)
+                convertParsedToCalendarEvent(parsed, source, originalInput, attachments)
               );
 
               setBatchProcessing(prev => {
@@ -184,10 +187,19 @@ export default function Home() {
       const base64 = await base64Promise;
       const mimeType = file.type;
 
+      const attachment: EventAttachment = {
+        id: `attachment-${Date.now()}`,
+        filename: file.name,
+        mimeType,
+        data: base64,
+        type: 'original-image',
+        size: file.size,
+      };
+
       await handleBatchStream('image', {
         imageBase64: base64,
         imageMimeType: mimeType,
-      }, URL.createObjectURL(file));
+      }, URL.createObjectURL(file), [attachment]);
     } catch (err) {
       const errorMessage = err instanceof Error
         ? err.message
@@ -231,7 +243,20 @@ export default function Home() {
       updateRateLimitFromHeaders(response.headers);
 
       const parsed: ParsedEvent = await response.json();
-      const event = convertParsedToCalendarEvent(parsed, 'text', text);
+
+      const textBase64 = btoa(unescape(encodeURIComponent(text)));
+      const textSizeBytes = new Blob([text]).size;
+
+      const attachment: EventAttachment = {
+        id: `attachment-${Date.now()}`,
+        filename: 'original-input.txt',
+        mimeType: 'text/plain',
+        data: textBase64,
+        type: 'original-text',
+        size: textSizeBytes,
+      };
+
+      const event = convertParsedToCalendarEvent(parsed, 'text', text, [attachment]);
 
       setProcessingEvents(prev =>
         prev.map(p => p.id === processingId ? { ...p, status: 'success', event } : p)
