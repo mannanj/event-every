@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { CalendarEvent } from '@/types/event';
+import { downloadAttachment } from '@/utils/downloadAttachment';
 
 interface EventEditorProps {
   event: CalendarEvent;
@@ -291,14 +292,24 @@ export default function EventEditor({ event, onSave, onCancel }: EventEditorProp
                   <p className="text-sm text-black">
                     [{attachment.type === 'original-image' ? 'Image' : attachment.type === 'original-text' ? 'Text' : 'Metadata'} #{index + 1}] {attachment.filename} ({(attachment.size / 1024).toFixed(1)} KB)
                   </p>
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveAttachment(attachment.id)}
-                    className="px-3 py-1 text-sm bg-white border-2 border-black text-black hover:bg-black hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-black"
-                    aria-label={`Remove ${attachment.filename}`}
-                  >
-                    Remove
-                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => downloadAttachment(attachment)}
+                      className="px-3 py-1 text-sm bg-black text-white hover:bg-gray-800 transition-colors focus:outline-none focus:ring-2 focus:ring-black"
+                      aria-label={`Download ${attachment.filename}`}
+                    >
+                      Download
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveAttachment(attachment.id)}
+                      className="px-3 py-1 text-sm bg-white border-2 border-black text-black hover:bg-black hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-black"
+                      aria-label={`Remove ${attachment.filename}`}
+                    >
+                      Remove
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
