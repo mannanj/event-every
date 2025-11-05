@@ -96,7 +96,7 @@ const TextInput = forwardRef<TextInputHandle, TextInputProps>(
             }
           `}
         >
-          Parse Event
+          Transform
         </button>
       </div>
     </div>
