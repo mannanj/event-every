@@ -714,7 +714,7 @@ export default function Home() {
 
         {/* History section */}
         {events.length > 0 && (
-          <div className="mb-12 -mx-[14.28%] bg-green-100 bg-opacity-40 px-[14.28%] py-6 rounded-lg">
+          <div className="mb-12 bg-green-100 bg-opacity-40 p-6 rounded-lg">
             <div className="space-y-4">
               {events.map((event) => (
                 <div
