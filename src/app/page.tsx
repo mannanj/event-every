@@ -130,6 +130,8 @@ export default function Home() {
               setBatchProcessing(prev => prev ? { ...prev, isProcessing: false } : null);
               if (source === 'image') {
                 imageUploadRef.current?.clear();
+              } else if (source === 'text') {
+                textInputRef.current?.clear();
               }
               break;
             }
@@ -220,30 +222,7 @@ export default function Home() {
   };
 
   const handleTextSubmit = async (text: string) => {
-    const processingId = `processing-${Date.now()}`;
-
-    setProcessingEvents(prev => [...prev, {
-      id: processingId,
-      type: 'text',
-      status: 'processing',
-    }]);
-
     try {
-      const response = await fetch('/api/parse', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Failed to parse event from text' }));
-        throw new Error(errorData.error || 'Failed to parse event from text');
-      }
-
-      updateRateLimitFromHeaders(response.headers);
-
-      const parsed: ParsedEvent = await response.json();
-
       const textBase64 = btoa(unescape(encodeURIComponent(text)));
       const textSizeBytes = new Blob([text]).size;
 
@@ -256,25 +235,19 @@ export default function Home() {
         size: textSizeBytes,
       };
 
-      const event = convertParsedToCalendarEvent(parsed, 'text', text, [attachment]);
-
-      setProcessingEvents(prev =>
-        prev.map(p => p.id === processingId ? { ...p, status: 'success', event } : p)
-      );
-
-      setTimeout(() => {
-        setProcessingEvents(prev => prev.filter(p => p.id !== processingId));
-        addEvent(event);
-        textInputRef.current?.clear();
-      }, 2000);
+      await handleBatchStream('text', { text }, text, [attachment]);
     } catch (err) {
       const errorMessage = err instanceof Error
         ? err.message
         : 'Unable to extract event details from this text.';
 
-      setProcessingEvents(prev =>
-        prev.map(p => p.id === processingId ? { ...p, status: 'error', error: errorMessage } : p)
-      );
+      const processingId = `error-${Date.now()}`;
+      setProcessingEvents(prev => [...prev, {
+        id: processingId,
+        type: 'text',
+        status: 'error',
+        error: errorMessage,
+      }]);
 
       setTimeout(() => {
         setProcessingEvents(prev => prev.filter(p => p.id !== processingId));
@@ -412,7 +385,7 @@ export default function Home() {
               <TextInput
                 ref={textInputRef}
                 onTextSubmit={handleTextSubmit}
-                isLoading={false}
+                isLoading={batchProcessing?.isProcessing || false}
               />
             </div>
           </div>
