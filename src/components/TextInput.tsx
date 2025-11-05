@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useCallback, useImperativeHandle, forwardRef } from 'react';
+import { useState, useCallback, useImperativeHandle, forwardRef, useEffect } from 'react';
+import URLPill from './URLPill';
 
 interface TextInputProps {
   onTextSubmit: (text: string) => void;
@@ -12,17 +13,31 @@ export interface TextInputHandle {
 
 const MIN_TEXT_LENGTH = 3;
 
+const URL_REGEX = /(https?:\/\/(?:www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b(?:[-a-zA-Z0-9()@:%_\+.~#?&\/=]*))/gi;
+
 const TextInput = forwardRef<TextInputHandle, TextInputProps>(
   function TextInput({ onTextSubmit }, ref) {
     const [text, setText] = useState('');
     const [error, setError] = useState<string | null>(null);
+    const [detectedUrls, setDetectedUrls] = useState<string[]>([]);
 
     useImperativeHandle(ref, () => ({
       clear: () => {
         setText('');
         setError(null);
+        setDetectedUrls([]);
       },
     }));
+
+    useEffect(() => {
+      const matches = text.match(URL_REGEX);
+      if (matches) {
+        const uniqueUrls = Array.from(new Set(matches));
+        setDetectedUrls(uniqueUrls);
+      } else {
+        setDetectedUrls([]);
+      }
+    }, [text]);
 
   const handleSubmit = useCallback(() => {
     setError(null);
@@ -49,6 +64,10 @@ const TextInput = forwardRef<TextInputHandle, TextInputProps>(
     if (error) {
       setError(null);
     }
+  };
+
+  const handleRemoveUrl = (urlToRemove: string) => {
+    setText(prevText => prevText.replace(urlToRemove, '').trim());
   };
 
   return (
@@ -78,6 +97,21 @@ const TextInput = forwardRef<TextInputHandle, TextInputProps>(
         <p id="text-input-error" className="text-sm text-red-600" role="alert">
           {error}
         </p>
+      )}
+
+      {detectedUrls.length > 0 && (
+        <div
+          className="max-h-[100px] overflow-y-auto border-2 border-gray-200 rounded-lg p-3 flex flex-wrap gap-2"
+          aria-label="Detected URLs"
+        >
+          {detectedUrls.map((url, index) => (
+            <URLPill
+              key={`${url}-${index}`}
+              url={url}
+              onRemove={() => handleRemoveUrl(url)}
+            />
+          ))}
+        </div>
       )}
 
       <div className="flex items-center justify-end">
