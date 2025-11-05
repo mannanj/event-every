@@ -10,7 +10,19 @@ export interface RateLimitResult {
 const DAILY_LIMIT = 10;
 const WINDOW_DURATION = 24 * 60 * 60; // 24 hours in seconds
 
+const isKVAvailable = () => {
+  return !!(process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN);
+};
+
 export async function checkRateLimit(identifier: string): Promise<RateLimitResult> {
+  if (!isKVAvailable()) {
+    return {
+      success: true,
+      remaining: DAILY_LIMIT,
+      reset: Date.now() + (WINDOW_DURATION * 1000)
+    };
+  }
+
   try {
     const key = `ratelimit:events:${identifier}`;
     const now = Date.now();
@@ -47,6 +59,14 @@ export async function checkRateLimit(identifier: string): Promise<RateLimitResul
 }
 
 export async function incrementRateLimit(identifier: string): Promise<RateLimitResult> {
+  if (!isKVAvailable()) {
+    return {
+      success: true,
+      remaining: DAILY_LIMIT - 1,
+      reset: Date.now() + (WINDOW_DURATION * 1000)
+    };
+  }
+
   try {
     const key = `ratelimit:events:${identifier}`;
 
