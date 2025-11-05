@@ -714,11 +714,29 @@ export default function Home() {
 
         {/* History section */}
         {events.length > 0 && (
-          <div
-            className="mb-12 -mx-8 bg-green-100 bg-opacity-40 px-8 py-6"
-            style={{ clipPath: 'polygon(3rem 0, 100% 0, 100% calc(100% - 3rem), calc(100% - 3rem) 100%, 0 100%, 0 3rem)' }}
-          >
-            <div className="space-y-4">
+          <>
+            <svg width="0" height="0" style={{ position: 'absolute' }}>
+              <defs>
+                <clipPath id="custom-shape" clipPathUnits="objectBoundingBox">
+                  <path d="
+                    M 0,0.05
+                    L 0.05,0
+                    L 0.95,0
+                    Q 1,0 1,0.05
+                    L 1,0.95
+                    L 0.95,1
+                    L 0.05,1
+                    Q 0,1 0,0.95
+                    Z
+                  " />
+                </clipPath>
+              </defs>
+            </svg>
+            <div
+              className="mb-12 -mx-8 bg-green-100 bg-opacity-55 px-8 py-6"
+              style={{ clipPath: 'url(#custom-shape)' }}
+            >
+              <div className="space-y-4">
               {events.map((event) => (
                 <div
                   key={event.id}
@@ -779,6 +797,7 @@ export default function Home() {
               ))}
             </div>
           </div>
+          </>
         )}
 
       </div>
