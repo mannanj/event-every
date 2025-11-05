@@ -215,21 +215,30 @@ const SmartInput = forwardRef<SmartInputHandle, SmartInputProps>(
                   >
                     <div
                       onClick={(e) => handleImageClick(e, index)}
-                      className="w-12 h-12 border-2 border-black bg-white cursor-pointer overflow-hidden hover:border-gray-600 transition-colors"
+                      className="w-[128px] h-[128px] border-2 border-black bg-white cursor-pointer overflow-hidden hover:border-gray-600 transition-colors relative"
                     >
                       <img
                         src={img.preview}
                         alt={`Uploaded ${index + 1}`}
                         className="w-full h-full object-cover"
                       />
+                      {/* Image count label on first image only */}
+                      {index === 0 && (
+                        <div className="absolute top-1 left-1 bg-black text-white text-xs px-2 py-1 font-medium">
+                          {images.length} {images.length === 1 ? 'image' : 'images'}
+                        </div>
+                      )}
+                      <div className="absolute bottom-1 left-1 bg-black bg-opacity-75 text-white text-xs px-1.5 py-0.5 rounded">
+                        #{index + 1}
+                      </div>
                     </div>
                     <button
                       onClick={(e) => handleRemoveImage(e, index)}
-                      className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-black text-white rounded-full flex items-center justify-center hover:bg-gray-800 focus:outline-none"
+                      className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-600 text-white rounded-full flex items-center justify-center hover:bg-red-700 focus:outline-none z-50"
                       aria-label={`Remove image ${index + 1}`}
                     >
                       <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 12h12" />
                       </svg>
                     </button>
 
@@ -240,9 +249,9 @@ const SmartInput = forwardRef<SmartInputHandle, SmartInputProps>(
                           <img
                             src={img.preview}
                             alt={`Preview ${index + 1}`}
-                            className="max-w-xs max-h-64 object-contain"
+                            className="max-w-lg max-h-96 object-contain"
                           />
-                          <p className="text-black text-xs mt-2 text-center truncate max-w-xs">{img.file.name}</p>
+                          <p className="text-black text-xs mt-2 text-center truncate max-w-lg">{img.file.name}</p>
                         </div>
                       </div>
                     )}
@@ -261,6 +270,11 @@ const SmartInput = forwardRef<SmartInputHandle, SmartInputProps>(
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
             </svg>
+            {images.length > 0 && (
+              <span className="absolute -top-1 -right-1 bg-black text-white text-xs w-5 h-5 flex items-center justify-center rounded-full font-medium">
+                {images.length}
+              </span>
+            )}
           </button>
 
           {/* Text area - takes remaining space */}
