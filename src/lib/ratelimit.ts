@@ -7,7 +7,7 @@ export interface RateLimitResult {
   error?: string;
 }
 
-const DAILY_LIMIT = 10;
+const DAILY_LIMIT = 1000;
 const WINDOW_DURATION = 24 * 60 * 60; // 24 hours in seconds
 
 const isKVAvailable = () => {
