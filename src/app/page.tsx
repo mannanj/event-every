@@ -715,7 +715,6 @@ export default function Home() {
         {/* History section */}
         {events.length > 0 && (
           <div className="mb-12">
-            <h2 className="text-2xl font-bold mb-4 text-black">Created</h2>
             <div className="space-y-4">
               {events.map((event) => (
                 <div
