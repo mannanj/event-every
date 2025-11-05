@@ -719,7 +719,7 @@ export default function Home() {
               {events.map((event) => (
                 <div
                   key={event.id}
-                  className="border-2 border-black p-4 bg-yellow-50 hover:bg-yellow-100 transition-colors rounded-md"
+                  className="border-2 border-black p-4 bg-white"
                 >
                   <div className="flex justify-between items-start mb-2">
                     <h3 className="font-bold text-lg flex-1">{event.title}</h3>
