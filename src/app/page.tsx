@@ -1,8 +1,7 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import ImageUpload, { ImageUploadHandle } from '@/components/ImageUpload';
-import TextInput, { TextInputHandle } from '@/components/TextInput';
+import SmartInput, { SmartInputHandle } from '@/components/SmartInput';
 import EventEditor from '@/components/EventEditor';
 import ProcessingSection from '@/components/ProcessingSection';
 import ErrorNotification from '@/components/ErrorNotification';
@@ -56,8 +55,7 @@ export default function Home() {
   const [rateLimitInfo, setRateLimitInfo] = useState<{ remaining: number; total: number; resetTime: number } | undefined>();
   const { events, addEvent, deleteEvent } = useHistory();
   const { addToQueue, updateProgress } = useProcessingQueue();
-  const imageUploadRef = useRef<ImageUploadHandle>(null);
-  const textInputRef = useRef<TextInputHandle>(null);
+  const smartInputRef = useRef<SmartInputHandle>(null);
 
   const updateRateLimitFromHeaders = (headers: Headers) => {
     const remaining = parseInt(headers.get('X-RateLimit-Remaining') || '5');
@@ -161,11 +159,6 @@ export default function Home() {
 
             if (chunk.isComplete) {
               setBatchProcessing(prev => prev ? { ...prev, isProcessing: false } : null);
-              if (source === 'image') {
-                imageUploadRef.current?.clear();
-              } else if (source === 'text') {
-                textInputRef.current?.clear();
-              }
               break;
             }
 
@@ -208,8 +201,6 @@ export default function Home() {
 
   const handleImageSelect = async (files: File[]) => {
     if (files.length === 0) return;
-
-    imageUploadRef.current?.clear();
 
     addToQueue(
       'image',
@@ -371,8 +362,6 @@ export default function Home() {
   };
 
   const handleTextSubmit = async (text: string) => {
-    textInputRef.current?.clear();
-
     addToQueue(
       'text',
       text,
@@ -553,6 +542,20 @@ export default function Home() {
     );
   };
 
+  const handleSmartInputSubmit = async (data: { text: string; images: File[] }) => {
+    const { text, images } = data;
+
+    if (images.length > 0) {
+      handleImageSelect(images);
+    }
+
+    if (text.trim().length > 0) {
+      handleTextSubmit(text);
+    }
+
+    smartInputRef.current?.clear();
+  };
+
   const handleError = (errorMessage: string) => {
     const processingId = `error-${Date.now()}`;
     setProcessingEvents(prev => [...prev, {
@@ -659,30 +662,23 @@ export default function Home() {
           <p className="text-gray-600">Transform images and text into calendar events</p>
         </header>
 
-        {/* Single card input section */}
+        {/* Smart input section */}
         <div className="border-2 border-black p-4 mb-12">
-          <h2 className="text-lg font-medium mb-4 text-black">Add an image or enter text</h2>
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1">
-              <ImageUpload
-                ref={imageUploadRef}
-                onImageSelect={handleImageSelect}
-                onError={handleError}
-              />
-            </div>
-
-            <div className="flex-1">
-              <TextInput
-                ref={textInputRef}
-                onTextSubmit={handleTextSubmit}
-              />
-            </div>
-          </div>
+          <h2 className="text-lg font-medium mb-4 text-black">Add images, text, or both</h2>
+          <SmartInput
+            ref={smartInputRef}
+            onSubmit={handleSmartInputSubmit}
+            onError={handleError}
+          />
         </div>
 
         {/* Error notifications */}
         <ErrorNotification
-          errors={processingEvents}
+          errors={processingEvents.filter(e => e.status === 'error' && e.error).map(e => ({
+            id: e.id,
+            type: e.type,
+            error: e.error!,
+          }))}
           onDismiss={handleRemoveFromQueue}
         />
 

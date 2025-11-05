@@ -1,0 +1,359 @@
+'use client';
+
+import { useState, useRef, useCallback, useImperativeHandle, forwardRef, useEffect } from 'react';
+import URLPill from './URLPill';
+
+interface SmartInputProps {
+  onSubmit: (data: { text: string; images: File[] }) => void;
+  onError: (error: string) => void;
+}
+
+export interface SmartInputHandle {
+  clear: () => void;
+}
+
+const MIN_TEXT_LENGTH = 3;
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+const MAX_FILES = 25;
+const ACCEPTED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/heic'];
+const URL_REGEX = /(https?:\/\/(?:www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b(?:[-a-zA-Z0-9()@:%_\+.~#?&\/=]*))/gi;
+
+interface ImagePreview {
+  file: File;
+  preview: string;
+}
+
+const SmartInput = forwardRef<SmartInputHandle, SmartInputProps>(
+  function SmartInput({ onSubmit, onError }, ref) {
+    const [text, setText] = useState('');
+    const [images, setImages] = useState<ImagePreview[]>([]);
+    const [error, setError] = useState<string | null>(null);
+    const [detectedUrls, setDetectedUrls] = useState<string[]>([]);
+    const [isDragging, setIsDragging] = useState(false);
+    const [hoveredImageIndex, setHoveredImageIndex] = useState<number | null>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+    useImperativeHandle(ref, () => ({
+      clear: () => {
+        setText('');
+        setImages([]);
+        setError(null);
+        setDetectedUrls([]);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+      },
+    }));
+
+    useEffect(() => {
+      const matches = text.match(URL_REGEX);
+      if (matches) {
+        const uniqueUrls = Array.from(new Set(matches));
+        setDetectedUrls(uniqueUrls);
+      } else {
+        setDetectedUrls([]);
+      }
+    }, [text]);
+
+    const validateFile = (file: File): string | null => {
+      if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
+        return 'Please upload a valid image file (JPEG, PNG, WebP, or HEIC)';
+      }
+      if (file.size > MAX_FILE_SIZE) {
+        return 'File size must be less than 10MB';
+      }
+      return null;
+    };
+
+    const handleFiles = useCallback((files: File[]) => {
+      if (files.length === 0) return;
+
+      if (images.length + files.length > MAX_FILES) {
+        onError(`You can only upload up to ${MAX_FILES} images at once`);
+        return;
+      }
+
+      const validFiles: File[] = [];
+      const errors: string[] = [];
+
+      files.forEach(file => {
+        const errorMsg = validateFile(file);
+        if (errorMsg) {
+          errors.push(`${file.name}: ${errorMsg}`);
+        } else {
+          validFiles.push(file);
+        }
+      });
+
+      if (errors.length > 0) {
+        onError(errors.join('\n'));
+      }
+
+      if (validFiles.length === 0) return;
+
+      const newPreviews: ImagePreview[] = [];
+      validFiles.forEach((file) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          newPreviews.push({
+            file,
+            preview: reader.result as string,
+          });
+          if (newPreviews.length === validFiles.length) {
+            setImages(prev => [...prev, ...newPreviews]);
+          }
+        };
+        reader.readAsDataURL(file);
+      });
+    }, [images.length, onError]);
+
+    const handleDragOver = (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsDragging(true);
+    };
+
+    const handleDragLeave = (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsDragging(false);
+    };
+
+    const handleDrop = (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsDragging(false);
+
+      const files = Array.from(e.dataTransfer.files).filter(file =>
+        ACCEPTED_IMAGE_TYPES.includes(file.type)
+      );
+      if (files.length > 0) {
+        handleFiles(files);
+      }
+    };
+
+    const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const files = e.target.files;
+      if (files && files.length > 0) {
+        handleFiles(Array.from(files));
+      }
+    };
+
+    const handleImageClick = (e: React.MouseEvent, preview: string) => {
+      e.stopPropagation();
+      window.open(preview, '_blank');
+    };
+
+    const handleRemoveImage = (e: React.MouseEvent, index: number) => {
+      e.stopPropagation();
+      setImages(prev => prev.filter((_, i) => i !== index));
+    };
+
+    const handleSubmit = useCallback(() => {
+      setError(null);
+
+      const trimmedText = text.trim();
+
+      if (trimmedText.length < MIN_TEXT_LENGTH && images.length === 0) {
+        setError('Please enter at least 3 characters or add an image');
+        return;
+      }
+
+      onSubmit({
+        text: trimmedText,
+        images: images.map(img => img.file),
+      });
+    }, [text, images, onSubmit]);
+
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        handleSubmit();
+      }
+    };
+
+    const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+      setText(e.target.value);
+      if (error) {
+        setError(null);
+      }
+    };
+
+    const handleRemoveUrl = (urlToRemove: string) => {
+      setText(prevText => prevText.replace(urlToRemove, '').trim());
+    };
+
+    const handleUploadClick = () => {
+      fileInputRef.current?.click();
+    };
+
+    const isButtonEnabled = text.trim().length >= MIN_TEXT_LENGTH || images.length > 0;
+
+    return (
+      <div className="w-full space-y-4">
+        <div
+          className={`relative border-2 rounded-lg transition-all duration-200 ${
+            isDragging
+              ? 'border-black bg-gray-50'
+              : error
+                ? 'border-red-500'
+                : 'border-gray-300 hover:border-black'
+          }`}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+        >
+          {/* Image thumbnails at top-left */}
+          {images.length > 0 && (
+            <div className="absolute top-3 left-3 flex gap-1.5 z-10">
+              {images.map((img, index) => (
+                <div
+                  key={index}
+                  className="relative group"
+                  onMouseEnter={() => setHoveredImageIndex(index)}
+                  onMouseLeave={() => setHoveredImageIndex(null)}
+                >
+                  <div
+                    onClick={(e) => handleImageClick(e, img.preview)}
+                    className="w-12 h-12 border-2 border-black bg-white rounded cursor-pointer overflow-hidden"
+                  >
+                    <img
+                      src={img.preview}
+                      alt={`Uploaded ${index + 1}`}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <button
+                    onClick={(e) => handleRemoveImage(e, index)}
+                    className="absolute -top-1 -right-1 w-4 h-4 bg-black text-white rounded-full flex items-center justify-center hover:bg-gray-800 focus:outline-none"
+                    aria-label={`Remove image ${index + 1}`}
+                  >
+                    <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+
+                  {/* Tooltip preview */}
+                  {hoveredImageIndex === index && (
+                    <div className="absolute top-full left-0 mt-2 z-50 pointer-events-none">
+                      <div className="bg-black p-2 rounded shadow-lg">
+                        <img
+                          src={img.preview}
+                          alt={`Preview ${index + 1}`}
+                          className="w-48 h-48 object-cover rounded"
+                        />
+                        <p className="text-white text-xs mt-1 text-center">{img.file.name}</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          <textarea
+            ref={textareaRef}
+            value={text}
+            onChange={handleChange}
+            onKeyDown={handleKeyDown}
+            placeholder="Type or paste event details, or drag images here..."
+            aria-label="Enter event details as text or drop images"
+            aria-describedby={error ? 'smart-input-error' : undefined}
+            aria-invalid={error ? 'true' : 'false'}
+            rows={6}
+            className={`
+              w-full px-4 py-3 rounded-lg
+              text-black placeholder-gray-400 bg-transparent
+              resize-none
+              transition-all duration-200
+              focus:outline-none focus:ring-2 focus:ring-black focus:ring-offset-2
+              ${images.length > 0 ? 'pt-[60px]' : ''}
+            `}
+          />
+
+          {/* Hidden file input */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            className="hidden"
+            accept={ACCEPTED_IMAGE_TYPES.join(',')}
+            multiple
+            onChange={handleFileInputChange}
+            aria-hidden="true"
+          />
+        </div>
+
+        {error && (
+          <p id="smart-input-error" className="text-sm text-red-600" role="alert">
+            {error}
+          </p>
+        )}
+
+        {/* Image count label */}
+        {images.length > 0 && (
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-600">
+              {images.length} image{images.length !== 1 ? 's' : ''} added
+            </span>
+            <button
+              onClick={handleUploadClick}
+              className="text-sm text-black underline hover:no-underline focus:outline-none"
+            >
+              Add more
+            </button>
+          </div>
+        )}
+
+        {/* URL pills */}
+        {detectedUrls.length > 0 && (
+          <div
+            className="flex flex-wrap gap-1.5 items-center"
+            aria-label="Detected URLs"
+          >
+            {detectedUrls.map((url, index) => (
+              <URLPill
+                key={`${url}-${index}`}
+                url={url}
+                onRemove={() => handleRemoveUrl(url)}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* Action buttons */}
+        <div className="flex items-center justify-between gap-2">
+          {images.length === 0 && (
+            <button
+              onClick={handleUploadClick}
+              className="px-4 py-2 text-sm border-2 border-gray-300 text-gray-600 rounded-lg hover:border-black hover:text-black transition-colors focus:outline-none focus:ring-2 focus:ring-black focus:ring-offset-2"
+              aria-label="Add images"
+            >
+              Add Images
+            </button>
+          )}
+
+          <button
+            onClick={handleSubmit}
+            disabled={!isButtonEnabled}
+            aria-label="Transform content to events"
+            className={`
+              ml-auto px-6 py-2 rounded-lg font-medium
+              transition-all duration-200
+              focus:outline-none focus:ring-2 focus:ring-black focus:ring-offset-2
+              ${
+                !isButtonEnabled
+                  ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                  : 'bg-black text-white hover:bg-gray-800'
+              }
+            `}
+          >
+            Transform
+          </button>
+        </div>
+      </div>
+    );
+  }
+);
+
+export default SmartInput;
