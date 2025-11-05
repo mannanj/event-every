@@ -30,7 +30,7 @@ export default function HistoryPanel({ onEventSelect }: HistoryPanelProps) {
   };
 
   const handleDeleteEvent = (id: string) => {
-    if (confirm('Delete this event from history?')) {
+    if (confirm('Delete this processed event?')) {
       deleteEvent(id);
     }
   };
@@ -61,10 +61,10 @@ export default function HistoryPanel({ onEventSelect }: HistoryPanelProps) {
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="fixed top-4 right-4 z-50 bg-black text-white px-4 py-2 border-2 border-black hover:bg-white hover:text-black transition-colors focus:outline-none focus:ring-2 focus:ring-black"
-        aria-label={isOpen ? 'Close history' : 'Open history'}
+        aria-label={isOpen ? 'Close processed events' : 'Open processed events'}
         aria-expanded={isOpen}
       >
-        {isOpen ? '✕' : 'History'}
+        {isOpen ? '✕' : 'Processed'}
       </button>
 
       {isOpen && (
@@ -80,12 +80,12 @@ export default function HistoryPanel({ onEventSelect }: HistoryPanelProps) {
           isOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
         role="dialog"
-        aria-label="Event History"
+        aria-label="Processed Events"
         aria-hidden={!isOpen}
       >
         <div className="flex flex-col h-full">
           <div className="p-6 border-b-2 border-black">
-            <h2 className="text-2xl font-bold mb-4">Event History</h2>
+            <h2 className="text-2xl font-bold mb-4">Processed</h2>
 
             <input
               type="text"
@@ -105,9 +105,9 @@ export default function HistoryPanel({ onEventSelect }: HistoryPanelProps) {
                       ? 'bg-black text-white'
                       : 'bg-white text-black hover:bg-gray-100'
                   }`}
-                  aria-label="Clear all history"
+                  aria-label="Clear all processed events"
                 >
-                  {showClearConfirm ? 'Click again to confirm' : 'Clear All History'}
+                  {showClearConfirm ? 'Click again to confirm' : 'Clear All Processed'}
                 </button>
               </div>
             )}
@@ -130,7 +130,7 @@ export default function HistoryPanel({ onEventSelect }: HistoryPanelProps) {
             {!isLoading && events.length === 0 && (
               <div className="text-center py-8">
                 <p className="text-gray-500">
-                  {searchQuery ? 'No events found' : 'No events in history'}
+                  {searchQuery ? 'No events found' : 'No processed events'}
                 </p>
               </div>
             )}

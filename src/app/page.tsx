@@ -4,9 +4,9 @@ import { useState, useRef } from 'react';
 import ImageUpload, { ImageUploadHandle } from '@/components/ImageUpload';
 import TextInput, { TextInputHandle } from '@/components/TextInput';
 import EventEditor from '@/components/EventEditor';
-import BatchEventList from '@/components/BatchEventList';
+import ProcessingSection from '@/components/ProcessingSection';
+import ErrorNotification from '@/components/ErrorNotification';
 import RateLimitBanner from '@/components/RateLimitBanner';
-import ProcessingQueuePanel from '@/components/ProcessingQueuePanel';
 import { CalendarEvent, ParsedEvent, StreamedEventChunk, EventAttachment } from '@/types/event';
 import { exportToICS } from '@/services/exporter';
 import { useHistory } from '@/hooks/useHistory';
@@ -55,7 +55,7 @@ export default function Home() {
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
   const [rateLimitInfo, setRateLimitInfo] = useState<{ remaining: number; total: number; resetTime: number } | undefined>();
   const { events, addEvent, deleteEvent } = useHistory();
-  const { queue, cancelItem, clearCompleted, addToQueue, updateProgress } = useProcessingQueue();
+  const { addToQueue, updateProgress } = useProcessingQueue();
   const imageUploadRef = useRef<ImageUploadHandle>(null);
   const textInputRef = useRef<TextInputHandle>(null);
 
@@ -680,178 +680,25 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Image processing progress section */}
-        {imageProcessingStatuses.length > 0 && (
-          <div className="mb-12">
-            <div className="border-2 border-black p-4">
-              <h2 className="text-lg font-bold mb-4 text-black">
-                Processing {imageProcessingStatuses.length} image{imageProcessingStatuses.length !== 1 ? 's' : ''}
-              </h2>
-              <div className="space-y-3">
-                {imageProcessingStatuses.map((status, index) => (
-                  <div
-                    key={status.id}
-                    className="flex items-center gap-3 p-3 bg-gray-50 border border-gray-300"
-                  >
-                    <div className="flex-shrink-0">
-                      {status.status === 'pending' && (
-                        <div className="w-6 h-6 border-2 border-gray-300 rounded-full" />
-                      )}
-                      {status.status === 'processing' && (
-                        <div className="animate-spin rounded-full h-6 w-6 border-2 border-black border-t-transparent" />
-                      )}
-                      {status.status === 'complete' && (
-                        <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                      )}
-                      {status.status === 'error' && (
-                        <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      )}
-                    </div>
+        {/* Error notifications */}
+        <ErrorNotification
+          errors={processingEvents}
+          onDismiss={handleRemoveFromQueue}
+        />
 
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-sm text-black truncate">{status.filename}</p>
-                      <p className="text-xs text-gray-600">
-                        {status.status === 'pending' && 'Waiting...'}
-                        {status.status === 'processing' && 'Processing...'}
-                        {status.status === 'complete' && `Complete - ${status.eventCount || 0} event${status.eventCount !== 1 ? 's' : ''} found`}
-                        {status.status === 'error' && status.error}
-                      </p>
-                    </div>
-
-                    <div className="text-xs text-gray-500 flex-shrink-0">
-                      {index + 1}/{imageProcessingStatuses.length}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* URL processing progress section */}
-        {urlProcessingStatus && (
-          <div className="mb-12">
-            <div className="border-2 border-black p-4">
-              <div className="flex items-center gap-3">
-                {urlProcessingStatus.phase !== 'complete' && (
-                  <div className="animate-spin rounded-full h-6 w-6 border-2 border-black border-t-transparent" />
-                )}
-                {urlProcessingStatus.phase === 'complete' && (
-                  <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                )}
-                <div className="flex-1">
-                  <p className="font-medium text-black">{urlProcessingStatus.message}</p>
-                  {urlProcessingStatus.phase === 'fetching' && urlProcessingStatus.urlCount && (
-                    <p className="text-sm text-gray-600 mt-1">
-                      Processing {urlProcessingStatus.urlCount} URL{urlProcessingStatus.urlCount !== 1 ? 's' : ''}
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Batch processing section */}
-        {batchProcessing && (
-          <div className="mb-12">
-            <BatchEventList
-              events={batchProcessing.events}
-              isProcessing={batchProcessing.isProcessing}
-              totalExpected={batchProcessing.totalExpected}
-              source={batchProcessing.source}
-              onEdit={handleBatchEventEdit}
-              onDelete={handleBatchEventDelete}
-              onExport={handleBatchEventExport}
-              onCancel={handleCancelBatch}
-              onExportComplete={(events) => {
-                events.forEach(event => addEvent(event));
-              }}
-            />
-          </div>
-        )}
-
-        {/* Processing queue section */}
-        {processingEvents.length > 0 && (
-          <div className="mb-12">
-            <h2 className="text-2xl font-bold mb-4 text-black">Processing</h2>
-            <div className="space-y-4">
-              {processingEvents.map((item) => (
-                <div
-                  key={item.id}
-                  className={`border-2 p-4 ${
-                    item.status === 'error' ? 'border-red-500 bg-red-50' :
-                    item.status === 'success' ? 'border-green-500 bg-green-50' :
-                    'border-black bg-white'
-                  }`}
-                >
-                  {item.status === 'processing' && (
-                    <div className="flex items-center gap-3">
-                      <div className="animate-spin rounded-full h-6 w-6 border-2 border-black border-t-transparent" />
-                      <span className="text-black flex-1">Processing {item.type} input...</span>
-                      <button
-                        onClick={() => handleRemoveFromQueue(item.id)}
-                        className="ml-2 text-black hover:text-gray-600 focus:outline-none"
-                        aria-label="Cancel processing"
-                      >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
-                    </div>
-                  )}
-
-                  {item.status === 'success' && item.event && (
-                    <div className="flex items-center gap-3">
-                      <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                      <div className="flex-1">
-                        <span className="font-bold text-black">{item.event.title}</span>
-                        <span className="text-sm text-gray-600 ml-2">
-                          {formatDate(item.event.startDate)}
-                        </span>
-                      </div>
-                      <button
-                        onClick={() => handleRemoveFromQueue(item.id)}
-                        className="ml-2 text-black hover:text-gray-600 focus:outline-none"
-                        aria-label="Remove from queue"
-                      >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
-                    </div>
-                  )}
-
-                  {item.status === 'error' && (
-                    <div className="flex items-center gap-3">
-                      <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                      <span className="text-red-600 flex-1">{item.error}</span>
-                      <button
-                        onClick={() => handleRemoveFromQueue(item.id)}
-                        className="ml-2 text-black hover:text-gray-600 focus:outline-none"
-                        aria-label="Remove from queue"
-                      >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+        {/* Unified Processing section */}
+        <ProcessingSection
+          imageProcessingStatuses={imageProcessingStatuses}
+          urlProcessingStatus={urlProcessingStatus}
+          batchProcessing={batchProcessing}
+          onBatchEventEdit={handleBatchEventEdit}
+          onBatchEventDelete={handleBatchEventDelete}
+          onBatchEventExport={handleBatchEventExport}
+          onCancelBatch={handleCancelBatch}
+          onExportComplete={(events) => {
+            events.forEach(event => addEvent(event));
+          }}
+        />
 
         {/* Event editor section */}
         {editingEvent && (
@@ -932,12 +779,6 @@ export default function Home() {
           </div>
         )}
 
-        {/* Processing queue panel */}
-        <ProcessingQueuePanel
-          items={queue}
-          onCancel={cancelItem}
-          onClear={clearCompleted}
-        />
       </div>
     </main>
   );
