@@ -714,8 +714,8 @@ export default function Home() {
 
         {/* History section */}
         {events.length > 0 && (
-          <div className="mb-12 -mx-8 bg-green-100 bg-opacity-30 p-6 rounded-lg">
-            <div className="max-w-4xl mx-auto space-y-4">
+          <div className="mb-12 -mx-[14.28%] bg-green-100 bg-opacity-30 px-[14.28%] py-6 rounded-lg">
+            <div className="space-y-4">
               {events.map((event) => (
                 <div
                   key={event.id}
