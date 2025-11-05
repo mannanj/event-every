@@ -64,8 +64,15 @@ export default function Home() {
     attachments?: EventAttachment[]
   ): CalendarEvent => {
     const now = new Date();
-    const startDate = parsed.startDate ? new Date(parsed.startDate) : now;
-    const endDate = parsed.endDate ? new Date(parsed.endDate) : new Date(startDate.getTime() + 60 * 60 * 1000);
+
+    const parseDate = (dateString: string | undefined, fallback: Date): Date => {
+      if (!dateString) return fallback;
+      const date = new Date(dateString);
+      return isNaN(date.getTime()) ? fallback : date;
+    };
+
+    const startDate = parseDate(parsed.startDate, now);
+    const endDate = parseDate(parsed.endDate, new Date(startDate.getTime() + 60 * 60 * 1000));
 
     return {
       id: `event-${Date.now()}-${Math.random().toString(36).substring(7)}`,
@@ -449,6 +456,9 @@ export default function Home() {
   };
 
   const formatDate = (date: Date) => {
+    if (isNaN(date.getTime())) {
+      return 'Invalid Date';
+    }
     return new Intl.DateTimeFormat('en-US', {
       month: 'short',
       day: 'numeric',

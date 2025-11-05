@@ -57,6 +57,9 @@ export default function BatchEventList({
   };
 
   const formatDate = (date: Date) => {
+    if (isNaN(date.getTime())) {
+      return 'Invalid Date';
+    }
     return new Intl.DateTimeFormat('en-US', {
       month: 'short',
       day: 'numeric',
@@ -67,6 +70,9 @@ export default function BatchEventList({
   };
 
   const formatCompactDate = (date: Date) => {
+    if (isNaN(date.getTime())) {
+      return 'Invalid Date';
+    }
     return new Intl.DateTimeFormat('en-US', {
       month: 'short',
       day: 'numeric',
