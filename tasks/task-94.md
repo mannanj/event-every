@@ -7,12 +7,14 @@
 - [x] Remove "URL:" text prefix
 - [x] Remove "www." from displayed hostname
 - [x] Detect meetup.com URLs and show only path (no domain)
-- [x] Add icon system for pill types (calendar icon for meetup.com, link icon for generic URLs)
+- [x] Remove leading "/" from meetup URL paths in pill display
+- [x] Add icon system for pill types (link icon for all URLs)
 - [x] Remove buggy hover effect where text turns black
 - [x] Change copy interaction: clicking pill (except X) copies content
 - [x] Transform icon to copy button on hover
 - [x] Transform icon to checkmark when copied
 - [x] Show tooltip with full URL on hover
+- [x] Enable text wrapping in tooltip with max-width constraint
 - [x] Show toast message "copied <type> to clipboard" on copy
 - [x] Keep X button for removal (click only on X to remove)
 - Location: `src/components/URLPill.tsx`, `src/components/TextInput.tsx`

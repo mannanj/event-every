@@ -28,7 +28,8 @@ const URLPill = ({ url, onRemove }: URLPillProps) => {
       const path = urlObj.pathname + urlObj.search;
 
       if (hostname.includes('meetup.com')) {
-        return path.length > 12 ? `${path.substring(0, 10)}...` : path;
+        const pathWithoutSlash = path.replace(/^\//, '');
+        return pathWithoutSlash.length > 12 ? `${pathWithoutSlash.substring(0, 10)}...` : pathWithoutSlash;
       }
 
       if (path.length <= 8) {
@@ -38,6 +39,21 @@ const URLPill = ({ url, onRemove }: URLPillProps) => {
       return `${hostname}${path.substring(0, 6)}...`;
     } catch {
       return url.length > 12 ? `${url.substring(0, 10)}...` : url;
+    }
+  };
+
+  const getTooltipText = (url: string) => {
+    try {
+      const urlObj = new URL(url);
+      const hostname = urlObj.hostname.replace(/^www\./, '');
+
+      if (hostname.includes('meetup.com')) {
+        return `Copy Meetup Event ${url}`;
+      }
+
+      return url;
+    } catch {
+      return url;
     }
   };
 
@@ -78,10 +94,6 @@ const URLPill = ({ url, onRemove }: URLPillProps) => {
             <svg className="w-2.5 h-2.5 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
             </svg>
-          ) : isMeetupURL(url) ? (
-            <svg className="w-2.5 h-2.5 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
           ) : (
             <svg className="w-2.5 h-2.5 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
@@ -104,8 +116,8 @@ const URLPill = ({ url, onRemove }: URLPillProps) => {
         </button>
 
         {isHovered && !copied && (
-          <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-1 px-2 py-1 bg-black text-white text-[10px] rounded whitespace-nowrap z-50">
-            {url}
+          <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-1 px-2 py-1 bg-black text-white text-[10px] rounded z-50 max-w-sm break-words">
+            {getTooltipText(url)}
           </div>
         )}
       </div>
