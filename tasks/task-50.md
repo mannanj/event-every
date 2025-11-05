@@ -8,3 +8,5 @@
 - [ ] Add validation for valid URLs
 - [ ] Update EventConfirmation to show webpage source
 - Location: `src/components/LinkInput.tsx`, `src/services/webScraper.ts`, `src/app/page.tsx`
+
+**Note:** Superseded by Task 87 (Advanced LLM-Powered Batch URL Detection)
