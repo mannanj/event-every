@@ -4,6 +4,12 @@ import { useState, useEffect } from 'react';
 import { CalendarEvent } from '@/types/event';
 import { exportToICS, exportMultipleToICS } from '@/services/exporter';
 
+/**
+ * Batch event list component for reviewing and exporting multiple events.
+ *
+ * Workflow: User selects events → Clicks Export → Events saved to history → UI cleared
+ * Note: Events are automatically saved to history during export via onExportComplete callback.
+ */
 interface BatchEventListProps {
   events: CalendarEvent[];
   isProcessing: boolean;
@@ -12,7 +18,7 @@ interface BatchEventListProps {
   onDelete: (eventId: string) => void;
   onExport: (event: CalendarEvent) => void;
   onCancel: () => void;
-  onSaveToHistory: (events: CalendarEvent[]) => void;
+  onExportComplete: (events: CalendarEvent[]) => void;
 }
 
 export default function BatchEventList({
@@ -23,7 +29,7 @@ export default function BatchEventList({
   onDelete,
   onExport,
   onCancel,
-  onSaveToHistory,
+  onExportComplete,
 }: BatchEventListProps) {
   const [expandedEventIds, setExpandedEventIds] = useState<Set<string>>(new Set());
   const [selectedEventIds, setSelectedEventIds] = useState<Set<string>>(new Set());
@@ -91,7 +97,8 @@ export default function BatchEventList({
     const result = exportMultipleToICS(selectedEvents);
 
     if (result.success) {
-      onSaveToHistory(selectedEvents);
+      // Export succeeded: save events to history and clear batch UI
+      onExportComplete(selectedEvents);
       onCancel();
     } else {
       alert(`Export failed: ${result.error}`);

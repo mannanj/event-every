@@ -16,7 +16,7 @@ export interface CalendarEvent {
   description?: string;
   allDay: boolean;
   created: Date;
-  source: 'image' | 'text';
+  source: 'image' | 'text' | 'url';
   originalInput?: string;
   attachments?: EventAttachment[];
 }

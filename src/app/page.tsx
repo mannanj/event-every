@@ -450,16 +450,6 @@ export default function Home() {
     exportToICS(event);
   };
 
-  const handleSaveBatch = () => {
-    if (!batchProcessing) return;
-
-    batchProcessing.events.forEach(event => {
-      addEvent(event);
-    });
-
-    setBatchProcessing(null);
-  };
-
   const handleCancelBatch = () => {
     setBatchProcessing(null);
   };
@@ -573,7 +563,7 @@ export default function Home() {
               onDelete={handleBatchEventDelete}
               onExport={handleBatchEventExport}
               onCancel={handleCancelBatch}
-              onSaveToHistory={(events) => {
+              onExportComplete={(events) => {
                 events.forEach(event => addEvent(event));
               }}
             />
