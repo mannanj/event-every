@@ -5,7 +5,6 @@ import { useState, useRef, useCallback, useImperativeHandle, forwardRef } from '
 interface ImageUploadProps {
   onImageSelect: (files: File[]) => void;
   onError: (error: string) => void;
-  isLoading?: boolean;
 }
 
 export interface ImageUploadHandle {
@@ -17,7 +16,7 @@ const MAX_FILES = 25;
 const ACCEPTED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/heic'];
 
 const ImageUpload = forwardRef<ImageUploadHandle, ImageUploadProps>(
-  function ImageUpload({ onImageSelect, onError, isLoading = false }, ref) {
+  function ImageUpload({ onImageSelect, onError }, ref) {
     const [isDragging, setIsDragging] = useState(false);
     const [previews, setPreviews] = useState<string[]>([]);
     const [fileCount, setFileCount] = useState(0);
@@ -89,9 +88,7 @@ const ImageUpload = forwardRef<ImageUploadHandle, ImageUploadProps>(
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
-    if (!isLoading) {
-      setIsDragging(true);
-    }
+    setIsDragging(true);
   };
 
   const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
@@ -105,8 +102,6 @@ const ImageUpload = forwardRef<ImageUploadHandle, ImageUploadProps>(
     e.stopPropagation();
     setIsDragging(false);
 
-    if (isLoading) return;
-
     const files = Array.from(e.dataTransfer.files);
     if (files.length > 0) {
       handleFiles(files);
@@ -114,7 +109,7 @@ const ImageUpload = forwardRef<ImageUploadHandle, ImageUploadProps>(
   };
 
   const handleClick = () => {
-    if (!isLoading && fileInputRef.current) {
+    if (fileInputRef.current) {
       fileInputRef.current.click();
     }
   };
@@ -137,9 +132,8 @@ const ImageUpload = forwardRef<ImageUploadHandle, ImageUploadProps>(
     <div className="w-full">
       <div
         role="button"
-        tabIndex={isLoading ? -1 : 0}
+        tabIndex={0}
         aria-label="Upload image files. Click or drag and drop one or more images to extract event details"
-        aria-disabled={isLoading}
         className={`
           relative border-2 border-dashed rounded-lg p-8 text-center
           transition-all duration-200 cursor-pointer
@@ -147,7 +141,6 @@ const ImageUpload = forwardRef<ImageUploadHandle, ImageUploadProps>(
             ? 'border-black bg-gray-50'
             : 'border-gray-300 hover:border-black hover:bg-gray-50'
           }
-          ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}
           ${fileCount > 0 ? 'border-solid' : ''}
           focus:outline-none focus:ring-2 focus:ring-black focus:ring-offset-2
         `}
@@ -164,7 +157,6 @@ const ImageUpload = forwardRef<ImageUploadHandle, ImageUploadProps>(
           accept={ACCEPTED_IMAGE_TYPES.join(',')}
           multiple
           onChange={handleFileInputChange}
-          disabled={isLoading}
           aria-hidden="true"
         />
 
@@ -200,9 +192,7 @@ const ImageUpload = forwardRef<ImageUploadHandle, ImageUploadProps>(
                 <p className="font-medium text-black mt-2">{fileCount} image{fileCount !== 1 ? 's' : ''} selected</p>
               </div>
             )}
-            {!isLoading && (
-              <p className="text-sm text-gray-600">Click to change images</p>
-            )}
+            <p className="text-sm text-gray-600">Click to change images</p>
           </div>
         ) : (
           <div className="space-y-4">
@@ -224,15 +214,6 @@ const ImageUpload = forwardRef<ImageUploadHandle, ImageUploadProps>(
               <p className="font-medium">Click to upload or drag and drop</p>
               <p className="text-sm mt-1">JPEG, PNG, WebP, or HEIC up to 10MB</p>
               <p className="text-sm mt-1">Select up to {MAX_FILES} images at once</p>
-            </div>
-          </div>
-        )}
-
-        {isLoading && (
-          <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-90 rounded-lg">
-            <div className="text-center space-y-2">
-              <div className="animate-spin rounded-full h-8 w-8 border-2 border-black border-t-transparent mx-auto" />
-              <p className="text-sm text-gray-600">Uploading...</p>
             </div>
           </div>
         )}

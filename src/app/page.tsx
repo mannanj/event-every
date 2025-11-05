@@ -6,12 +6,15 @@ import TextInput, { TextInputHandle } from '@/components/TextInput';
 import EventEditor from '@/components/EventEditor';
 import BatchEventList from '@/components/BatchEventList';
 import RateLimitBanner from '@/components/RateLimitBanner';
+import ProcessingQueuePanel from '@/components/ProcessingQueuePanel';
 import { CalendarEvent, ParsedEvent, StreamedEventChunk, EventAttachment } from '@/types/event';
 import { exportToICS } from '@/services/exporter';
 import { useHistory } from '@/hooks/useHistory';
+import { useProcessingQueue } from '@/hooks/useProcessingQueue';
 import { deduplicateEvents } from '@/utils/deduplication';
 import { detectURLs } from '@/services/urlDetector';
 import { scrapeURLsBatch } from '@/services/webScraper';
+import { QueueItem } from '@/services/processingQueue';
 
 interface ProcessingEvent {
   id: string;
@@ -51,6 +54,7 @@ export default function Home() {
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
   const [rateLimitInfo, setRateLimitInfo] = useState<{ remaining: number; total: number; resetTime: number } | undefined>();
   const { events, addEvent, deleteEvent } = useHistory();
+  const { queue, cancelItem, clearCompleted, addToQueue, updateProgress } = useProcessingQueue();
   const imageUploadRef = useRef<ImageUploadHandle>(null);
   const textInputRef = useRef<TextInputHandle>(null);
 
@@ -203,241 +207,346 @@ export default function Home() {
   const handleImageSelect = async (files: File[]) => {
     if (files.length === 0) return;
 
-    const batchId = `batch-${Date.now()}`;
+    imageUploadRef.current?.clear();
 
-    const initialStatuses: ImageProcessingStatus[] = files.map((file, index) => ({
-      id: `image-${Date.now()}-${index}`,
-      filename: file.name,
-      status: 'pending' as const,
-    }));
+    addToQueue(
+      'image',
+      files,
+      async (queueItem: QueueItem) => {
+        const imageFiles = queueItem.payload as File[];
+        const allEvents: CalendarEvent[] = [];
 
-    setImageProcessingStatuses(initialStatuses);
-    setBatchProcessing({
-      id: batchId,
-      events: [],
-      isProcessing: true,
-    });
-
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      const statusId = initialStatuses[i].id;
-
-      setImageProcessingStatuses(prev =>
-        prev.map(s => s.id === statusId ? { ...s, status: 'processing' as const } : s)
-      );
-
-      try {
-        const reader = new FileReader();
-        const base64Promise = new Promise<string>((resolve, reject) => {
-          reader.onload = () => {
-            const result = reader.result as string;
-            const base64 = result.split(',')[1];
-            resolve(base64);
-          };
-          reader.onerror = reject;
-          reader.readAsDataURL(file);
+        const batchId = `batch-${Date.now()}`;
+        setBatchProcessing({
+          id: batchId,
+          events: [],
+          isProcessing: true,
         });
 
-        const base64 = await base64Promise;
-        const mimeType = file.type;
-
-        const attachment: EventAttachment = {
-          id: `attachment-${Date.now()}-${i}`,
+        const initialStatuses: ImageProcessingStatus[] = imageFiles.map((file, index) => ({
+          id: `image-${Date.now()}-${index}`,
           filename: file.name,
-          mimeType,
-          data: base64,
-          type: 'original-image',
-          size: file.size,
-        };
+          status: 'pending' as const,
+        }));
 
-        const response = await fetch('/api/parse', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            imageBase64: base64,
-            imageMimeType: mimeType,
-            batch: true,
-          }),
-        });
+        setImageProcessingStatuses(initialStatuses);
 
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({ error: 'Failed to process image' }));
-          throw new Error(errorData.error || 'Failed to process image');
-        }
+        for (let i = 0; i < imageFiles.length; i++) {
+          const file = imageFiles[i];
+          const statusId = initialStatuses[i].id;
 
-        updateRateLimitFromHeaders(response.headers);
+          setImageProcessingStatuses(prev =>
+            prev.map(s => s.id === statusId ? { ...s, status: 'processing' as const } : s)
+          );
 
-        const reader2 = response.body?.getReader();
-        if (!reader2) {
-          throw new Error('No response stream');
-        }
+          updateProgress(queueItem.id, Math.round((i / imageFiles.length) * 100));
 
-        const decoder = new TextDecoder();
-        let buffer = '';
-        let eventsFromThisImage = 0;
+          try {
+            const reader = new FileReader();
+            const base64Promise = new Promise<string>((resolve, reject) => {
+              reader.onload = () => {
+                const result = reader.result as string;
+                const base64 = result.split(',')[1];
+                resolve(base64);
+              };
+              reader.onerror = reject;
+              reader.readAsDataURL(file);
+            });
 
-        while (true) {
-          const { done, value } = await reader2.read();
-          if (done) break;
+            const base64 = await base64Promise;
+            const mimeType = file.type;
 
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\n\n');
-          buffer = lines.pop() || '';
+            const attachment: EventAttachment = {
+              id: `attachment-${Date.now()}-${i}`,
+              filename: file.name,
+              mimeType,
+              data: base64,
+              type: 'original-image',
+              size: file.size,
+            };
 
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              const data = JSON.parse(line.slice(6));
+            const response = await fetch('/api/parse', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                imageBase64: base64,
+                imageMimeType: mimeType,
+                batch: true,
+              }),
+            });
 
-              if (data.error) {
-                throw new Error(data.error);
-              }
+            if (!response.ok) {
+              const errorData = await response.json().catch(() => ({ error: 'Failed to process image' }));
+              throw new Error(errorData.error || 'Failed to process image');
+            }
 
-              const chunk = data as StreamedEventChunk;
+            updateRateLimitFromHeaders(response.headers);
 
-              if (chunk.isComplete) {
-                break;
-              }
+            const reader2 = response.body?.getReader();
+            if (!reader2) {
+              throw new Error('No response stream');
+            }
 
-              if (chunk.events && chunk.events.length > 0) {
-                const newEvents = chunk.events.map(parsed =>
-                  convertParsedToCalendarEvent(parsed, 'image', URL.createObjectURL(file), [attachment])
-                );
+            const decoder = new TextDecoder();
+            let buffer = '';
+            let eventsFromThisImage = 0;
 
-                eventsFromThisImage += newEvents.length;
+            while (true) {
+              const { done, value } = await reader2.read();
+              if (done) break;
 
-                setBatchProcessing(prev => {
-                  if (!prev) return null;
-                  return {
-                    ...prev,
-                    events: [...prev.events, ...newEvents],
-                  };
-                });
+              buffer += decoder.decode(value, { stream: true });
+              const lines = buffer.split('\n\n');
+              buffer = lines.pop() || '';
+
+              for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                  const data = JSON.parse(line.slice(6));
+
+                  if (data.error) {
+                    throw new Error(data.error);
+                  }
+
+                  const chunk = data as StreamedEventChunk;
+
+                  if (chunk.isComplete) {
+                    break;
+                  }
+
+                  if (chunk.events && chunk.events.length > 0) {
+                    const newEvents = chunk.events.map(parsed =>
+                      convertParsedToCalendarEvent(parsed, 'image', URL.createObjectURL(file), [attachment])
+                    );
+
+                    eventsFromThisImage += newEvents.length;
+                    allEvents.push(...newEvents);
+
+                    setBatchProcessing(prev => {
+                      if (!prev) return null;
+                      return {
+                        ...prev,
+                        events: [...prev.events, ...newEvents],
+                      };
+                    });
+                  }
+                }
               }
             }
+
+            setImageProcessingStatuses(prev =>
+              prev.map(s => s.id === statusId ? { ...s, status: 'complete' as const, eventCount: eventsFromThisImage } : s)
+            );
+          } catch (err) {
+            const errorMessage = err instanceof Error
+              ? err.message
+              : 'Unable to extract event details from this image.';
+
+            setImageProcessingStatuses(prev =>
+              prev.map(s => s.id === statusId ? { ...s, status: 'error' as const, error: errorMessage } : s)
+            );
           }
         }
 
-        setImageProcessingStatuses(prev =>
-          prev.map(s => s.id === statusId ? { ...s, status: 'complete' as const, eventCount: eventsFromThisImage } : s)
-        );
-      } catch (err) {
-        const errorMessage = err instanceof Error
-          ? err.message
-          : 'Unable to extract event details from this image.';
+        setBatchProcessing(prev => {
+          if (!prev) return null;
+          const deduplicatedEvents = deduplicateEvents(prev.events);
+          return {
+            ...prev,
+            events: deduplicatedEvents,
+            isProcessing: false,
+          };
+        });
 
-        setImageProcessingStatuses(prev =>
-          prev.map(s => s.id === statusId ? { ...s, status: 'error' as const, error: errorMessage } : s)
-        );
-      }
-    }
+        setTimeout(() => {
+          setImageProcessingStatuses([]);
+        }, 10000);
 
-    setBatchProcessing(prev => {
-      if (!prev) return null;
-      const deduplicatedEvents = deduplicateEvents(prev.events);
-      return {
-        ...prev,
-        events: deduplicatedEvents,
-        isProcessing: false,
-      };
-    });
-    imageUploadRef.current?.clear();
-
-    setTimeout(() => {
-      setImageProcessingStatuses([]);
-    }, 10000);
+        return allEvents;
+      },
+      { fileCount: files.length }
+    );
   };
 
   const handleTextSubmit = async (text: string) => {
-    try {
-      setUrlProcessingStatus({
-        phase: 'detecting',
-        message: 'Detecting URLs...',
-      });
+    textInputRef.current?.clear();
 
-      const urlDetectionResult = await detectURLs(text);
+    addToQueue(
+      'text',
+      text,
+      async (queueItem: QueueItem) => {
+        const inputText = queueItem.payload as string;
 
-      let combinedText = text;
+        try {
+          setUrlProcessingStatus({
+            phase: 'detecting',
+            message: 'Detecting URLs...',
+          });
 
-      if (urlDetectionResult.hasUrls && urlDetectionResult.urls.length > 0) {
-        setUrlProcessingStatus({
-          phase: 'fetching',
-          urlCount: urlDetectionResult.urls.length,
-          message: `Fetching ${urlDetectionResult.urls.length} event page${urlDetectionResult.urls.length !== 1 ? 's' : ''}...`,
-        });
+          const urlDetectionResult = await detectURLs(inputText);
 
-        const scrapedContent = await scrapeURLsBatch(urlDetectionResult.urls);
+          let combinedText = inputText;
 
-        const successfulScrapes = scrapedContent.results.filter(r => r.status === 'success');
+          if (urlDetectionResult.hasUrls && urlDetectionResult.urls.length > 0) {
+            setUrlProcessingStatus({
+              phase: 'fetching',
+              urlCount: urlDetectionResult.urls.length,
+              message: `Fetching ${urlDetectionResult.urls.length} event page${urlDetectionResult.urls.length !== 1 ? 's' : ''}...`,
+            });
 
-        const scrapedTexts = successfulScrapes.map(result => {
-          const content = result.title
-            ? `${result.title}\n\n${result.text}`
-            : result.text;
-          return `${content}\n\n---\nOriginal Event: ${result.url}`;
-        });
+            updateProgress(queueItem.id, 30);
 
-        combinedText = [
-          urlDetectionResult.remainingText,
-          ...scrapedTexts,
-        ]
-          .filter(t => t.trim())
-          .join('\n\n');
+            const scrapedContent = await scrapeURLsBatch(urlDetectionResult.urls);
 
-        if (!combinedText.trim()) {
-          throw new Error('Unable to extract content from the provided URLs. Please check the URLs and try again.');
+            const successfulScrapes = scrapedContent.results.filter(r => r.status === 'success');
+
+            const scrapedTexts = successfulScrapes.map(result => {
+              const content = result.title
+                ? `${result.title}\n\n${result.text}`
+                : result.text;
+              return `${content}\n\n---\nOriginal Event: ${result.url}`;
+            });
+
+            combinedText = [
+              urlDetectionResult.remainingText,
+              ...scrapedTexts,
+            ]
+              .filter(t => t.trim())
+              .join('\n\n');
+
+            if (!combinedText.trim()) {
+              throw new Error('Unable to extract content from the provided URLs. Please check the URLs and try again.');
+            }
+          }
+
+          if (!combinedText.trim()) {
+            throw new Error('Please enter some text or URLs to process.');
+          }
+
+          setUrlProcessingStatus({
+            phase: 'extracting',
+            message: 'Extracting events...',
+          });
+
+          updateProgress(queueItem.id, 50);
+
+          const textBase64 = btoa(unescape(encodeURIComponent(inputText)));
+          const textSizeBytes = new Blob([inputText]).size;
+
+          const attachment: EventAttachment = {
+            id: `attachment-${Date.now()}`,
+            filename: 'original-input.txt',
+            mimeType: 'text/plain',
+            data: textBase64,
+            type: 'original-text',
+            size: textSizeBytes,
+          };
+
+          const batchId = `batch-${Date.now()}`;
+          setBatchProcessing({
+            id: batchId,
+            events: [],
+            isProcessing: true,
+          });
+
+          const response = await fetch('/api/parse', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: combinedText, batch: true }),
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ error: 'Failed to process batch' }));
+            throw new Error(errorData.error || 'Failed to process batch');
+          }
+
+          updateRateLimitFromHeaders(response.headers);
+
+          const reader = response.body?.getReader();
+          if (!reader) {
+            throw new Error('No response stream');
+          }
+
+          const decoder = new TextDecoder();
+          let buffer = '';
+          const allEvents: CalendarEvent[] = [];
+
+          updateProgress(queueItem.id, 70);
+
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n\n');
+            buffer = lines.pop() || '';
+
+            for (const line of lines) {
+              if (line.startsWith('data: ')) {
+                const data = JSON.parse(line.slice(6));
+
+                if (data.error) {
+                  throw new Error(data.error);
+                }
+
+                const chunk = data as StreamedEventChunk;
+
+                if (chunk.isComplete) {
+                  setBatchProcessing(prev => prev ? { ...prev, isProcessing: false } : null);
+                  break;
+                }
+
+                if (chunk.events && chunk.events.length > 0) {
+                  const newEvents = chunk.events.map(parsed =>
+                    convertParsedToCalendarEvent(parsed, 'text', inputText, [attachment])
+                  );
+
+                  allEvents.push(...newEvents);
+
+                  setBatchProcessing(prev => {
+                    if (!prev) return null;
+                    return {
+                      ...prev,
+                      events: [...prev.events, ...newEvents],
+                    };
+                  });
+                }
+              }
+            }
+          }
+
+          setUrlProcessingStatus({
+            phase: 'complete',
+            message: 'Complete',
+          });
+
+          setTimeout(() => {
+            setUrlProcessingStatus(null);
+          }, 3000);
+
+          return allEvents;
+        } catch (err) {
+          const errorMessage = err instanceof Error
+            ? err.message
+            : 'Unable to extract event details from this text.';
+
+          const processingId = `error-${Date.now()}`;
+          setProcessingEvents(prev => [...prev, {
+            id: processingId,
+            type: 'text',
+            status: 'error',
+            error: errorMessage,
+          }]);
+
+          setUrlProcessingStatus(null);
+
+          setTimeout(() => {
+            setProcessingEvents(prev => prev.filter(p => p.id !== processingId));
+          }, 5000);
+
+          throw err;
         }
       }
-
-      if (!combinedText.trim()) {
-        throw new Error('Please enter some text or URLs to process.');
-      }
-
-      setUrlProcessingStatus({
-        phase: 'extracting',
-        message: 'Extracting events...',
-      });
-
-      const textBase64 = btoa(unescape(encodeURIComponent(text)));
-      const textSizeBytes = new Blob([text]).size;
-
-      const attachment: EventAttachment = {
-        id: `attachment-${Date.now()}`,
-        filename: 'original-input.txt',
-        mimeType: 'text/plain',
-        data: textBase64,
-        type: 'original-text',
-        size: textSizeBytes,
-      };
-
-      await handleBatchStream('text', { text: combinedText }, text, [attachment]);
-
-      setUrlProcessingStatus({
-        phase: 'complete',
-        message: 'Complete',
-      });
-
-      setTimeout(() => {
-        setUrlProcessingStatus(null);
-      }, 3000);
-    } catch (err) {
-      const errorMessage = err instanceof Error
-        ? err.message
-        : 'Unable to extract event details from this text.';
-
-      const processingId = `error-${Date.now()}`;
-      setProcessingEvents(prev => [...prev, {
-        id: processingId,
-        type: 'text',
-        status: 'error',
-        error: errorMessage,
-      }]);
-
-      setUrlProcessingStatus(null);
-
-      setTimeout(() => {
-        setProcessingEvents(prev => prev.filter(p => p.id !== processingId));
-      }, 5000);
-    }
+    );
   };
 
   const handleError = (errorMessage: string) => {
@@ -555,7 +664,6 @@ export default function Home() {
                 ref={imageUploadRef}
                 onImageSelect={handleImageSelect}
                 onError={handleError}
-                isLoading={batchProcessing?.isProcessing || false}
               />
             </div>
 
@@ -563,7 +671,6 @@ export default function Home() {
               <TextInput
                 ref={textInputRef}
                 onTextSubmit={handleTextSubmit}
-                isLoading={batchProcessing?.isProcessing || false}
               />
             </div>
           </div>
@@ -819,6 +926,13 @@ export default function Home() {
             </div>
           </div>
         )}
+
+        {/* Processing queue panel */}
+        <ProcessingQueuePanel
+          items={queue}
+          onCancel={cancelItem}
+          onClear={clearCompleted}
+        />
       </div>
     </main>
   );

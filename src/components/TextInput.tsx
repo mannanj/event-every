@@ -4,7 +4,6 @@ import { useState, useCallback, useImperativeHandle, forwardRef } from 'react';
 
 interface TextInputProps {
   onTextSubmit: (text: string) => void;
-  isLoading?: boolean;
 }
 
 export interface TextInputHandle {
@@ -14,7 +13,7 @@ export interface TextInputHandle {
 const MIN_TEXT_LENGTH = 3;
 
 const TextInput = forwardRef<TextInputHandle, TextInputProps>(
-  function TextInput({ onTextSubmit, isLoading = false }, ref) {
+  function TextInput({ onTextSubmit }, ref) {
     const [text, setText] = useState('');
     const [error, setError] = useState<string | null>(null);
 
@@ -59,7 +58,6 @@ const TextInput = forwardRef<TextInputHandle, TextInputProps>(
           value={text}
           onChange={handleChange}
           onKeyDown={handleKeyDown}
-          disabled={isLoading}
           placeholder="Paste event details here... (e.g., 'Team meeting tomorrow at 3pm in Conference Room A')"
           aria-label="Enter event details as text"
           aria-describedby={error ? 'text-input-error' : undefined}
@@ -72,18 +70,8 @@ const TextInput = forwardRef<TextInputHandle, TextInputProps>(
             transition-all duration-200
             focus:outline-none focus:ring-2 focus:ring-black focus:ring-offset-2
             ${error ? 'border-red-500' : 'border-gray-300 hover:border-black'}
-            ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}
           `}
         />
-
-        {isLoading && (
-          <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-90 rounded-lg">
-            <div className="text-center space-y-2">
-              <div className="animate-spin rounded-full h-8 w-8 border-2 border-black border-t-transparent mx-auto" />
-              <p className="text-sm text-gray-600">Parsing event details...</p>
-            </div>
-          </div>
-        )}
       </div>
 
       {error && (
@@ -95,14 +83,14 @@ const TextInput = forwardRef<TextInputHandle, TextInputProps>(
       <div className="flex items-center justify-end">
         <button
           onClick={handleSubmit}
-          disabled={isLoading || text.trim().length < MIN_TEXT_LENGTH}
+          disabled={text.trim().length < MIN_TEXT_LENGTH}
           aria-label="Parse event from text"
           className={`
             px-6 py-2 rounded-lg font-medium
             transition-all duration-200
             focus:outline-none focus:ring-2 focus:ring-black focus:ring-offset-2
             ${
-              isLoading || text.trim().length < MIN_TEXT_LENGTH
+              text.trim().length < MIN_TEXT_LENGTH
                 ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
                 : 'bg-black text-white hover:bg-gray-800'
             }
