@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import PatternLock from './PatternLock';
 import EmailRequestModal from './EmailRequestModal';
+import SideDrawerLockButton from './SideDrawerLockButton';
 
 export default function AuthWrapper({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading, attempts, isLockedOut, lockoutMinutes, verifyPattern, logout } = useAuth();
@@ -74,13 +75,7 @@ export default function AuthWrapper({ children }: { children: React.ReactNode })
     return (
       <>
         {children}
-        <button
-          onClick={handleDevLock}
-          className="fixed top-4 right-4 px-4 py-2 bg-white border-2 border-black hover:bg-black hover:text-white transition-colors text-sm z-50"
-          aria-label="Lock application"
-        >
-          Lock
-        </button>
+        <SideDrawerLockButton onLock={handleDevLock} />
       </>
     );
   }
