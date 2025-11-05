@@ -714,12 +714,12 @@ export default function Home() {
 
         {/* History section */}
         {events.length > 0 && (
-          <div className="mb-12">
+          <div className="mb-12 bg-green-100 p-6 rounded-lg">
             <div className="space-y-4">
               {events.map((event) => (
                 <div
                   key={event.id}
-                  className="border-2 border-black p-4 bg-white hover:bg-gray-50 transition-colors"
+                  className="border-2 border-black p-4 bg-yellow-50 hover:bg-yellow-100 transition-colors rounded-md"
                 >
                   <div className="flex justify-between items-start mb-2">
                     <h3 className="font-bold text-lg flex-1">{event.title}</h3>
