@@ -79,11 +79,19 @@ const URLPill = ({ url, onRemove }: URLPillProps) => {
   return (
     <>
       <div className="relative inline-block">
-        <button
+        <div
           onClick={handlePillClick}
           onMouseEnter={() => setIsHovered(true)}
           onMouseLeave={() => setIsHovered(false)}
           className="inline-flex items-center gap-0.5 px-0.5 py-0.5 bg-gray-100 rounded-full cursor-pointer focus:outline-none focus:ring-1 focus:ring-black"
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              handlePillClick();
+            }
+          }}
           aria-label="Copy URL to clipboard"
         >
           {copied ? (
@@ -113,7 +121,7 @@ const URLPill = ({ url, onRemove }: URLPillProps) => {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
-        </button>
+        </div>
 
         {isHovered && !copied && (
           <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-1 px-2 py-1 bg-black text-white text-[10px] rounded z-50 max-w-sm break-words">

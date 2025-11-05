@@ -147,7 +147,7 @@ export default function BatchEventList({
       </div>
 
       {/* Event list */}
-      <div>
+      <div className="max-h-[80vh] overflow-y-auto">
         {events.map((event, index) => {
           const isExpanded = expandedEventIds.has(event.id);
           const isNew = index === events.length - 1 && isProcessing;

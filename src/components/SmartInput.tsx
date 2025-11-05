@@ -2,6 +2,7 @@
 
 import { useState, useRef, useCallback, useImperativeHandle, forwardRef, useEffect } from 'react';
 import URLPill from './URLPill';
+import ImageModal from './ImageModal';
 
 interface SmartInputProps {
   onSubmit: (data: { text: string; images: File[] }) => void;
@@ -31,6 +32,7 @@ const SmartInput = forwardRef<SmartInputHandle, SmartInputProps>(
     const [detectedUrls, setDetectedUrls] = useState<string[]>([]);
     const [isDragging, setIsDragging] = useState(false);
     const [hoveredImageIndex, setHoveredImageIndex] = useState<number | null>(null);
+    const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -140,9 +142,9 @@ const SmartInput = forwardRef<SmartInputHandle, SmartInputProps>(
       }
     };
 
-    const handleImageClick = (e: React.MouseEvent, preview: string) => {
+    const handleImageClick = (e: React.MouseEvent, index: number) => {
       e.stopPropagation();
-      window.open(preview, '_blank');
+      setSelectedImageIndex(index);
     };
 
     const handleRemoveImage = (e: React.MouseEvent, index: number) => {
@@ -202,18 +204,18 @@ const SmartInput = forwardRef<SmartInputHandle, SmartInputProps>(
         >
           {/* Images row at top - scrollable horizontally up to attach icon */}
           {images.length > 0 && (
-            <div className="flex-shrink-0 pr-12 pb-2">
-              <div className="flex gap-1.5 overflow-x-auto pb-1">
+            <div className="flex-shrink-0 pt-3 pl-2 pr-12 pb-2">
+              <div className="flex gap-2 overflow-x-auto pb-1">
                 {images.map((img, index) => (
                   <div
                     key={index}
-                    className="relative group flex-shrink-0"
+                    className="relative group flex-shrink-0 pt-1 pr-1"
                     onMouseEnter={() => setHoveredImageIndex(index)}
                     onMouseLeave={() => setHoveredImageIndex(null)}
                   >
                     <div
-                      onClick={(e) => handleImageClick(e, img.preview)}
-                      className="w-12 h-12 border-2 border-black bg-white cursor-pointer overflow-hidden"
+                      onClick={(e) => handleImageClick(e, index)}
+                      className="w-12 h-12 border-2 border-black bg-white cursor-pointer overflow-hidden hover:border-gray-600 transition-colors"
                     >
                       <img
                         src={img.preview}
@@ -223,7 +225,7 @@ const SmartInput = forwardRef<SmartInputHandle, SmartInputProps>(
                     </div>
                     <button
                       onClick={(e) => handleRemoveImage(e, index)}
-                      className="absolute -top-1 -right-1 w-4 h-4 bg-black text-white rounded-full flex items-center justify-center hover:bg-gray-800 focus:outline-none"
+                      className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-black text-white rounded-full flex items-center justify-center hover:bg-gray-800 focus:outline-none"
                       aria-label={`Remove image ${index + 1}`}
                     >
                       <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -231,16 +233,16 @@ const SmartInput = forwardRef<SmartInputHandle, SmartInputProps>(
                       </svg>
                     </button>
 
-                    {/* Tooltip preview */}
+                    {/* Enhanced tooltip preview */}
                     {hoveredImageIndex === index && (
                       <div className="absolute top-full left-0 mt-2 z-50 pointer-events-none">
-                        <div className="bg-black p-2 rounded shadow-lg">
+                        <div className="bg-white border-2 border-black p-3 shadow-xl">
                           <img
                             src={img.preview}
                             alt={`Preview ${index + 1}`}
-                            className="w-48 h-48 object-cover"
+                            className="max-w-xs max-h-64 object-contain"
                           />
-                          <p className="text-white text-xs mt-1 text-center">{img.file.name}</p>
+                          <p className="text-black text-xs mt-2 text-center truncate max-w-xs">{img.file.name}</p>
                         </div>
                       </div>
                     )}
@@ -267,17 +269,17 @@ const SmartInput = forwardRef<SmartInputHandle, SmartInputProps>(
             value={text}
             onChange={handleChange}
             onKeyDown={handleKeyDown}
-            placeholder="Type or paste event details, or drag images here..."
+            placeholder="Add text, images or more"
             aria-label="Enter event details as text or drop images"
             aria-describedby={error ? 'smart-input-error' : undefined}
             aria-invalid={error ? 'true' : 'false'}
-            className="flex-1 w-full p-2 text-black placeholder-gray-400 bg-transparent resize-none focus:outline-none"
+            className="flex-1 w-full p-2 pr-12 text-black placeholder-gray-400 bg-transparent resize-none focus:outline-none"
           />
 
-          {/* URL pills at bottom - inline with Transform button, scrollable horizontally */}
+          {/* URL pills row at bottom - flex item like images */}
           {detectedUrls.length > 0 && (
-            <div className="absolute bottom-2 left-2 right-[120px] flex items-center">
-              <div className="flex gap-1.5 overflow-x-auto overflow-y-hidden whitespace-nowrap">
+            <div className="flex-shrink-0 flex items-center gap-2 pl-2 pr-2 pb-2">
+              <div className="flex gap-1.5 overflow-x-auto overflow-y-hidden whitespace-nowrap flex-1">
                 {detectedUrls.map((url, index) => (
                   <div key={`${url}-${index}`} className="flex-shrink-0">
                     <URLPill
@@ -287,28 +289,49 @@ const SmartInput = forwardRef<SmartInputHandle, SmartInputProps>(
                   </div>
                 ))}
               </div>
+              {/* Transform button inline with pills */}
+              <button
+                onClick={handleSubmit}
+                disabled={!isButtonEnabled}
+                aria-label="Transform content to events"
+                className={`
+                  flex-shrink-0 px-6 py-2 rounded font-medium
+                  transition-all duration-200
+                  focus:outline-none focus:ring-2 focus:ring-black focus:ring-offset-2
+                  ${
+                    !isButtonEnabled
+                      ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                      : 'bg-black text-white hover:bg-gray-800'
+                  }
+                `}
+              >
+                Transform
+              </button>
             </div>
           )}
 
-          {/* Transform button at bottom-right - floating */}
-          <button
-            onClick={handleSubmit}
-            disabled={!isButtonEnabled}
-            aria-label="Transform content to events"
-            className={`
-              absolute bottom-2 right-2 z-20
-              px-6 py-2 rounded font-medium
-              transition-all duration-200
-              focus:outline-none focus:ring-2 focus:ring-black focus:ring-offset-2
-              ${
-                !isButtonEnabled
-                  ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                  : 'bg-black text-white hover:bg-gray-800'
-              }
-            `}
-          >
-            Transform
-          </button>
+          {/* Transform button when no pills - floating at bottom-right */}
+          {detectedUrls.length === 0 && (
+            <button
+              onClick={handleSubmit}
+              disabled={!isButtonEnabled}
+              aria-label="Transform content to events"
+              className={`
+                absolute bottom-2 right-2 z-20
+                px-6 py-2 rounded font-medium
+                transition-all duration-200
+                focus:outline-none focus:ring-2 focus:ring-black focus:ring-offset-2
+                ${
+                  !isButtonEnabled
+                    ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                    : 'bg-black text-white hover:bg-gray-800'
+                }
+              `}
+            >
+              Transform
+            </button>
+          )}
+
 
           {/* Hidden file input */}
           <input
@@ -326,6 +349,15 @@ const SmartInput = forwardRef<SmartInputHandle, SmartInputProps>(
           <p id="smart-input-error" className="text-sm text-red-600 mt-2" role="alert">
             {error}
           </p>
+        )}
+
+        {/* Image zoom modal */}
+        {selectedImageIndex !== null && (
+          <ImageModal
+            images={images}
+            initialIndex={selectedImageIndex}
+            onClose={() => setSelectedImageIndex(null)}
+          />
         )}
       </div>
     );
