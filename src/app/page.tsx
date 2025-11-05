@@ -10,6 +10,8 @@ import { CalendarEvent, ParsedEvent, StreamedEventChunk, EventAttachment } from 
 import { exportToICS } from '@/services/exporter';
 import { useHistory } from '@/hooks/useHistory';
 import { deduplicateEvents } from '@/utils/deduplication';
+import { detectURLs } from '@/services/urlDetector';
+import { scrapeURLsBatch } from '@/services/webScraper';
 
 interface ProcessingEvent {
   id: string;
@@ -34,10 +36,18 @@ interface BatchProcessing {
   totalExpected?: number;
 }
 
+interface URLProcessingStatus {
+  phase: 'detecting' | 'fetching' | 'extracting' | 'complete';
+  urlCount?: number;
+  fetchedCount?: number;
+  message: string;
+}
+
 export default function Home() {
   const [processingEvents, setProcessingEvents] = useState<ProcessingEvent[]>([]);
   const [batchProcessing, setBatchProcessing] = useState<BatchProcessing | null>(null);
   const [imageProcessingStatuses, setImageProcessingStatuses] = useState<ImageProcessingStatus[]>([]);
+  const [urlProcessingStatus, setUrlProcessingStatus] = useState<URLProcessingStatus | null>(null);
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
   const [rateLimitInfo, setRateLimitInfo] = useState<{ remaining: number; total: number; resetTime: number } | undefined>();
   const { events, addEvent, deleteEvent } = useHistory();
@@ -339,6 +349,46 @@ export default function Home() {
 
   const handleTextSubmit = async (text: string) => {
     try {
+      setUrlProcessingStatus({
+        phase: 'detecting',
+        message: 'Detecting URLs...',
+      });
+
+      const urlDetectionResult = await detectURLs(text);
+
+      let combinedText = text;
+
+      if (urlDetectionResult.hasUrls && urlDetectionResult.urls.length > 0) {
+        setUrlProcessingStatus({
+          phase: 'fetching',
+          urlCount: urlDetectionResult.urls.length,
+          message: `Fetching ${urlDetectionResult.urls.length} event page${urlDetectionResult.urls.length !== 1 ? 's' : ''}...`,
+        });
+
+        const scrapedContent = await scrapeURLsBatch(urlDetectionResult.urls);
+
+        const successfulScrapes = scrapedContent.results.filter(r => r.status === 'success');
+
+        const scrapedTexts = successfulScrapes.map(result => {
+          const content = result.title
+            ? `${result.title}\n\n${result.text}`
+            : result.text;
+          return `${content}\n\n---\nOriginal Event: ${result.url}`;
+        });
+
+        combinedText = [
+          urlDetectionResult.remainingText,
+          ...scrapedTexts,
+        ]
+          .filter(t => t.trim())
+          .join('\n\n');
+      }
+
+      setUrlProcessingStatus({
+        phase: 'extracting',
+        message: 'Extracting events...',
+      });
+
       const textBase64 = btoa(unescape(encodeURIComponent(text)));
       const textSizeBytes = new Blob([text]).size;
 
@@ -351,7 +401,16 @@ export default function Home() {
         size: textSizeBytes,
       };
 
-      await handleBatchStream('text', { text }, text, [attachment]);
+      await handleBatchStream('text', { text: combinedText }, text, [attachment]);
+
+      setUrlProcessingStatus({
+        phase: 'complete',
+        message: 'Complete',
+      });
+
+      setTimeout(() => {
+        setUrlProcessingStatus(null);
+      }, 3000);
     } catch (err) {
       const errorMessage = err instanceof Error
         ? err.message
@@ -364,6 +423,8 @@ export default function Home() {
         status: 'error',
         error: errorMessage,
       }]);
+
+      setUrlProcessingStatus(null);
 
       setTimeout(() => {
         setProcessingEvents(prev => prev.filter(p => p.id !== processingId));
@@ -547,6 +608,32 @@ export default function Home() {
                     </div>
                   </div>
                 ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* URL processing progress section */}
+        {urlProcessingStatus && (
+          <div className="mb-12">
+            <div className="border-2 border-black p-4">
+              <div className="flex items-center gap-3">
+                {urlProcessingStatus.phase !== 'complete' && (
+                  <div className="animate-spin rounded-full h-6 w-6 border-2 border-black border-t-transparent" />
+                )}
+                {urlProcessingStatus.phase === 'complete' && (
+                  <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                )}
+                <div className="flex-1">
+                  <p className="font-medium text-black">{urlProcessingStatus.message}</p>
+                  {urlProcessingStatus.phase === 'fetching' && urlProcessingStatus.urlCount && (
+                    <p className="text-sm text-gray-600 mt-1">
+                      Processing {urlProcessingStatus.urlCount} URL{urlProcessingStatus.urlCount !== 1 ? 's' : ''}
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
           </div>

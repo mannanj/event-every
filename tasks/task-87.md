@@ -1,14 +1,14 @@
 ### Task 87: Advanced LLM-Powered Batch URL Detection and Event Extraction
-- [ ] Remove separate LinkInput component (revert to single TextInput)
-- [ ] Create LLM-based URL detection service (Phase 1)
-- [ ] Implement parallel/batch URL fetching and scraping (Phase 2)
-- [ ] Integrate scraped content with existing batch event parser (Phase 3)
-- [ ] Add URL processing status indicators in UI
-- [ ] Handle mixed input (text + multiple URLs)
-- [ ] Store original URL links in event descriptions
-- [ ] Support Meetup, Eventbrite, Luma, and other event platforms
-- [ ] Add error handling for invalid/unreachable URLs
-- [ ] Update UI to show "Fetching X URLs..." progress
+- [x] Remove separate LinkInput component (revert to single TextInput)
+- [x] Create LLM-based URL detection service (Phase 1)
+- [x] Implement parallel/batch URL fetching and scraping (Phase 2)
+- [x] Integrate scraped content with existing batch event parser (Phase 3)
+- [x] Add URL processing status indicators in UI
+- [x] Handle mixed input (text + multiple URLs)
+- [x] Store original URL links in event descriptions
+- [x] Support Meetup, Eventbrite, Luma, and other event platforms
+- [x] Add error handling for invalid/unreachable URLs
+- [x] Update UI to show "Fetching X URLs..." progress
 - Location: `src/app/page.tsx`, `src/services/urlDetector.ts`, `src/services/webScraper.ts`, `src/app/api/detect-urls/route.ts`
 
 **Architecture:**
