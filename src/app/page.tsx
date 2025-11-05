@@ -9,6 +9,7 @@ import RateLimitBanner from '@/components/RateLimitBanner';
 import { CalendarEvent, ParsedEvent, StreamedEventChunk, EventAttachment } from '@/types/event';
 import { exportToICS } from '@/services/exporter';
 import { useHistory } from '@/hooks/useHistory';
+import { deduplicateEvents } from '@/utils/deduplication';
 
 interface ProcessingEvent {
   id: string;
@@ -320,7 +321,15 @@ export default function Home() {
       }
     }
 
-    setBatchProcessing(prev => prev ? { ...prev, isProcessing: false } : null);
+    setBatchProcessing(prev => {
+      if (!prev) return null;
+      const deduplicatedEvents = deduplicateEvents(prev.events);
+      return {
+        ...prev,
+        events: deduplicatedEvents,
+        isProcessing: false,
+      };
+    });
     imageUploadRef.current?.clear();
 
     setTimeout(() => {
