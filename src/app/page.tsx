@@ -18,6 +18,14 @@ interface ProcessingEvent {
   error?: string;
 }
 
+interface ImageProcessingStatus {
+  id: string;
+  filename: string;
+  status: 'pending' | 'processing' | 'complete' | 'error';
+  error?: string;
+  eventCount?: number;
+}
+
 interface BatchProcessing {
   id: string;
   events: CalendarEvent[];
@@ -28,6 +36,7 @@ interface BatchProcessing {
 export default function Home() {
   const [processingEvents, setProcessingEvents] = useState<ProcessingEvent[]>([]);
   const [batchProcessing, setBatchProcessing] = useState<BatchProcessing | null>(null);
+  const [imageProcessingStatuses, setImageProcessingStatuses] = useState<ImageProcessingStatus[]>([]);
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
   const [rateLimitInfo, setRateLimitInfo] = useState<{ remaining: number; total: number; resetTime: number } | undefined>();
   const { events, addEvent, deleteEvent } = useHistory();
@@ -173,52 +182,143 @@ export default function Home() {
     }
   };
 
-  const handleImageSelect = async (file: File) => {
-    try {
-      const reader = new FileReader();
-      const base64Promise = new Promise<string>((resolve, reject) => {
-        reader.onload = () => {
-          const result = reader.result as string;
-          const base64 = result.split(',')[1];
-          resolve(base64);
+  const handleImageSelect = async (files: File[]) => {
+    if (files.length === 0) return;
+
+    const batchId = `batch-${Date.now()}`;
+
+    const initialStatuses: ImageProcessingStatus[] = files.map((file, index) => ({
+      id: `image-${Date.now()}-${index}`,
+      filename: file.name,
+      status: 'pending' as const,
+    }));
+
+    setImageProcessingStatuses(initialStatuses);
+    setBatchProcessing({
+      id: batchId,
+      events: [],
+      isProcessing: true,
+    });
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const statusId = initialStatuses[i].id;
+
+      setImageProcessingStatuses(prev =>
+        prev.map(s => s.id === statusId ? { ...s, status: 'processing' as const } : s)
+      );
+
+      try {
+        const reader = new FileReader();
+        const base64Promise = new Promise<string>((resolve, reject) => {
+          reader.onload = () => {
+            const result = reader.result as string;
+            const base64 = result.split(',')[1];
+            resolve(base64);
+          };
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+
+        const base64 = await base64Promise;
+        const mimeType = file.type;
+
+        const attachment: EventAttachment = {
+          id: `attachment-${Date.now()}-${i}`,
+          filename: file.name,
+          mimeType,
+          data: base64,
+          type: 'original-image',
+          size: file.size,
         };
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
 
-      const base64 = await base64Promise;
-      const mimeType = file.type;
+        const response = await fetch('/api/parse', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            imageBase64: base64,
+            imageMimeType: mimeType,
+            batch: true,
+          }),
+        });
 
-      const attachment: EventAttachment = {
-        id: `attachment-${Date.now()}`,
-        filename: file.name,
-        mimeType,
-        data: base64,
-        type: 'original-image',
-        size: file.size,
-      };
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ error: 'Failed to process image' }));
+          throw new Error(errorData.error || 'Failed to process image');
+        }
 
-      await handleBatchStream('image', {
-        imageBase64: base64,
-        imageMimeType: mimeType,
-      }, URL.createObjectURL(file), [attachment]);
-    } catch (err) {
-      const errorMessage = err instanceof Error
-        ? err.message
-        : 'Unable to extract event details from this image.';
+        updateRateLimitFromHeaders(response.headers);
 
-      const processingId = `error-${Date.now()}`;
-      setProcessingEvents(prev => [...prev, {
-        id: processingId,
-        type: 'image',
-        status: 'error',
-        error: errorMessage,
-      }]);
+        const reader2 = response.body?.getReader();
+        if (!reader2) {
+          throw new Error('No response stream');
+        }
 
-      setTimeout(() => {
-        setProcessingEvents(prev => prev.filter(p => p.id !== processingId));
-      }, 5000);
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let eventsFromThisImage = 0;
+
+        while (true) {
+          const { done, value } = await reader2.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n\n');
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const data = JSON.parse(line.slice(6));
+
+              if (data.error) {
+                throw new Error(data.error);
+              }
+
+              const chunk = data as StreamedEventChunk;
+
+              if (chunk.isComplete) {
+                break;
+              }
+
+              if (chunk.events && chunk.events.length > 0) {
+                const newEvents = chunk.events.map(parsed =>
+                  convertParsedToCalendarEvent(parsed, 'image', URL.createObjectURL(file), [attachment])
+                );
+
+                eventsFromThisImage += newEvents.length;
+
+                setBatchProcessing(prev => {
+                  if (!prev) return null;
+                  return {
+                    ...prev,
+                    events: [...prev.events, ...newEvents],
+                  };
+                });
+              }
+            }
+          }
+        }
+
+        setImageProcessingStatuses(prev =>
+          prev.map(s => s.id === statusId ? { ...s, status: 'complete' as const, eventCount: eventsFromThisImage } : s)
+        );
+      } catch (err) {
+        const errorMessage = err instanceof Error
+          ? err.message
+          : 'Unable to extract event details from this image.';
+
+        setImageProcessingStatuses(prev =>
+          prev.map(s => s.id === statusId ? { ...s, status: 'error' as const, error: errorMessage } : s)
+        );
+      }
     }
+
+    setBatchProcessing(prev => prev ? { ...prev, isProcessing: false } : null);
+    imageUploadRef.current?.clear();
+
+    setTimeout(() => {
+      setImageProcessingStatuses([]);
+    }, 10000);
   };
 
   const handleTextSubmit = async (text: string) => {
@@ -390,6 +490,58 @@ export default function Home() {
             </div>
           </div>
         </div>
+
+        {/* Image processing progress section */}
+        {imageProcessingStatuses.length > 0 && (
+          <div className="mb-12">
+            <div className="border-2 border-black p-4">
+              <h2 className="text-lg font-bold mb-4 text-black">
+                Processing {imageProcessingStatuses.length} image{imageProcessingStatuses.length !== 1 ? 's' : ''}
+              </h2>
+              <div className="space-y-3">
+                {imageProcessingStatuses.map((status, index) => (
+                  <div
+                    key={status.id}
+                    className="flex items-center gap-3 p-3 bg-gray-50 border border-gray-300"
+                  >
+                    <div className="flex-shrink-0">
+                      {status.status === 'pending' && (
+                        <div className="w-6 h-6 border-2 border-gray-300 rounded-full" />
+                      )}
+                      {status.status === 'processing' && (
+                        <div className="animate-spin rounded-full h-6 w-6 border-2 border-black border-t-transparent" />
+                      )}
+                      {status.status === 'complete' && (
+                        <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
+                      {status.status === 'error' && (
+                        <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      )}
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm text-black truncate">{status.filename}</p>
+                      <p className="text-xs text-gray-600">
+                        {status.status === 'pending' && 'Waiting...'}
+                        {status.status === 'processing' && 'Processing...'}
+                        {status.status === 'complete' && `Complete - ${status.eventCount || 0} event${status.eventCount !== 1 ? 's' : ''} found`}
+                        {status.status === 'error' && status.error}
+                      </p>
+                    </div>
+
+                    <div className="text-xs text-gray-500 flex-shrink-0">
+                      {index + 1}/{imageProcessingStatuses.length}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Batch processing section */}
         {batchProcessing && (

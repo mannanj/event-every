@@ -29,8 +29,9 @@ export default function SideDrawerLockButton({ onLock }: SideDrawerLockButtonPro
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
         onClick={handleClick}
-        className="fixed right-0 top-1/2 -translate-y-1/2 bg-white border-2 border-black border-r-0 py-3 z-50 flex items-center overflow-hidden transition-all duration-300 ease-in-out hover:bg-black hover:text-white group"
+        className="absolute right-0 bg-white border-2 border-black border-r-0 rounded-l-3xl py-3 z-50 flex items-center overflow-hidden transition-all duration-300 ease-in-out hover:bg-black hover:text-white group"
         style={{
+          top: '4rem',
           width: isHovered ? '120px' : '48px',
           paddingLeft: isHovered ? '16px' : '12px',
           paddingRight: isHovered ? '16px' : '12px',

@@ -3,7 +3,7 @@
 import { useState, useRef, useCallback, useImperativeHandle, forwardRef } from 'react';
 
 interface ImageUploadProps {
-  onImageSelect: (file: File) => void;
+  onImageSelect: (files: File[]) => void;
   onError: (error: string) => void;
   isLoading?: boolean;
 }
@@ -13,17 +13,20 @@ export interface ImageUploadHandle {
 }
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+const MAX_FILES = 25;
 const ACCEPTED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/heic'];
 
 const ImageUpload = forwardRef<ImageUploadHandle, ImageUploadProps>(
   function ImageUpload({ onImageSelect, onError, isLoading = false }, ref) {
     const [isDragging, setIsDragging] = useState(false);
-    const [preview, setPreview] = useState<string | null>(null);
+    const [previews, setPreviews] = useState<string[]>([]);
+    const [fileCount, setFileCount] = useState(0);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     useImperativeHandle(ref, () => ({
       clear: () => {
-        setPreview(null);
+        setPreviews([]);
+        setFileCount(0);
         if (fileInputRef.current) {
           fileInputRef.current.value = '';
         }
@@ -40,20 +43,47 @@ const ImageUpload = forwardRef<ImageUploadHandle, ImageUploadProps>(
     return null;
   };
 
-  const handleFile = useCallback((file: File) => {
-    const error = validateFile(file);
-    if (error) {
-      onError(error);
+  const handleFiles = useCallback((files: File[]) => {
+    if (files.length === 0) return;
+
+    if (files.length > MAX_FILES) {
+      onError(`You can only upload up to ${MAX_FILES} images at once`);
       return;
     }
 
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setPreview(reader.result as string);
-    };
-    reader.readAsDataURL(file);
+    const validFiles: File[] = [];
+    const errors: string[] = [];
 
-    onImageSelect(file);
+    files.forEach(file => {
+      const error = validateFile(file);
+      if (error) {
+        errors.push(`${file.name}: ${error}`);
+      } else {
+        validFiles.push(file);
+      }
+    });
+
+    if (errors.length > 0) {
+      onError(errors.join('\n'));
+    }
+
+    if (validFiles.length === 0) return;
+
+    setFileCount(validFiles.length);
+    const newPreviews: string[] = [];
+
+    validFiles.forEach((file, index) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        newPreviews.push(reader.result as string);
+        if (newPreviews.length === validFiles.length) {
+          setPreviews(newPreviews);
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+
+    onImageSelect(validFiles);
   }, [onImageSelect, onError]);
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
@@ -77,9 +107,9 @@ const ImageUpload = forwardRef<ImageUploadHandle, ImageUploadProps>(
 
     if (isLoading) return;
 
-    const files = e.dataTransfer.files;
+    const files = Array.from(e.dataTransfer.files);
     if (files.length > 0) {
-      handleFile(files[0]);
+      handleFiles(files);
     }
   };
 
@@ -92,7 +122,7 @@ const ImageUpload = forwardRef<ImageUploadHandle, ImageUploadProps>(
   const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files && files.length > 0) {
-      handleFile(files[0]);
+      handleFiles(Array.from(files));
     }
   };
 
@@ -108,7 +138,7 @@ const ImageUpload = forwardRef<ImageUploadHandle, ImageUploadProps>(
       <div
         role="button"
         tabIndex={isLoading ? -1 : 0}
-        aria-label="Upload image file. Click or drag and drop an image to extract event details"
+        aria-label="Upload image files. Click or drag and drop one or more images to extract event details"
         aria-disabled={isLoading}
         className={`
           relative border-2 border-dashed rounded-lg p-8 text-center
@@ -132,20 +162,46 @@ const ImageUpload = forwardRef<ImageUploadHandle, ImageUploadProps>(
           type="file"
           className="hidden"
           accept={ACCEPTED_IMAGE_TYPES.join(',')}
+          multiple
           onChange={handleFileInputChange}
           disabled={isLoading}
           aria-hidden="true"
         />
 
-        {preview ? (
+        {fileCount > 0 ? (
           <div className="space-y-4">
-            <img
-              src={preview}
-              alt="Uploaded event image"
-              className="max-h-64 mx-auto rounded"
-            />
+            {previews.length > 0 && previews.length <= 3 ? (
+              <div className="grid grid-cols-3 gap-2">
+                {previews.map((preview, index) => (
+                  <img
+                    key={index}
+                    src={preview}
+                    alt={`Uploaded event image ${index + 1}`}
+                    className="max-h-32 w-full object-cover rounded"
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="text-center">
+                <svg
+                  className="mx-auto h-12 w-12 text-black"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                  />
+                </svg>
+                <p className="font-medium text-black mt-2">{fileCount} image{fileCount !== 1 ? 's' : ''} selected</p>
+              </div>
+            )}
             {!isLoading && (
-              <p className="text-sm text-gray-600">Click to change image</p>
+              <p className="text-sm text-gray-600">Click to change images</p>
             )}
           </div>
         ) : (
@@ -167,6 +223,7 @@ const ImageUpload = forwardRef<ImageUploadHandle, ImageUploadProps>(
             <div className="text-gray-600">
               <p className="font-medium">Click to upload or drag and drop</p>
               <p className="text-sm mt-1">JPEG, PNG, WebP, or HEIC up to 10MB</p>
+              <p className="text-sm mt-1">Select up to {MAX_FILES} images at once</p>
             </div>
           </div>
         )}

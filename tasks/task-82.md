@@ -1,7 +1,7 @@
 ### Task 82: Add Multiple Image Import Support
-- [ ] Update file picker to allow multiple image selection (add `multiple` attribute)
-- [ ] Handle multiple file selections in ImageUpload component
-- [ ] Update UI to display all selected images before processing
-- [ ] Process multiple images sequentially or in parallel
-- [ ] Generate events from each image and display them in the confirmation view
+- [x] Update file picker to allow multiple image selection (add `multiple` attribute)
+- [x] Handle multiple file selections in ImageUpload component
+- [x] Update UI to display all selected images before processing
+- [x] Process multiple images sequentially or in parallel
+- [x] Generate events from each image and display them in the confirmation view
 - Location: `src/components/ImageUpload.tsx`, `src/app/page.tsx`
