@@ -253,7 +253,7 @@ const SmartInput = forwardRef<SmartInputHandle, SmartInputProps>(
           {/* Attach icon button at top-right - floating */}
           <button
             onClick={handleUploadClick}
-            className="absolute top-2 right-2 z-20 p-2 text-gray-600 hover:text-black transition-colors focus:outline-none focus:ring-2 focus:ring-black rounded bg-white"
+            className="absolute top-2 right-2 z-20 p-2 text-gray-600 hover:text-black transition-colors focus:outline-none focus:ring-2 focus:ring-black rounded"
             aria-label="Attach images"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -271,20 +271,13 @@ const SmartInput = forwardRef<SmartInputHandle, SmartInputProps>(
             aria-label="Enter event details as text or drop images"
             aria-describedby={error ? 'smart-input-error' : undefined}
             aria-invalid={error ? 'true' : 'false'}
-            className={`
-              flex-1 w-full px-3 py-2
-              text-black placeholder-gray-400 bg-transparent
-              resize-none
-              transition-all duration-200
-              focus:outline-none
-              ${detectedUrls.length > 0 ? 'pb-20 sm:pb-12' : 'pb-14'}
-            `}
+            className="flex-1 w-full p-2 text-black placeholder-gray-400 bg-transparent resize-none focus:outline-none"
           />
 
-          {/* URL pills at bottom - scrollable row up to Transform button */}
+          {/* URL pills at bottom - inline with Transform button, scrollable horizontally */}
           {detectedUrls.length > 0 && (
-            <div className="absolute bottom-12 left-0 right-20 px-2">
-              <div className="flex gap-1.5 overflow-x-auto pb-1 max-h-20 sm:max-h-12 flex-wrap sm:flex-nowrap">
+            <div className="absolute bottom-2 left-2 right-[120px] flex items-center">
+              <div className="flex gap-1.5 overflow-x-auto overflow-y-hidden whitespace-nowrap">
                 {detectedUrls.map((url, index) => (
                   <div key={`${url}-${index}`} className="flex-shrink-0">
                     <URLPill
