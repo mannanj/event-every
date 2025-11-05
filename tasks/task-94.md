@@ -1,0 +1,12 @@
+### Task 94: Redesign URL Pills - Smaller, Icon-Based, Inline Layout
+- [x] Reduce pill size to 1/4th current size (smaller padding, font, icons)
+- [x] Remove square border around pills
+- [x] Make pills display inline in a row
+- [x] Remove "URL:" text prefix
+- [x] Add icon system for pill types (link icon for URLs, image icon for future support)
+- [x] Remove buggy hover effect where text turns black
+- [x] Change copy interaction: clicking pill (except X) copies content
+- [x] Transform icon to checkmark when copied
+- [x] Show toast message "copied <type> to clipboard" on copy
+- [x] Keep X button for removal (click only on X to remove)
+- Location: `src/components/URLPill.tsx`, `src/components/TextInput.tsx`

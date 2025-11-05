@@ -101,7 +101,7 @@ const TextInput = forwardRef<TextInputHandle, TextInputProps>(
 
       {detectedUrls.length > 0 && (
         <div
-          className="max-h-[100px] overflow-y-auto border-2 border-gray-200 rounded-lg p-3 flex flex-wrap gap-2"
+          className="flex flex-wrap gap-1.5 items-center"
           aria-label="Detected URLs"
         >
           {detectedUrls.map((url, index) => (

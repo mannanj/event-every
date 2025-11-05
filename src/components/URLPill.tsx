@@ -8,8 +8,8 @@ interface URLPillProps {
 }
 
 const URLPill = ({ url, onRemove }: URLPillProps) => {
-  const [showTooltip, setShowTooltip] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [showToast, setShowToast] = useState(false);
 
   const truncateURL = (url: string) => {
     try {
@@ -17,71 +17,73 @@ const URLPill = ({ url, onRemove }: URLPillProps) => {
       const hostname = urlObj.hostname;
       const path = urlObj.pathname + urlObj.search;
 
-      if (path.length <= 20) {
+      if (path.length <= 15) {
         return `${hostname}${path}`;
       }
 
-      return `${hostname}${path.substring(0, 17)}...`;
+      return `${hostname}${path.substring(0, 12)}...`;
     } catch {
-      return url.length > 30 ? `${url.substring(0, 27)}...` : url;
+      return url.length > 20 ? `${url.substring(0, 17)}...` : url;
     }
   };
 
-  const handleCopy = async (e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handlePillClick = async () => {
     try {
       await navigator.clipboard.writeText(url);
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      setShowToast(true);
+      setTimeout(() => {
+        setCopied(false);
+        setShowToast(false);
+      }, 2000);
     } catch (err) {
       console.error('Failed to copy URL:', err);
     }
   };
 
-  return (
-    <div
-      className="relative inline-flex items-center gap-2 px-3 py-1.5 bg-gray-100 border border-gray-300 rounded-full group hover:bg-gray-200 transition-colors"
-      onMouseEnter={() => setShowTooltip(true)}
-      onMouseLeave={() => setShowTooltip(false)}
-    >
-      <span className="text-sm text-gray-700 select-none">
-        URL: {truncateURL(url)}
-      </span>
+  const handleRemove = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onRemove();
+  };
 
+  return (
+    <>
       <button
-        onClick={handleCopy}
-        className="opacity-0 group-hover:opacity-100 transition-opacity hover:scale-110 transform focus:outline-none"
+        onClick={handlePillClick}
+        className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-gray-100 rounded-full cursor-pointer focus:outline-none focus:ring-1 focus:ring-black"
         aria-label="Copy URL to clipboard"
-        title={copied ? 'Copied!' : 'Copy URL'}
       >
         {copied ? (
-          <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-3 h-3 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
           </svg>
         ) : (
-          <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+          <svg className="w-3 h-3 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
           </svg>
         )}
+
+        <span className="text-xs text-black select-none">
+          {truncateURL(url)}
+        </span>
+
+        <button
+          onClick={handleRemove}
+          className="hover:scale-110 transform focus:outline-none ml-0.5"
+          aria-label="Remove URL"
+        >
+          <svg className="w-2.5 h-2.5 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
       </button>
 
-      <button
-        onClick={onRemove}
-        className="hover:scale-110 transform focus:outline-none"
-        aria-label="Remove URL"
-        title="Remove URL"
-      >
-        <svg className="w-4 h-4 text-gray-600 hover:text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-        </svg>
-      </button>
-
-      {showTooltip && (
-        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-black text-white text-xs rounded shadow-lg whitespace-nowrap z-10 max-w-xs overflow-hidden text-ellipsis">
-          {url}
+      {showToast && (
+        <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 px-4 py-2 bg-black text-white text-sm rounded shadow-lg z-50 animate-fade-in">
+          copied URL to clipboard
         </div>
       )}
-    </div>
+    </>
   );
 };
 
