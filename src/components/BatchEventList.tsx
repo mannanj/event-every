@@ -14,6 +14,7 @@ interface BatchEventListProps {
   events: CalendarEvent[];
   isProcessing: boolean;
   totalExpected?: number;
+  source: 'image' | 'text';
   onEdit: (event: CalendarEvent) => void;
   onDelete: (eventId: string) => void;
   onExport: (event: CalendarEvent) => void;
@@ -25,6 +26,7 @@ export default function BatchEventList({
   events,
   isProcessing,
   totalExpected,
+  source,
   onEdit,
   onDelete,
   onExport,
@@ -125,7 +127,9 @@ export default function BatchEventList({
             {isProcessing ? (
               <>
                 {currentCount === 0 ? (
-                  <span className="text-lg font-bold text-black transition-opacity duration-300">Processing image...</span>
+                  <span className="text-lg font-bold text-black transition-opacity duration-300">
+                    Processing {source === 'image' ? 'image' : 'text'}...
+                  </span>
                 ) : (
                   <span className="text-lg font-bold text-black transition-opacity duration-300">
                     Extracting events... ({currentCount} found)

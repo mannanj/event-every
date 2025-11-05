@@ -37,6 +37,7 @@ interface BatchProcessing {
   events: CalendarEvent[];
   isProcessing: boolean;
   totalExpected?: number;
+  source: 'image' | 'text';
 }
 
 interface URLProcessingStatus {
@@ -115,6 +116,7 @@ export default function Home() {
       id: batchId,
       events: [],
       isProcessing: true,
+      source,
     });
 
     try {
@@ -221,6 +223,7 @@ export default function Home() {
           id: batchId,
           events: [],
           isProcessing: true,
+          source: 'image',
         });
 
         const initialStatuses: ImageProcessingStatus[] = imageFiles.map((file, index) => ({
@@ -446,6 +449,7 @@ export default function Home() {
             id: batchId,
             events: [],
             isProcessing: true,
+            source: 'text',
           });
 
           const response = await fetch('/api/parse', {
@@ -761,6 +765,7 @@ export default function Home() {
               events={batchProcessing.events}
               isProcessing={batchProcessing.isProcessing}
               totalExpected={batchProcessing.totalExpected}
+              source={batchProcessing.source}
               onEdit={handleBatchEventEdit}
               onDelete={handleBatchEventDelete}
               onExport={handleBatchEventExport}
