@@ -52,6 +52,7 @@ export default function BatchEventList({
 }: BatchEventListProps) {
   const [expandedEventIds, setExpandedEventIds] = useState<Set<string>>(new Set());
   const [selectedEventIds, setSelectedEventIds] = useState<Set<string>>(new Set());
+  const [editingField, setEditingField] = useState<{ eventId: string; field: string } | null>(null);
 
   useEffect(() => {
     setSelectedEventIds(new Set(events.map((e) => e.id)));
@@ -79,6 +80,28 @@ export default function BatchEventList({
       }
       return next;
     });
+  };
+
+  const handleFieldEdit = (event: CalendarEvent, field: string, value: string) => {
+    let updatedEvent = { ...event };
+
+    if (field === 'title') {
+      updatedEvent.title = value;
+    } else if (field === 'startDate') {
+      const [year, month, day] = value.split('-').map(Number);
+      const newDate = new Date(event.startDate);
+      newDate.setFullYear(year, month - 1, day);
+      updatedEvent.startDate = newDate;
+    } else if (field === 'startTime') {
+      const [hours, minutes] = value.split(':').map(Number);
+      const newDate = new Date(event.startDate);
+      newDate.setHours(hours, minutes);
+      updatedEvent.startDate = newDate;
+    } else if (field === 'location') {
+      updatedEvent.location = value.trim() || undefined;
+    }
+
+    onEdit(updatedEvent);
   };
 
   const formatDate = (date: Date) => {
@@ -147,7 +170,7 @@ export default function BatchEventList({
                 isNew ? 'bg-green-50' : 'bg-white'
               }`}
             >
-              {/* Compact card view */}
+              {/* Card header - always visible */}
               <div
                 className={`p-3 transition-colors duration-200 ${!isNew ? 'hover:bg-gray-100' : ''}`}
               >
@@ -167,20 +190,137 @@ export default function BatchEventList({
 
                     {/* Event info */}
                     <div className="flex-1 min-w-0">
+                      {/* Title - editable */}
                       <div className="flex items-center gap-2 mb-1">
-                        <h3 className="font-bold text-base truncate">{event.title}</h3>
+                        {editingField?.eventId === event.id && editingField.field === 'title' ? (
+                          <input
+                            type="text"
+                            value={event.title}
+                            onChange={(e) => handleFieldEdit(event, 'title', e.target.value)}
+                            onBlur={() => setEditingField(null)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === 'Escape') {
+                                setEditingField(null);
+                              }
+                            }}
+                            className="font-bold text-base border border-black px-1 py-0 focus:outline-none focus:ring-1 focus:ring-black flex-1"
+                            autoFocus
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                        ) : (
+                          <h3
+                            className="font-bold text-base truncate cursor-pointer hover:bg-gray-200 px-1 rounded"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingField({ eventId: event.id, field: 'title' });
+                            }}
+                          >
+                            {event.title}
+                          </h3>
+                        )}
                         {isNew && (
                           <span className="text-xs bg-green-600 text-white px-2 py-0.5 rounded flex-shrink-0">
                             NEW
                           </span>
                         )}
                       </div>
-                      {!isExpanded && (
-                        <p className="text-sm text-gray-600 truncate">
-                          {formatCompactDate(event.startDate)}
-                          {event.location && ` • ${event.location}`}
-                        </p>
-                      )}
+
+                      {/* Date, Time, Location - always visible on one line, editable */}
+                      <p className="text-sm text-gray-600 truncate overflow-hidden px-1">
+                        {editingField?.eventId === event.id && editingField.field === 'startDate' ? (
+                          <input
+                            type="date"
+                            value={formatDateForInput(event.startDate)}
+                            onChange={(e) => handleFieldEdit(event, 'startDate', e.target.value)}
+                            onBlur={() => setEditingField(null)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === 'Escape') {
+                                setEditingField(null);
+                              }
+                            }}
+                            className="border border-black px-1 text-sm focus:outline-none focus:ring-1 focus:ring-black"
+                            style={{ width: '140px' }}
+                            autoFocus
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                        ) : (
+                          <span
+                            className="cursor-pointer hover:bg-gray-200 rounded"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingField({ eventId: event.id, field: 'startDate' });
+                            }}
+                          >
+                            {new Intl.DateTimeFormat('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                            }).format(event.startDate)}
+                          </span>
+                        )}{' '}
+                        at{' '}
+                        {editingField?.eventId === event.id && editingField.field === 'startTime' ? (
+                          <input
+                            type="time"
+                            value={formatTimeForInput(event.startDate)}
+                            onChange={(e) => handleFieldEdit(event, 'startTime', e.target.value)}
+                            onBlur={() => setEditingField(null)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === 'Escape') {
+                                setEditingField(null);
+                              }
+                            }}
+                            className="border border-black px-1 text-sm focus:outline-none focus:ring-1 focus:ring-black"
+                            style={{ width: '100px' }}
+                            autoFocus
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                        ) : (
+                          <span
+                            className="cursor-pointer hover:bg-gray-200 rounded"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingField({ eventId: event.id, field: 'startTime' });
+                            }}
+                          >
+                            {new Intl.DateTimeFormat('en-US', {
+                              hour: 'numeric',
+                              minute: '2-digit',
+                            }).format(event.startDate)}
+                          </span>
+                        )}
+                        {event.location && (
+                          <>
+                            {' '}•{' '}
+                            {editingField?.eventId === event.id && editingField.field === 'location' ? (
+                              <input
+                                type="text"
+                                value={event.location}
+                                onChange={(e) => handleFieldEdit(event, 'location', e.target.value)}
+                                onBlur={() => setEditingField(null)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter' || e.key === 'Escape') {
+                                    setEditingField(null);
+                                  }
+                                }}
+                                className="border border-black px-1 text-sm focus:outline-none focus:ring-1 focus:ring-black"
+                                style={{ minWidth: '150px', maxWidth: '400px' }}
+                                autoFocus
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                            ) : (
+                              <span
+                                className="cursor-pointer hover:bg-gray-200 rounded"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditingField({ eventId: event.id, field: 'location' });
+                                }}
+                              >
+                                {event.location}
+                              </span>
+                            )}
+                          </>
+                        )}
+                      </p>
                     </div>
                   </div>
 
