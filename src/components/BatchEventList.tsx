@@ -181,6 +181,7 @@ export default function BatchEventList({
                     <input
                       type="checkbox"
                       checked={selectedEventIds.has(event.id)}
+                      onClick={(e) => e.stopPropagation()}
                       onChange={(e) => {
                         e.stopPropagation();
                         toggleSelection(event.id);
