@@ -10,7 +10,6 @@ import { CalendarEvent, ParsedEvent, StreamedEventChunk, EventAttachment } from 
 import { exportToICS } from '@/services/exporter';
 import { useHistory } from '@/hooks/useHistory';
 import { useProcessingQueue } from '@/hooks/useProcessingQueue';
-import { deduplicateEvents } from '@/utils/deduplication';
 import { detectURLs } from '@/services/urlDetector';
 import { scrapeURLsBatch } from '@/services/webScraper';
 import { QueueItem } from '@/services/processingQueue';
@@ -356,7 +355,6 @@ export default function Home() {
           }
         }
 
-        setUnsavedEvents(prev => deduplicateEvents(prev));
         setBatchProcessing(prev => prev ? { ...prev, isProcessing: false } : null);
 
         setTimeout(() => {
@@ -508,8 +506,6 @@ export default function Home() {
               }
             }
           }
-
-          setUnsavedEvents(prev => deduplicateEvents(prev));
 
           setUrlProcessingStatus({
             phase: 'complete',
