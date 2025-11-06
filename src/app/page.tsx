@@ -647,17 +647,17 @@ export default function Home() {
   };
 
   return (
-    <main className="min-h-screen bg-white">
+    <main className="min-h-screen rainbow-gradient-bg">
       <RateLimitBanner rateLimitInfo={rateLimitInfo} />
 
       <div className="w-full px-[14.28%] py-12">
         <header className="text-center mb-12">
-          <h1 className="text-5xl font-bold text-black mb-3">Event Every</h1>
+          <h1 className="text-3xl font-bold retro-rainbow-text mb-3">Event Every</h1>
           <p className="text-gray-600">Transform images and text into calendar events</p>
         </header>
 
         {/* Smart input section */}
-        <div className="border-2 border-black p-[5px] mb-12 h-[400px]">
+        <div className="border-2 border-black bg-white p-[5px] mb-12 h-[400px]">
           <SmartInput
             ref={smartInputRef}
             onSubmit={handleSmartInputSubmit}
@@ -710,7 +710,7 @@ export default function Home() {
 
         {/* History section */}
         {events.length > 0 && (
-          <div className="mb-12 -mx-8 px-8 py-6 rounded-3xl max-h-[99vh] overflow-y-auto rainbow-gradient-bg">
+          <div className="mb-12 max-h-[99vh] overflow-y-auto">
               <div className="space-y-4">
               {events.map((event) => (
                 <div

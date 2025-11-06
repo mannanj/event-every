@@ -1,6 +1,13 @@
 import type { Metadata } from 'next'
 import './globals.css'
 import AuthWrapper from '@/components/AuthWrapper'
+import { Press_Start_2P } from 'next/font/google'
+
+const pressStart = Press_Start_2P({
+  weight: '400',
+  subsets: ['latin'],
+  variable: '--font-press-start',
+})
 
 export const metadata: Metadata = {
   title: 'Event Every',
@@ -14,7 +21,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body>
+      <body className={pressStart.variable}>
         <AuthWrapper>{children}</AuthWrapper>
       </body>
     </html>
