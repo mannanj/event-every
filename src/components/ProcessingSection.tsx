@@ -42,12 +42,29 @@ const FUN_MESSAGES = [
   'Almost there... probably',
 ];
 
-function AnimatedEllipsis() {
+function AnimatedEllipsis({ textLength }: { textLength: number }) {
+  const baseDelay = textLength * 0.1;
+
   return (
     <span className="inline-flex gap-[1px] items-end">
-      <span className="animate-[bounceUp1_1.1s_ease-in-out_0.2s_infinite] inline-block">.</span>
-      <span className="animate-[bounceUp2_0.9s_ease-in-out_0.5s_infinite] inline-block">.</span>
-      <span className="animate-[bounceUp3_1.3s_ease-in-out_0s_infinite] inline-block">.</span>
+      <span
+        className="inline-block"
+        style={{
+          animation: `bounceUp1 1.4s ease-out 0.3s infinite, rainbow 4s linear ${baseDelay}s infinite`
+        }}
+      >.</span>
+      <span
+        className="inline-block"
+        style={{
+          animation: `bounceUp2 0.7s ease-in-out 0.8s infinite, rainbow 4s linear ${baseDelay + 0.1}s infinite`
+        }}
+      >.</span>
+      <span
+        className="inline-block"
+        style={{
+          animation: `bounceUp3 1.8s ease-in 0.1s infinite, rainbow 4s linear ${baseDelay + 0.2}s infinite`
+        }}
+      >.</span>
     </span>
   );
 }
@@ -120,12 +137,14 @@ export default function ProcessingSection({
     3
   );
 
+  const currentMessage = FUN_MESSAGES[currentMessageIndex];
+
   return (
     <div className="mb-12">
       <div className="border-2 border-black bg-gray-50 p-4">
         <h2 className="text-lg font-bold text-black mb-4">
-          <RainbowText>{FUN_MESSAGES[currentMessageIndex]}</RainbowText>
-          <AnimatedEllipsis />
+          <RainbowText>{currentMessage}</RainbowText>
+          <AnimatedEllipsis textLength={currentMessage.length} />
         </h2>
         <div className="space-y-4">
           {Array.from({ length: processingCount }).map((_, index) => (
