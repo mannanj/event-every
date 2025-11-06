@@ -72,6 +72,15 @@ function RainbowText({ children }: { children: string }) {
   );
 }
 
+function SkeletonLoader() {
+  return (
+    <div className="animate-pulse space-y-3">
+      <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+      <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+    </div>
+  );
+}
+
 export default function ProcessingSection({
   imageProcessingStatuses,
   urlProcessingStatus,
@@ -106,100 +115,22 @@ export default function ProcessingSection({
     return null;
   }
 
+  const processingCount = Math.min(
+    activeProcessingItems.length + (urlProcessingStatus && urlProcessingStatus.phase !== 'complete' ? 1 : 0) || 1,
+    3
+  );
+
   return (
     <div className="mb-12">
-      <div className="border-2 border-black bg-gray-50">
-        <div className="p-4">
-          <h2 className="text-lg font-bold mb-4 text-black">Processing</h2>
-          <div className="space-y-3">
-            {/* Consolidated processing banner */}
-            {isProcessing && (
-              <div className="flex items-center gap-3 p-3 bg-white border border-gray-300">
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-sm">
-                    <RainbowText>{FUN_MESSAGES[currentMessageIndex]}</RainbowText>
-                    <AnimatedEllipsis />
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {/* Image processing items */}
-            {!isProcessing && activeProcessingItems.map((status, index) => {
-                    const isComplete = status.status === 'complete';
-                    const isError = status.status === 'error';
-                    const isProcessing = status.status === 'processing';
-
-                    return (
-                      <div
-                        key={status.id}
-                        className="flex items-center gap-3 p-3 bg-gray-50 border border-gray-300"
-                      >
-                        {isComplete && (
-                          <div className="flex-shrink-0">
-                            <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                            </svg>
-                          </div>
-                        )}
-                        {isError && (
-                          <div className="flex-shrink-0">
-                            <svg className="w-3 h-3 text-red-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                          </div>
-                        )}
-
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-sm">
-                            {status.status === 'pending' && (
-                              <>
-                                <RainbowText>Waiting</RainbowText>
-                                <AnimatedEllipsis />
-                              </>
-                            )}
-                            {status.status === 'processing' && (
-                              <>
-                                <RainbowText>{FUN_MESSAGES[currentMessageIndex]}</RainbowText>
-                                <AnimatedEllipsis />
-                              </>
-                            )}
-                            {status.status === 'complete' && (
-                              <span className="text-black">{`${status.eventCount || 0} event${status.eventCount !== 1 ? 's' : ''} made`}</span>
-                            )}
-                            {status.status === 'error' && (
-                              <span className="text-black">{status.error || 'No events could be found'}</span>
-                            )}
-                          </p>
-                        </div>
-                      </div>
-                    );
-                  })}
-
-            {/* URL processing item */}
-            {urlProcessingStatus && (
-              <div className="flex items-center gap-3 p-3 bg-white border border-gray-300">
-                      {urlProcessingStatus.phase === 'complete' && (
-                        <div className="flex-shrink-0">
-                          <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                          </svg>
-                        </div>
-                      )}
-
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm text-black">
-                          {urlProcessingStatus.message}
-                        </p>
-                        {urlProcessingStatus.phase === 'fetching' && urlProcessingStatus.urlCount && (
-                          <p className="text-xs text-gray-600">
-                            {urlProcessingStatus.urlCount} URL{urlProcessingStatus.urlCount !== 1 ? 's' : ''}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-              )}
-          </div>
+      <div className="border-2 border-black bg-gray-50 p-4">
+        <h2 className="text-lg font-bold text-black mb-4">
+          <RainbowText>{FUN_MESSAGES[currentMessageIndex]}</RainbowText>
+          <AnimatedEllipsis />
+        </h2>
+        <div className="space-y-4">
+          {Array.from({ length: processingCount }).map((_, index) => (
+            <SkeletonLoader key={index} />
+          ))}
         </div>
       </div>
     </div>
