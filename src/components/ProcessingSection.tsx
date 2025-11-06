@@ -44,10 +44,10 @@ const FUN_MESSAGES = [
 
 function AnimatedEllipsis() {
   return (
-    <span className="inline-flex gap-[1px] items-end translate-y-[7px]">
-      <span className="animate-[bounce_0.8s_ease-in-out_0s_infinite] inline-block translate-y-1">.</span>
-      <span className="animate-[bounce_1.2s_ease-in-out_0.15s_infinite] inline-block translate-y-1">.</span>
-      <span className="animate-[bounce_1s_ease-in-out_0.3s_infinite] inline-block translate-y-1">.</span>
+    <span className="inline-flex gap-[1px] items-end">
+      <span className="animate-[bounceUp1_1.1s_ease-in-out_0.2s_infinite] inline-block">.</span>
+      <span className="animate-[bounceUp2_0.9s_ease-in-out_0.5s_infinite] inline-block">.</span>
+      <span className="animate-[bounceUp3_1.3s_ease-in-out_0s_infinite] inline-block">.</span>
     </span>
   );
 }

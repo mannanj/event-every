@@ -46,3 +46,30 @@ body {
     color: #9400d3;
   }
 }
+
+@keyframes bounceUp1 {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  45% {
+    transform: translateY(-0.4rem);
+  }
+}
+
+@keyframes bounceUp2 {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  52% {
+    transform: translateY(-0.6rem);
+  }
+}
+
+@keyframes bounceUp3 {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  48% {
+    transform: translateY(-0.5rem);
+  }
+}
