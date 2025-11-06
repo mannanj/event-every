@@ -20,6 +20,7 @@ interface BatchEventListProps {
   onExport: (event: CalendarEvent) => void;
   onCancel: () => void;
   onExportComplete: (events: CalendarEvent[]) => void;
+  showHeader?: boolean;
 }
 
 export default function BatchEventList({
@@ -32,6 +33,7 @@ export default function BatchEventList({
   onExport,
   onCancel,
   onExportComplete,
+  showHeader = true,
 }: BatchEventListProps) {
   const [expandedEventIds, setExpandedEventIds] = useState<Set<string>>(new Set());
   const [selectedEventIds, setSelectedEventIds] = useState<Set<string>>(new Set());
@@ -111,9 +113,11 @@ export default function BatchEventList({
   return (
     <>
       {/* Header */}
-      <div className="p-4">
-        <h2 className="text-lg text-black">Made up events</h2>
-      </div>
+      {showHeader && (
+        <div className="p-4">
+          <h2 className="text-lg text-black">Made some events</h2>
+        </div>
+      )}
 
       {/* Event list */}
       <div className="max-h-[80vh] overflow-y-auto">

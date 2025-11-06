@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import SmartInput, { SmartInputHandle } from '@/components/SmartInput';
 import EventEditor from '@/components/EventEditor';
 import ProcessingSection from '@/components/ProcessingSection';
+import UnsavedEventsSection from '@/components/UnsavedEventsSection';
 import ErrorNotification from '@/components/ErrorNotification';
 import RateLimitBanner from '@/components/RateLimitBanner';
 import { CalendarEvent, ParsedEvent, StreamedEventChunk, EventAttachment } from '@/types/event';
@@ -50,10 +51,12 @@ interface URLProcessingStatus {
 export default function Home() {
   const [processingEvents, setProcessingEvents] = useState<ProcessingEvent[]>([]);
   const [batchProcessing, setBatchProcessing] = useState<BatchProcessing | null>(null);
+  const [unsavedEvents, setUnsavedEvents] = useState<CalendarEvent[]>([]);
   const [imageProcessingStatuses, setImageProcessingStatuses] = useState<ImageProcessingStatus[]>([]);
   const [urlProcessingStatus, setUrlProcessingStatus] = useState<URLProcessingStatus | null>(null);
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
   const [rateLimitInfo, setRateLimitInfo] = useState<{ remaining: number; total: number; resetTime: number } | undefined>();
+  const [hasLoadedTempEvents, setHasLoadedTempEvents] = useState(false);
   const { events, addEvent, deleteEvent } = useHistory();
   const { addToQueue, updateProgress } = useProcessingQueue();
   const smartInputRef = useRef<SmartInputHandle>(null);
@@ -61,24 +64,20 @@ export default function Home() {
   useEffect(() => {
     const result = eventStorage.getTempUnsavedEvents();
     if (result.success && result.data && result.data.length > 0) {
-      const firstEventSource = result.data[0]?.source;
-      const batchSource: 'image' | 'text' = (firstEventSource === 'image' || firstEventSource === 'text') ? firstEventSource : 'text';
-      setBatchProcessing({
-        id: `batch-restored-${Date.now()}`,
-        events: result.data,
-        isProcessing: false,
-        source: batchSource,
-      });
+      setUnsavedEvents(result.data);
     }
+    setHasLoadedTempEvents(true);
   }, []);
 
   useEffect(() => {
-    if (batchProcessing && batchProcessing.events.length > 0) {
-      eventStorage.saveTempUnsavedEvents(batchProcessing.events);
-    } else if (!batchProcessing) {
+    if (!hasLoadedTempEvents) return;
+
+    if (unsavedEvents.length > 0) {
+      eventStorage.saveTempUnsavedEvents(unsavedEvents);
+    } else {
       eventStorage.clearTempUnsavedEvents();
     }
-  }, [batchProcessing]);
+  }, [unsavedEvents, hasLoadedTempEvents]);
 
   const updateRateLimitFromHeaders = (headers: Headers) => {
     const remaining = parseInt(headers.get('X-RateLimit-Remaining') || '5');
@@ -233,12 +232,12 @@ export default function Home() {
         const allEvents: CalendarEvent[] = [];
 
         const batchId = `batch-${Date.now()}`;
-        setBatchProcessing(prev => ({
+        setBatchProcessing({
           id: batchId,
-          events: prev?.events || [],
+          events: [],
           isProcessing: true,
           source: 'image',
-        }));
+        });
 
         const initialStatuses: ImageProcessingStatus[] = imageFiles.map((file, index) => ({
           id: `image-${Date.now()}-${index}`,
@@ -338,13 +337,7 @@ export default function Home() {
                     eventsFromThisImage += newEvents.length;
                     allEvents.push(...newEvents);
 
-                    setBatchProcessing(prev => {
-                      if (!prev) return null;
-                      return {
-                        ...prev,
-                        events: [...prev.events, ...newEvents],
-                      };
-                    });
+                    setUnsavedEvents(prev => [...prev, ...newEvents]);
                   }
                 }
               }
@@ -364,15 +357,8 @@ export default function Home() {
           }
         }
 
-        setBatchProcessing(prev => {
-          if (!prev) return null;
-          const deduplicatedEvents = deduplicateEvents(prev.events);
-          return {
-            ...prev,
-            events: deduplicatedEvents,
-            isProcessing: false,
-          };
-        });
+        setUnsavedEvents(prev => deduplicateEvents(prev));
+        setBatchProcessing(prev => prev ? { ...prev, isProcessing: false } : null);
 
         setTimeout(() => {
           setImageProcessingStatuses([]);
@@ -457,12 +443,12 @@ export default function Home() {
           };
 
           const batchId = `batch-${Date.now()}`;
-          setBatchProcessing(prev => ({
+          setBatchProcessing({
             id: batchId,
-            events: prev?.events || [],
+            events: [],
             isProcessing: true,
             source: 'text',
-          }));
+          });
 
           const response = await fetch('/api/parse', {
             method: 'POST',
@@ -518,17 +504,13 @@ export default function Home() {
 
                   allEvents.push(...newEvents);
 
-                  setBatchProcessing(prev => {
-                    if (!prev) return null;
-                    return {
-                      ...prev,
-                      events: [...prev.events, ...newEvents],
-                    };
-                  });
+                  setUnsavedEvents(prev => [...prev, ...newEvents]);
                 }
               }
             }
           }
+
+          setUnsavedEvents(prev => deduplicateEvents(prev));
 
           setUrlProcessingStatus({
             phase: 'complete',
@@ -612,19 +594,13 @@ export default function Home() {
   const handleSaveEdit = (updatedEvent: CalendarEvent) => {
     if (!editingEvent) return;
 
-    if (batchProcessing) {
-      const isInBatch = batchProcessing.events.some(e => e.id === editingEvent.id);
-      if (isInBatch) {
-        setBatchProcessing(prev => {
-          if (!prev) return null;
-          return {
-            ...prev,
-            events: prev.events.map(e => e.id === editingEvent.id ? updatedEvent : e),
-          };
-        });
-        setEditingEvent(null);
-        return;
-      }
+    const isInUnsaved = unsavedEvents.some(e => e.id === editingEvent.id);
+    if (isInUnsaved) {
+      setUnsavedEvents(prev =>
+        prev.map(e => e.id === editingEvent.id ? updatedEvent : e)
+      );
+      setEditingEvent(null);
+      return;
     }
 
     deleteEvent(editingEvent.id);
@@ -645,13 +621,7 @@ export default function Home() {
   };
 
   const handleBatchEventDelete = (eventId: string) => {
-    setBatchProcessing(prev => {
-      if (!prev) return null;
-      return {
-        ...prev,
-        events: prev.events.filter(e => e.id !== eventId),
-      };
-    });
+    setUnsavedEvents(prev => prev.filter(e => e.id !== eventId));
   };
 
   const handleBatchEventExport = (event: CalendarEvent) => {
@@ -659,6 +629,7 @@ export default function Home() {
   };
 
   const handleCancelBatch = () => {
+    setUnsavedEvents([]);
     setBatchProcessing(null);
   };
 
@@ -704,29 +675,24 @@ export default function Home() {
           onDismiss={handleRemoveFromQueue}
         />
 
-        {/* Unified Processing section */}
+        {/* Processing status section */}
         <ProcessingSection
           imageProcessingStatuses={imageProcessingStatuses}
           urlProcessingStatus={urlProcessingStatus}
-          batchProcessing={batchProcessing}
-          onBatchEventEdit={handleBatchEventEdit}
-          onBatchEventDelete={handleBatchEventDelete}
-          onBatchEventExport={handleBatchEventExport}
-          onCancelBatch={handleCancelBatch}
+          isProcessing={batchProcessing?.isProcessing || false}
+        />
+
+        {/* Unsaved events section */}
+        <UnsavedEventsSection
+          events={unsavedEvents}
+          onEdit={handleBatchEventEdit}
+          onDelete={handleBatchEventDelete}
+          onExport={handleBatchEventExport}
+          onCancelAll={handleCancelBatch}
           onExportComplete={(events) => {
             events.forEach(event => addEvent(event));
-            setBatchProcessing(prev => {
-              if (!prev) return null;
-              const savedEventIds = new Set(events.map(e => e.id));
-              const remainingEvents = prev.events.filter(e => !savedEventIds.has(e.id));
-              if (remainingEvents.length === 0) {
-                return null;
-              }
-              return {
-                ...prev,
-                events: remainingEvents,
-              };
-            });
+            const savedEventIds = new Set(events.map(e => e.id));
+            setUnsavedEvents(prev => prev.filter(e => !savedEventIds.has(e.id)));
           }}
         />
 

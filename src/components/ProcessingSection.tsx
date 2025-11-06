@@ -1,7 +1,6 @@
 'use client';
 
-import { CalendarEvent } from '@/types/event';
-import BatchEventList from './BatchEventList';
+import { useState, useEffect } from 'react';
 
 interface ImageProcessingStatus {
   id: string;
@@ -18,156 +17,190 @@ interface URLProcessingStatus {
   message: string;
 }
 
-interface BatchProcessing {
-  id: string;
-  events: CalendarEvent[];
-  isProcessing: boolean;
-  totalExpected?: number;
-  source: 'image' | 'text';
-}
-
 interface ProcessingSectionProps {
   imageProcessingStatuses: ImageProcessingStatus[];
   urlProcessingStatus: URLProcessingStatus | null;
-  batchProcessing: BatchProcessing | null;
-  onBatchEventEdit: (event: CalendarEvent) => void;
-  onBatchEventDelete: (eventId: string) => void;
-  onBatchEventExport: (event: CalendarEvent) => void;
-  onCancelBatch: () => void;
-  onExportComplete: (events: CalendarEvent[]) => void;
+  isProcessing: boolean;
+}
+
+const FUN_MESSAGES = [
+  'Reading the tea leaves',
+  'Consulting the calendar spirits',
+  'Decoding the temporal mysteries',
+  'Summoning event details from the void',
+  'Teaching AI to read your wildest desires',
+  'Calculating the space-time coordinates',
+  'Extracting the juicy bits',
+  'Pondering the meaning of it all',
+  'Converting pixels to plans',
+  'Making sense of the chaos',
+  'Channeling my inner detective',
+  'Connecting the dots',
+  'Unraveling the event enigma',
+  'Working my magic',
+  'Actualizing your hopes and dreams',
+  'Almost there... probably',
+];
+
+function AnimatedEllipsis() {
+  return (
+    <span className="inline-flex gap-[1px] items-end">
+      <span className="animate-[bounce_0.8s_ease-in-out_0s_infinite] inline-block translate-y-1">.</span>
+      <span className="animate-[bounce_1.2s_ease-in-out_0.15s_infinite] inline-block translate-y-1">.</span>
+      <span className="animate-[bounce_1s_ease-in-out_0.3s_infinite] inline-block translate-y-1">.</span>
+    </span>
+  );
+}
+
+function RainbowText({ children }: { children: string }) {
+  const chars = children.split('');
+
+  return (
+    <span className="inline-block">
+      {chars.map((char, index) => (
+        <span
+          key={index}
+          className="inline-block animate-[rainbow_4s_linear_infinite]"
+          style={{
+            animationDelay: `${index * 0.1}s`,
+          }}
+        >
+          {char === ' ' ? '\u00A0' : char}
+        </span>
+      ))}
+    </span>
+  );
 }
 
 export default function ProcessingSection({
   imageProcessingStatuses,
   urlProcessingStatus,
-  batchProcessing,
-  onBatchEventEdit,
-  onBatchEventDelete,
-  onBatchEventExport,
-  onCancelBatch,
-  onExportComplete,
+  isProcessing,
 }: ProcessingSectionProps) {
-  const hasProcessingItems = imageProcessingStatuses.length > 0 || urlProcessingStatus !== null;
-  const hasCompletedBatch = batchProcessing && !batchProcessing.isProcessing && batchProcessing.events.length > 0;
+  const [currentMessageIndex, setCurrentMessageIndex] = useState(0);
 
-  if (!hasProcessingItems && !batchProcessing) {
+  useEffect(() => {
+    const getRandomInterval = () => Math.floor(Math.random() * 3000) + 6000;
+
+    const scheduleNextMessage = () => {
+      const timeout = setTimeout(() => {
+        setCurrentMessageIndex((prev) => (prev + 1) % FUN_MESSAGES.length);
+        scheduleNextMessage();
+      }, getRandomInterval());
+
+      return timeout;
+    };
+
+    const timeout = scheduleNextMessage();
+    return () => clearTimeout(timeout);
+  }, []);
+
+  const activeProcessingItems = imageProcessingStatuses.filter(
+    status => status.status === 'pending' || status.status === 'processing'
+  );
+  const hasActiveProcessing = activeProcessingItems.length > 0 ||
+    (urlProcessingStatus !== null && urlProcessingStatus.phase !== 'complete') ||
+    isProcessing;
+
+  if (!hasActiveProcessing) {
     return null;
   }
 
   return (
     <div className="mb-12">
-      <div className="border-2 border-black">
-        {/* Processing items header and list */}
-        {hasProcessingItems && (
-          <div className="p-4 border-b-2 border-black">
-            <h2 className="text-lg font-bold mb-4 text-black">Processing</h2>
-            <div className="space-y-3">
-              {/* Image processing items */}
-              {imageProcessingStatuses.map((status, index) => {
-                const isComplete = status.status === 'complete';
-                const isError = status.status === 'error';
-                const isProcessing = status.status === 'processing';
-
-                return (
-                  <div
-                    key={status.id}
-                    className="flex items-center gap-3 p-3 bg-gray-50 border border-gray-300"
-                  >
-                    <div className="flex-shrink-0">
-                      {isComplete && (
-                        <svg className="w-6 h-6 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                      )}
-                      {isError && (
-                        <svg className="w-6 h-6 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      )}
-                      {isProcessing && (
-                        <div className="animate-spin rounded-full h-6 w-6 border-2 border-black border-t-transparent" />
-                      )}
-                      {status.status === 'pending' && (
-                        <div className="w-6 h-6 border-2 border-gray-300 rounded-full" />
-                      )}
-                    </div>
-
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-sm text-black">
-                        [Image #{index + 1}]
-                        {status.status === 'pending' && ' - Waiting...'}
-                        {status.status === 'processing' && ' - Extracting text...'}
-                        {status.status === 'complete' && ` - Extracted ${status.eventCount || 0} event${status.eventCount !== 1 ? 's' : ''}`}
-                        {status.status === 'error' && ' - Error'}
-                      </p>
-                      {status.error && (
-                        <p className="text-xs text-gray-600 truncate">{status.error}</p>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-
-              {/* URL processing item */}
-              {urlProcessingStatus && (
-                <div className="flex items-center gap-3 p-3 bg-gray-50 border border-gray-300">
-                  <div className="flex-shrink-0">
-                    {urlProcessingStatus.phase === 'complete' ? (
-                      <svg className="w-6 h-6 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                    ) : (
-                      <div className="animate-spin rounded-full h-6 w-6 border-2 border-black border-t-transparent" />
-                    )}
-                  </div>
-
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm text-black">
-                      [Text #1] - {urlProcessingStatus.message}
-                    </p>
-                    {urlProcessingStatus.phase === 'fetching' && urlProcessingStatus.urlCount && (
-                      <p className="text-xs text-gray-600">
-                        Processing {urlProcessingStatus.urlCount} URL{urlProcessingStatus.urlCount !== 1 ? 's' : ''}
-                      </p>
-                    )}
-                  </div>
+      <div className="border-2 border-black bg-gray-50">
+        <div className="p-4">
+          <h2 className="text-lg font-bold mb-4 text-black">Processing</h2>
+          <div className="space-y-3">
+            {/* Consolidated processing banner */}
+            {isProcessing && (
+              <div className="flex items-center gap-3 p-3 bg-white border border-gray-300">
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-sm">
+                    <RainbowText>{FUN_MESSAGES[currentMessageIndex]}</RainbowText>
+                    <AnimatedEllipsis />
+                  </p>
                 </div>
+              </div>
+            )}
+
+            {/* Image processing items */}
+            {!isProcessing && activeProcessingItems.map((status, index) => {
+                    const isComplete = status.status === 'complete';
+                    const isError = status.status === 'error';
+                    const isProcessing = status.status === 'processing';
+
+                    return (
+                      <div
+                        key={status.id}
+                        className="flex items-center gap-3 p-3 bg-gray-50 border border-gray-300"
+                      >
+                        {isComplete && (
+                          <div className="flex-shrink-0">
+                            <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                          </div>
+                        )}
+                        {isError && (
+                          <div className="flex-shrink-0">
+                            <svg className="w-3 h-3 text-red-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </div>
+                        )}
+
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm">
+                            {status.status === 'pending' && (
+                              <>
+                                <RainbowText>Waiting</RainbowText>
+                                <AnimatedEllipsis />
+                              </>
+                            )}
+                            {status.status === 'processing' && (
+                              <>
+                                <RainbowText>{FUN_MESSAGES[currentMessageIndex]}</RainbowText>
+                                <AnimatedEllipsis />
+                              </>
+                            )}
+                            {status.status === 'complete' && (
+                              <span className="text-black">{`${status.eventCount || 0} event${status.eventCount !== 1 ? 's' : ''} made`}</span>
+                            )}
+                            {status.status === 'error' && (
+                              <span className="text-black">{status.error || 'No events could be found'}</span>
+                            )}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+            {/* URL processing item */}
+            {urlProcessingStatus && (
+              <div className="flex items-center gap-3 p-3 bg-white border border-gray-300">
+                      {urlProcessingStatus.phase === 'complete' && (
+                        <div className="flex-shrink-0">
+                          <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                        </div>
+                      )}
+
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm text-black">
+                          {urlProcessingStatus.message}
+                        </p>
+                        {urlProcessingStatus.phase === 'fetching' && urlProcessingStatus.urlCount && (
+                          <p className="text-xs text-gray-600">
+                            {urlProcessingStatus.urlCount} URL{urlProcessingStatus.urlCount !== 1 ? 's' : ''}
+                          </p>
+                        )}
+                      </div>
+                    </div>
               )}
-
-              {/* Text processing with batch indicator */}
-              {batchProcessing && batchProcessing.isProcessing && (
-                <div className="flex items-center gap-3 p-3 bg-gray-50 border border-gray-300">
-                  <div className="flex-shrink-0">
-                    <div className="animate-spin rounded-full h-6 w-6 border-2 border-black border-t-transparent" />
-                  </div>
-
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm text-black">
-                      [{batchProcessing.source === 'image' ? 'Image' : 'Text'} #1] - Extracting events... ({batchProcessing.events.length} found)
-                    </p>
-                  </div>
-                </div>
-              )}
-            </div>
           </div>
-        )}
-
-        {/* Batch event list for review and export */}
-        {hasCompletedBatch && (
-          <div className="p-4">
-            <BatchEventList
-              events={batchProcessing.events}
-              isProcessing={batchProcessing.isProcessing}
-              totalExpected={batchProcessing.totalExpected}
-              source={batchProcessing.source}
-              onEdit={onBatchEventEdit}
-              onDelete={onBatchEventDelete}
-              onExport={onBatchEventExport}
-              onCancel={onCancelBatch}
-              onExportComplete={onExportComplete}
-            />
-          </div>
-        )}
+        </div>
       </div>
     </div>
   );
