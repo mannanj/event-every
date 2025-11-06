@@ -171,7 +171,7 @@ export default function BatchEventList({
                         <div onClick={() => toggleExpand(event.id)} className="cursor-pointer">
                           <div className="flex items-center gap-2 mb-1">
                             <div
-                              className="font-bold text-base truncate hover:bg-gray-100 px-1 rounded cursor-text"
+                              className="font-bold text-base truncate hover:bg-gray-100 px-1 rounded cursor-pointer"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 toggleExpand(event.id);
@@ -186,7 +186,7 @@ export default function BatchEventList({
                             )}
                           </div>
                           <p
-                            className="text-sm text-gray-600 truncate hover:bg-gray-100 px-1 rounded cursor-text"
+                            className="text-sm text-gray-600 truncate hover:bg-gray-100 px-1 rounded cursor-pointer"
                             onClick={(e) => {
                               e.stopPropagation();
                               toggleExpand(event.id);

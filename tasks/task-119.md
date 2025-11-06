@@ -11,7 +11,7 @@ Replace separate Edit buttons with inline click-to-edit pattern for event displa
 - [x] Props: label, value, type, onChange, placeholder, multiline, readOnly
 - [x] Auto-save on every change (call onChange immediately)
 - [x] Exit edit mode on blur (onBlur) - return to read view
-- [x] Cursor: cursor-text on hover in read mode
+- [x] Cursor: cursor-pointer on hover in read mode (makes click action more obvious)
 
 **2. Create InlineEventEditor Component**
 - [x] Create `src/components/InlineEventEditor.tsx` using EditableField
@@ -48,7 +48,7 @@ Replace separate Edit buttons with inline click-to-edit pattern for event displa
 
 **6. Styling & Visual Polish**
 - [x] Consistent hover states across all editable fields (hover:bg-gray-50)
-- [x] Cursor changes to `cursor-text` on hover
+- [x] Cursor changes to `cursor-pointer` on hover
 - [x] Focus ring on active input (ring-2 ring-black)
 - [x] Smooth transitions for state changes (read ↔ edit)
 - [x] Maintain black & white aesthetic

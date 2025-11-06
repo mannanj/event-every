@@ -177,7 +177,7 @@ export default function EditableField({
     <div
       onClick={handleClick}
       className={`mb-2 ${
-        readOnly ? '' : 'cursor-text hover:bg-gray-50'
+        readOnly ? '' : 'cursor-pointer hover:bg-gray-50'
       } transition-all duration-200 ease-in-out px-3 py-2 rounded`}
       role="button"
       tabIndex={readOnly ? -1 : 0}
