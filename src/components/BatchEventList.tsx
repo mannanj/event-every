@@ -149,7 +149,7 @@ export default function BatchEventList({
             >
               {/* Compact card view */}
               <div
-                className={`p-3 transition-colors duration-200 ${!isNew ? 'hover:bg-gray-50' : ''}`}
+                className={`p-3 transition-colors duration-200 ${!isNew ? 'hover:bg-gray-100' : ''}`}
               >
                 <div className="flex justify-between items-start gap-3">
                   <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -165,46 +165,21 @@ export default function BatchEventList({
                       aria-label={`Select ${event.title}`}
                     />
 
-                    {/* Event info - editable in collapsed view */}
+                    {/* Event info */}
                     <div className="flex-1 min-w-0">
-                      {!isExpanded ? (
-                        <div onClick={() => toggleExpand(event.id)} className="cursor-pointer">
-                          <div className="flex items-center gap-2 mb-1">
-                            <div
-                              className="font-bold text-base truncate hover:bg-gray-100 px-1 rounded cursor-pointer"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                toggleExpand(event.id);
-                              }}
-                            >
-                              {event.title}
-                            </div>
-                            {isNew && (
-                              <span className="text-xs bg-green-600 text-white px-2 py-0.5 rounded flex-shrink-0">
-                                NEW
-                              </span>
-                            )}
-                          </div>
-                          <p
-                            className="text-sm text-gray-600 truncate hover:bg-gray-100 px-1 rounded cursor-pointer"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              toggleExpand(event.id);
-                            }}
-                          >
-                            {formatCompactDate(event.startDate)}
-                            {event.location && ` • ${event.location}`}
-                          </p>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-2">
-                          <h3 className="font-bold text-base">{event.title}</h3>
-                          {isNew && (
-                            <span className="text-xs bg-green-600 text-white px-2 py-0.5 rounded">
-                              NEW
-                            </span>
-                          )}
-                        </div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <h3 className="font-bold text-base truncate">{event.title}</h3>
+                        {isNew && (
+                          <span className="text-xs bg-green-600 text-white px-2 py-0.5 rounded flex-shrink-0">
+                            NEW
+                          </span>
+                        )}
+                      </div>
+                      {!isExpanded && (
+                        <p className="text-sm text-gray-600 truncate">
+                          {formatCompactDate(event.startDate)}
+                          {event.location && ` • ${event.location}`}
+                        </p>
                       )}
                     </div>
                   </div>

@@ -1,20 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { CalendarEvent } from '@/types/event';
-import EditableField from './EditableField';
 import { downloadAttachment } from '@/utils/downloadAttachment';
 
 interface InlineEventEditorProps {
   event: CalendarEvent;
   onChange: (updatedEvent: CalendarEvent) => void;
   showAttachments?: boolean;
-}
-
-interface ValidationErrors {
-  title?: string;
-  startDate?: string;
-  endDate?: string;
 }
 
 function formatDateForInput(date: Date): string {
@@ -30,8 +23,14 @@ function formatTimeForInput(date: Date): string {
   return `${hours}:${minutes}`;
 }
 
-function formatDateTimeForInput(date: Date): string {
-  return `${formatDateForInput(date)}T${formatTimeForInput(date)}`;
+function formatDateDisplay(date: Date): string {
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(date);
 }
 
 export default function InlineEventEditor({
@@ -39,184 +38,213 @@ export default function InlineEventEditor({
   onChange,
   showAttachments = true,
 }: InlineEventEditorProps) {
+  const [editingField, setEditingField] = useState<string | null>(null);
   const [formData, setFormData] = useState({
-    title: event.title,
     startDate: formatDateForInput(event.startDate),
     startTime: formatTimeForInput(event.startDate),
     endDate: formatDateForInput(event.endDate),
     endTime: formatTimeForInput(event.endDate),
     location: event.location || '',
     description: event.description || '',
-    allDay: event.allDay,
   });
 
-  const [errors, setErrors] = useState<ValidationErrors>({});
+  const dateInputRef = useRef<HTMLInputElement>(null);
+  const timeInputRef = useRef<HTMLInputElement>(null);
+  const locationInputRef = useRef<HTMLInputElement>(null);
+  const descriptionInputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     setFormData({
-      title: event.title,
       startDate: formatDateForInput(event.startDate),
       startTime: formatTimeForInput(event.startDate),
       endDate: formatDateForInput(event.endDate),
       endTime: formatTimeForInput(event.endDate),
       location: event.location || '',
       description: event.description || '',
-      allDay: event.allDay,
     });
   }, [event]);
 
-  const validateAndUpdate = (
-    field: string,
-    value: string,
-    updatedFormData?: typeof formData
-  ): boolean => {
-    const dataToValidate = updatedFormData || formData;
-    const newErrors: ValidationErrors = {};
-
-    if (field === 'title' || !field) {
-      if (!dataToValidate.title.trim()) {
-        newErrors.title = 'Title is required';
-      }
+  useEffect(() => {
+    if (editingField === 'startDate' && dateInputRef.current) {
+      dateInputRef.current.focus();
+    } else if (editingField === 'startTime' && timeInputRef.current) {
+      timeInputRef.current.focus();
+    } else if (editingField === 'location' && locationInputRef.current) {
+      locationInputRef.current.focus();
+      locationInputRef.current.select();
+    } else if (editingField === 'description' && descriptionInputRef.current) {
+      descriptionInputRef.current.focus();
+      descriptionInputRef.current.select();
     }
+  }, [editingField]);
 
-    if (field === 'startDate' || field === 'startTime' || !field) {
-      if (!dataToValidate.startDate) {
-        newErrors.startDate = 'Start date is required';
-      }
-    }
-
-    if (field === 'endDate' || field === 'endTime' || !field) {
-      if (!dataToValidate.endDate) {
-        newErrors.endDate = 'End date is required';
-      }
-    }
-
-    if (dataToValidate.startDate && dataToValidate.endDate) {
-      const start = new Date(`${dataToValidate.startDate}T${dataToValidate.startTime || '00:00'}`);
-      const end = new Date(`${dataToValidate.endDate}T${dataToValidate.endTime || '00:00'}`);
-
-      if (end < start) {
-        newErrors.endDate = 'End date/time must be after start date/time';
-      }
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleFieldChange = (field: keyof typeof formData, value: string) => {
+  const handleFieldChange = (field: string, value: string) => {
     const updatedFormData = { ...formData, [field]: value };
     setFormData(updatedFormData);
 
-    if (validateAndUpdate(field, value, updatedFormData)) {
-      const startDateTime = updatedFormData.allDay
-        ? new Date(updatedFormData.startDate)
-        : new Date(`${updatedFormData.startDate}T${updatedFormData.startTime}`);
+    const startDateTime = new Date(`${updatedFormData.startDate}T${updatedFormData.startTime}`);
+    const endDateTime = new Date(`${updatedFormData.endDate}T${updatedFormData.endTime}`);
 
-      const endDateTime = updatedFormData.allDay
-        ? new Date(updatedFormData.endDate)
-        : new Date(`${updatedFormData.endDate}T${updatedFormData.endTime}`);
-
+    if (!isNaN(startDateTime.getTime()) && !isNaN(endDateTime.getTime())) {
       const updatedEvent: CalendarEvent = {
         ...event,
-        title: updatedFormData.title.trim(),
         startDate: startDateTime,
         endDate: endDateTime,
         location: updatedFormData.location.trim() || undefined,
         description: updatedFormData.description.trim() || undefined,
-        allDay: updatedFormData.allDay,
       };
-
       onChange(updatedEvent);
     }
   };
 
   return (
-    <div className="space-y-1 transition-all duration-200">
-      <EditableField
-        label="Title"
-        value={formData.title}
-        onChange={(value) => handleFieldChange('title', value)}
-        placeholder="Event title"
-        required
-        error={errors.title}
-      />
-
-      <div className="grid grid-cols-2 gap-2 transition-all duration-200">
-        <EditableField
-          label="Start Date"
-          value={formData.startDate}
-          type="date"
-          onChange={(value) => handleFieldChange('startDate', value)}
-          required
-          error={errors.startDate}
-        />
-
-        {!formData.allDay && (
-          <EditableField
-            label="Start Time"
+    <div className="space-y-2 text-sm">
+      <div className="text-gray-700">
+        <span className="font-semibold">Start:</span>{' '}
+        {editingField === 'startDate' ? (
+          <input
+            ref={dateInputRef}
+            type="date"
+            value={formData.startDate}
+            onChange={(e) => handleFieldChange('startDate', e.target.value)}
+            onBlur={() => setEditingField(null)}
+            className="inline-block border-2 border-black px-2 py-0.5 text-sm focus:outline-none focus:ring-2 focus:ring-black"
+            style={{ width: 'auto', minWidth: '140px' }}
+          />
+        ) : (
+          <span
+            onClick={() => setEditingField('startDate')}
+            className="cursor-pointer hover:bg-gray-200 px-1 rounded"
+          >
+            {formatDateDisplay(event.startDate).split(' at ')[0]}
+          </span>
+        )}{' '}
+        at{' '}
+        {editingField === 'startTime' ? (
+          <input
+            ref={timeInputRef}
+            type="time"
             value={formData.startTime}
-            type="time"
-            onChange={(value) => handleFieldChange('startTime', value)}
+            onChange={(e) => handleFieldChange('startTime', e.target.value)}
+            onBlur={() => setEditingField(null)}
+            className="inline-block border-2 border-black px-2 py-0.5 text-sm focus:outline-none focus:ring-2 focus:ring-black"
+            style={{ width: 'auto', minWidth: '100px' }}
           />
+        ) : (
+          <span
+            onClick={() => setEditingField('startTime')}
+            className="cursor-pointer hover:bg-gray-200 px-1 rounded"
+          >
+            {formatDateDisplay(event.startDate).split(' at ')[1]}
+          </span>
         )}
       </div>
 
-      <div className="grid grid-cols-2 gap-2 transition-all duration-200">
-        <EditableField
-          label="End Date"
-          value={formData.endDate}
-          type="date"
-          onChange={(value) => handleFieldChange('endDate', value)}
-          required
-          error={errors.endDate}
-        />
-
-        {!formData.allDay && (
-          <EditableField
-            label="End Time"
+      <div className="text-gray-700">
+        <span className="font-semibold">End:</span>{' '}
+        {editingField === 'endDate' ? (
+          <input
+            ref={dateInputRef}
+            type="date"
+            value={formData.endDate}
+            onChange={(e) => handleFieldChange('endDate', e.target.value)}
+            onBlur={() => setEditingField(null)}
+            className="inline-block border-2 border-black px-2 py-0.5 text-sm focus:outline-none focus:ring-2 focus:ring-black"
+            style={{ width: 'auto', minWidth: '140px' }}
+          />
+        ) : (
+          <span
+            onClick={() => setEditingField('endDate')}
+            className="cursor-pointer hover:bg-gray-200 px-1 rounded"
+          >
+            {formatDateDisplay(event.endDate).split(' at ')[0]}
+          </span>
+        )}{' '}
+        at{' '}
+        {editingField === 'endTime' ? (
+          <input
+            ref={timeInputRef}
+            type="time"
             value={formData.endTime}
-            type="time"
-            onChange={(value) => handleFieldChange('endTime', value)}
+            onChange={(e) => handleFieldChange('endTime', e.target.value)}
+            onBlur={() => setEditingField(null)}
+            className="inline-block border-2 border-black px-2 py-0.5 text-sm focus:outline-none focus:ring-2 focus:ring-black"
+            style={{ width: 'auto', minWidth: '100px' }}
           />
+        ) : (
+          <span
+            onClick={() => setEditingField('endTime')}
+            className="cursor-pointer hover:bg-gray-200 px-1 rounded"
+          >
+            {formatDateDisplay(event.endDate).split(' at ')[1]}
+          </span>
         )}
       </div>
 
-      <EditableField
-        label="Location"
-        value={formData.location}
-        onChange={(value) => handleFieldChange('location', value)}
-        placeholder="Event location"
-      />
+      {(event.location || editingField === 'location') && (
+        <div className="text-gray-700">
+          <span className="font-semibold">Location:</span>{' '}
+          {editingField === 'location' ? (
+            <input
+              ref={locationInputRef}
+              type="text"
+              value={formData.location}
+              onChange={(e) => handleFieldChange('location', e.target.value)}
+              onBlur={() => setEditingField(null)}
+              className="inline-block border-2 border-black px-2 py-0.5 text-sm focus:outline-none focus:ring-2 focus:ring-black"
+              style={{ width: 'auto', minWidth: '200px' }}
+            />
+          ) : (
+            <span
+              onClick={() => setEditingField('location')}
+              className="cursor-pointer hover:bg-gray-200 px-1 rounded"
+            >
+              {event.location}
+            </span>
+          )}
+        </div>
+      )}
 
-      <EditableField
-        label="Description"
-        value={formData.description}
-        onChange={(value) => handleFieldChange('description', value)}
-        placeholder="Additional details"
-        multiline
-      />
+      {(event.description || editingField === 'description') && (
+        <div className="text-gray-700">
+          <span className="font-semibold">Description:</span>{' '}
+          {editingField === 'description' ? (
+            <textarea
+              ref={descriptionInputRef}
+              value={formData.description}
+              onChange={(e) => handleFieldChange('description', e.target.value)}
+              onBlur={() => setEditingField(null)}
+              className="block w-full border-2 border-black px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-black mt-1"
+              rows={3}
+            />
+          ) : (
+            <span
+              onClick={() => setEditingField('description')}
+              className="cursor-pointer hover:bg-gray-200 px-1 rounded block"
+            >
+              {event.description}
+            </span>
+          )}
+        </div>
+      )}
 
       {showAttachments && event.attachments && event.attachments.length > 0 && (
-        <div className="mt-3 pt-3 border-t border-gray-200 transition-all duration-200">
-          <p className="text-xs font-semibold text-black mb-2">ATTACHMENTS</p>
+        <div>
+          <p className="font-semibold text-gray-700">Attachments:</p>
           <div className="space-y-1">
             {event.attachments.map((attachment, index) => (
-              <div
+              <button
                 key={attachment.id}
-                className="flex items-center justify-between text-xs bg-gray-50 p-2 rounded transition-all duration-200 hover:bg-gray-100"
+                onClick={() => downloadAttachment(attachment)}
+                className="text-xs text-blue-600 hover:text-blue-800 hover:underline cursor-pointer text-left block"
               >
-                <span className="text-gray-700 truncate">
-                  [{attachment.type === 'original-image' ? 'Image' : attachment.type === 'original-text' ? 'Text' : 'Metadata'} #{index + 1}] {attachment.filename} ({(attachment.size / 1024).toFixed(1)} KB)
-                </span>
-                <button
-                  onClick={() => downloadAttachment(attachment)}
-                  className="ml-2 px-2 py-1 bg-black text-white text-xs hover:bg-gray-800 transition-all duration-200 focus:outline-none focus:ring-1 focus:ring-black"
-                  aria-label={`Download ${attachment.filename}`}
-                >
-                  ↓
-                </button>
-              </div>
+                [{ attachment.type === 'original-image'
+                  ? 'Image'
+                  : attachment.type === 'original-text'
+                  ? 'Text'
+                  : 'Metadata'
+                } #{index + 1}] {attachment.filename} ({(attachment.size / 1024).toFixed(1)} KB)
+              </button>
             ))}
           </div>
         </div>
