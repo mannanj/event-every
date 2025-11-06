@@ -115,7 +115,7 @@ export default function BatchEventList({
       {/* Header */}
       {showHeader && (
         <div className="p-4">
-          <h2 className="text-lg text-black">Made some events</h2>
+          <h2 className="text-lg font-normal text-black">Made some events</h2>
         </div>
       )}
 

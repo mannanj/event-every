@@ -26,16 +26,7 @@ export default function UnsavedEventsSection({
 
   return (
     <div className="mb-12">
-      <div className="border-2 border-black bg-white shadow-md">
-        <div className="p-4 border-b-2 border-black bg-white">
-          <div className="flex items-center gap-3">
-            <h2 className="text-lg font-bold text-black">Unsaved Events</h2>
-            <span className="px-3 py-1 bg-black text-white text-sm font-bold rounded-full">
-              {events.length}
-            </span>
-          </div>
-          <p className="text-sm text-gray-600 mt-1">Review and save your events</p>
-        </div>
+      <div className="border-2 border-black bg-white">
         <BatchEventList
           events={events}
           isProcessing={false}
@@ -45,7 +36,6 @@ export default function UnsavedEventsSection({
           onExport={onExport}
           onCancel={onCancelAll}
           onExportComplete={onExportComplete}
-          showHeader={false}
         />
       </div>
     </div>
