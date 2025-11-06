@@ -193,6 +193,29 @@ const SmartInput = forwardRef<SmartInputHandle, SmartInputProps>(
 
     const isButtonEnabled = text.trim().length >= MIN_TEXT_LENGTH || images.length > 0;
 
+    // Calculate content density (0 to 1) for sun-like color progression
+    const calculateDensity = (): number => {
+      let density = 0;
+
+      // Images trigger immediate color (blue phase) - start at 0.15 for first image
+      if (images.length > 0) {
+        density += 0.15 + Math.min(0.35, (images.length - 1) / 10 * 0.35);
+      }
+
+      // Text makes it darker - each character adds progression
+      const textLength = text.trim().length;
+      if (textLength > 0) {
+        density += Math.min(0.5, (textLength / 80) * 0.5);
+      }
+
+      // URLs add additional density
+      density += Math.min(0.15, (detectedUrls.length / 2) * 0.15);
+
+      return Math.min(1, density);
+    };
+
+    const contentDensity = calculateDensity();
+
     return (
       <div className="w-full h-full flex flex-col">
         <div
@@ -308,6 +331,7 @@ const SmartInput = forwardRef<SmartInputHandle, SmartInputProps>(
               <ParticleButton
                 onClick={handleSubmit}
                 disabled={!isButtonEnabled}
+                contentDensity={contentDensity}
                 aria-label="Transform content to events"
                 className="flex-shrink-0"
               />
@@ -320,6 +344,7 @@ const SmartInput = forwardRef<SmartInputHandle, SmartInputProps>(
               <ParticleButton
                 onClick={handleSubmit}
                 disabled={!isButtonEnabled}
+                contentDensity={contentDensity}
                 aria-label="Transform content to events"
               />
             </div>
