@@ -32,12 +32,19 @@ body {
 }
 
 .centered-placeholder {
-  padding-top: 0.75rem;
   padding-left: 15px;
 }
 
 .centered-placeholder:placeholder-shown {
-  padding-top: calc(35% - 5px);
+  padding-top: 170px;
+}
+
+.centered-placeholder.has-images:placeholder-shown {
+  padding-top: 14px;
+}
+
+.centered-placeholder:not(:placeholder-shown) {
+  padding-top: 0.75rem;
 }
 
 @keyframes rainbow {

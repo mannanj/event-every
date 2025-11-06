@@ -311,7 +311,7 @@ const SmartInput = forwardRef<SmartInputHandle, SmartInputProps>(
             aria-label="Enter event details as text or drop images"
             aria-describedby={error ? 'smart-input-error' : undefined}
             aria-invalid={error ? 'true' : 'false'}
-            className="flex-1 w-full p-2 pr-12 text-black placeholder-gray-400 bg-transparent resize-none focus:outline-none centered-placeholder"
+            className={`flex-1 w-full p-2 pr-12 text-black placeholder-gray-400 bg-transparent resize-none focus:outline-none centered-placeholder ${images.length > 0 ? 'has-images' : ''}`}
           />
 
           {/* URL pills row at bottom - flex item like images */}
