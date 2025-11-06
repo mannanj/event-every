@@ -237,19 +237,19 @@ export default function BatchEventList({
       </div>
 
       {/* Save button */}
-      {events.length > 0 && (
+      {events.length > 0 && !isProcessing && (
         <div className="px-4 pt-4 pb-1 border-t-2 border-black">
           <button
             onClick={handleExport}
-            disabled={selectedCount === 0 || isProcessing}
+            disabled={selectedCount === 0}
             className="w-full py-3 px-6 bg-black text-white border-2 border-black hover:bg-white hover:text-black transition-colors focus:outline-none focus:ring-2 focus:ring-black disabled:bg-gray-300 disabled:text-gray-500 disabled:border-gray-300 disabled:cursor-not-allowed"
-            aria-label={isProcessing ? 'Processing events' : `Save ${selectedCount} event${selectedCount !== 1 ? 's' : ''}`}
+            aria-label={`Save ${selectedCount} event${selectedCount !== 1 ? 's' : ''}`}
           >
-            {isProcessing ? 'Processing events...' : `Save ${selectedCount > 0 ? `(${selectedCount})` : ''}`}
+            Save {selectedCount > 0 && `(${selectedCount})`}
           </button>
           <div className="text-xs text-center mt-1">
             <p className="text-black">Pick what you want to keep</p>
-            {!isProcessing && selectedCount < events.length && selectedCount > 0 && (
+            {selectedCount < events.length && selectedCount > 0 && (
               <p className="text-red-400">
                 {events.length - selectedCount} event{events.length - selectedCount !== 1 ? 's' : ''} will be lost
               </p>
