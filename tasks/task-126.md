@@ -51,11 +51,24 @@ When clicking the X icon on an event card in the History panel (HistoryPanel.tsx
 6. Expected: Modal should appear
 7. Actual: Event deletes immediately
 
-**Tasks:**
-- [ ] Debug why modal is not appearing despite state changes
-- [ ] Verify modal renders in DOM but might be hidden
-- [ ] Check if deleteEvent is being called from somewhere else
-- [ ] Test state updates and re-renders
-- [ ] Ensure modal JSX is reachable in render path
+**Resolution:**
+The issue was that the HistoryPanel component (which had the delete confirmation modal) was never being used in the application. The page.tsx file had its own inline history section that called deleteEvent() directly without confirmation.
 
-- Location: `src/components/HistoryPanel.tsx`
+**Solution:**
+Instead of replacing the inline history with HistoryPanel (which would change UX by hiding history behind a toggle button), we added the delete confirmation modal directly to the inline history section in page.tsx.
+
+**Changes Made:**
+1. Added deleteConfirmId state to page.tsx
+2. Added handleDeleteEvent, confirmDelete, and cancelDelete functions
+3. Modified delete button to call handleDeleteEvent instead of deleteEvent directly
+4. Added modal JSX to page.tsx (identical to HistoryPanel's modal)
+5. Deleted unused HistoryPanel.tsx component
+
+**Tasks:**
+- [x] Debug why modal is not appearing despite state changes
+- [x] Add delete confirmation modal to inline history section in page.tsx
+- [x] Delete unused HistoryPanel component
+- [x] Test "No" button cancels deletion
+- [x] Test "Yes" button confirms deletion
+
+- Location: `src/app/page.tsx`
