@@ -29,36 +29,65 @@ export default function SideDrawerLockButton({ onLock }: SideDrawerLockButtonPro
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
         onClick={handleClick}
-        className="absolute right-0 bg-white border-2 border-black border-r-0 rounded-l-3xl py-3 z-50 flex items-center overflow-hidden transition-all duration-300 ease-in-out hover:bg-black hover:text-white group"
+        className="absolute bg-white border border-black rounded-full z-50 transition-all duration-200 ease-in-out hover:bg-black hover:text-white group"
         style={{
-          top: '4rem',
-          width: isHovered ? '120px' : '48px',
-          paddingLeft: isHovered ? '16px' : '12px',
-          paddingRight: isHovered ? '16px' : '12px',
+          top: isHovered ? 'calc(4rem - 8px)' : '4rem',
+          right: isHovered ? '0px' : '-18px',
+          width: isHovered ? '52px' : '36px',
+          height: isHovered ? '52px' : '36px',
         }}
         aria-label="Lock application"
       >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className="w-5 h-5 flex-shrink-0"
+        <div
+          className="absolute inset-0 flex items-center justify-center transition-opacity duration-200"
+          style={{
+            opacity: isHovered ? 0 : 1,
+          }}
         >
-          <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-          <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-        </svg>
-        <span
-          className="ml-2 text-sm font-medium whitespace-nowrap transition-opacity duration-300"
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="3"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            style={{
+              width: '10px',
+              height: '10px',
+              marginLeft: '-12px',
+            }}
+          >
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+          </svg>
+        </div>
+        <div
+          className="absolute inset-0 flex items-center justify-center transition-opacity duration-200"
           style={{
             opacity: isHovered ? 1 : 0,
           }}
         >
-          Lock
-        </span>
+          <div className="flex items-center gap-0.5">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              style={{
+                width: '14px',
+                height: '14px',
+              }}
+            >
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+            </svg>
+            <span className="text-xs font-medium">Lock</span>
+          </div>
+        </div>
       </button>
 
       {showConfirmation && (
