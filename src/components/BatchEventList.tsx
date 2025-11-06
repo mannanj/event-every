@@ -14,7 +14,7 @@ interface BatchEventListProps {
   events: CalendarEvent[];
   isProcessing: boolean;
   totalExpected?: number;
-  source: 'image' | 'text';
+  source: 'image' | 'text' | 'url';
   onEdit: (event: CalendarEvent) => void;
   onDelete: (eventId: string) => void;
   onExport: (event: CalendarEvent) => void;
