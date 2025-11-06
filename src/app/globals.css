@@ -31,6 +31,15 @@ body {
   pointer-events: none !important;
 }
 
+.centered-placeholder {
+  padding-top: 0.75rem;
+  padding-left: 15px;
+}
+
+.centered-placeholder:placeholder-shown {
+  padding-top: calc(35% - 5px);
+}
+
 @keyframes rainbow {
   0%, 100% {
     color: #ff0000;

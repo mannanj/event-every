@@ -307,11 +307,11 @@ const SmartInput = forwardRef<SmartInputHandle, SmartInputProps>(
             value={text}
             onChange={handleChange}
             onKeyDown={handleKeyDown}
-            placeholder="Add text, images or more"
+            placeholder="Transform images, text and more into calendar events. Just add and transform"
             aria-label="Enter event details as text or drop images"
             aria-describedby={error ? 'smart-input-error' : undefined}
             aria-invalid={error ? 'true' : 'false'}
-            className="flex-1 w-full p-2 pr-12 text-black placeholder-gray-400 bg-transparent resize-none focus:outline-none"
+            className="flex-1 w-full p-2 pr-12 text-black placeholder-gray-400 bg-transparent resize-none focus:outline-none centered-placeholder"
           />
 
           {/* URL pills row at bottom - flex item like images */}
