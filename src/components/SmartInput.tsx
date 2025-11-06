@@ -3,6 +3,7 @@
 import { useState, useRef, useCallback, useImperativeHandle, forwardRef, useEffect } from 'react';
 import URLPill from './URLPill';
 import ImageModal from './ImageModal';
+import ParticleButton from './ParticleButton';
 
 interface SmartInputProps {
   onSubmit: (data: { text: string; images: File[] }) => void;
@@ -304,46 +305,24 @@ const SmartInput = forwardRef<SmartInputHandle, SmartInputProps>(
                 ))}
               </div>
               {/* Transform button inline with pills */}
-              <button
+              <ParticleButton
                 onClick={handleSubmit}
                 disabled={!isButtonEnabled}
                 aria-label="Transform content to events"
-                className={`
-                  flex-shrink-0 px-6 py-2 rounded font-medium
-                  transition-all duration-200
-                  focus:outline-none focus:ring-2 focus:ring-black focus:ring-offset-2
-                  ${
-                    !isButtonEnabled
-                      ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                      : 'bg-black text-white hover:bg-gray-800'
-                  }
-                `}
-              >
-                Transform
-              </button>
+                className="flex-shrink-0"
+              />
             </div>
           )}
 
           {/* Transform button when no pills - floating at bottom-right */}
           {detectedUrls.length === 0 && (
-            <button
-              onClick={handleSubmit}
-              disabled={!isButtonEnabled}
-              aria-label="Transform content to events"
-              className={`
-                absolute bottom-2 right-2 z-20
-                px-6 py-2 rounded font-medium
-                transition-all duration-200
-                focus:outline-none focus:ring-2 focus:ring-black focus:ring-offset-2
-                ${
-                  !isButtonEnabled
-                    ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                    : 'bg-black text-white hover:bg-gray-800'
-                }
-              `}
-            >
-              Transform
-            </button>
+            <div className="absolute bottom-2 right-2 z-20">
+              <ParticleButton
+                onClick={handleSubmit}
+                disabled={!isButtonEnabled}
+                aria-label="Transform content to events"
+              />
+            </div>
           )}
 
 
