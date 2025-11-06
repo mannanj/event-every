@@ -652,7 +652,7 @@ export default function Home() {
 
       <div className="w-full px-[14.28%] py-12">
         <header className="text-center mb-12">
-          <h1 className="text-3xl font-bold retro-rainbow-text mb-3">Event Every</h1>
+          <h1 className="text-5xl font-black retro-rainbow-text mb-3 tracking-wider">Event Every</h1>
           <p className="text-gray-600">Transform images and text into calendar events</p>
         </header>
 

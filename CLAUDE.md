@@ -102,7 +102,7 @@ npm run lint
 ### Tech Stack
 - **Framework**: Next.js 15 with App Router
 - **Language**: TypeScript (strict mode)
-- **Styling**: Tailwind CSS (black & white only)
+- **Styling**: Tailwind CSS (minimal black & white with vibrant gradient accents)
 - **OCR**: Tesseract.js or cloud service (TBD)
 - **Parsing**: LLM-based extraction (Claude API or similar)
 - **Storage**: LocalStorage/IndexedDB for event history
@@ -116,7 +116,7 @@ event-every/
 │   ├── app/
 │   │   ├── layout.tsx          # Root layout with minimal UI
 │   │   ├── page.tsx            # Main input interface
-│   │   └── globals.css         # Black & white theme
+│   │   └── globals.css         # Black & white theme with gradient accents
 │   ├── components/
 │   │   ├── ImageUpload.tsx     # Drag-drop or click upload
 │   │   ├── TextInput.tsx       # Direct text entry
@@ -187,7 +187,8 @@ interface ParsedEvent {
 ## Code Standards
 
 ### UI/UX Requirements
-- **Black & White Only**: No colors, no gradients, no exceptions
+- **Minimal Black & White**: Core UI is black and white with vibrant gradient accents for headers
+- **Vibrant Header**: Header uses eye-catching purple/pink/cyan gradient with glow effects
 - **Minimal Design**: Remove all non-essential UI elements
 - **Fast & Responsive**: Optimize for instant feedback
 - **Mobile First**: Touch-friendly, responsive design
@@ -216,14 +217,17 @@ interface ParsedEvent {
 
 ### Styling Guidelines
 - **Tailwind Only**: No custom CSS except globals.css
-- **Black & White Palette**:
+- **Black & White Palette** (Core UI):
   - `bg-black`, `bg-white`
   - `text-black`, `text-white`
   - `border-black`, `border-white`
   - Grays only for disabled states: `bg-gray-100`, `text-gray-500`
-- **Typography**: Simple, readable fonts (system fonts preferred)
+- **Vibrant Gradients** (Accents only):
+  - Header uses `.retro-rainbow-text` with purple/pink/cyan gradient
+  - Background uses subtle rainbow gradient overlay
+- **Typography**: Retro pixel font (Press Start 2P) for header, system fonts for body
 - **Spacing**: Consistent use of Tailwind spacing scale
-- **Animations**: Minimal, fast transitions only
+- **Animations**: Minimal, fast transitions; gradient shifts for header
 
 ### Error Handling
 - **User-Friendly Messages**: Never expose technical errors
