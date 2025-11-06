@@ -1,12 +1,18 @@
 import type { Metadata } from 'next'
 import './globals.css'
 import AuthWrapper from '@/components/AuthWrapper'
-import { Press_Start_2P } from 'next/font/google'
+import { Press_Start_2P, Fredoka } from 'next/font/google'
 
 const pressStart = Press_Start_2P({
   weight: '400',
   subsets: ['latin'],
   variable: '--font-press-start',
+})
+
+const fredoka = Fredoka({
+  weight: '700',
+  subsets: ['latin'],
+  variable: '--font-fredoka',
 })
 
 export const metadata: Metadata = {
@@ -21,7 +27,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={pressStart.variable}>
+      <body className={`${pressStart.variable} ${fredoka.variable}`}>
         <AuthWrapper>{children}</AuthWrapper>
       </body>
     </html>

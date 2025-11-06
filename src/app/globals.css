@@ -113,9 +113,8 @@ body {
 }
 
 .retro-rainbow-text {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Arial Black', sans-serif;
-  font-weight: 900;
-  font-stretch: expanded;
+  font-family: var(--font-fredoka), 'Rounded Mplus 1c', 'Quicksand', 'Nunito', 'Arial Rounded MT Bold', sans-serif;
+  font-weight: 700;
   background: linear-gradient(
     135deg,
     #ff006e,
@@ -130,11 +129,16 @@ body {
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   animation: vibrant-shift 4s ease infinite;
-  filter: drop-shadow(0 0 20px rgba(131, 56, 236, 0.5))
-          drop-shadow(0 0 40px rgba(255, 0, 110, 0.3));
+  filter: drop-shadow(0 0 25px rgba(131, 56, 236, 0.6))
+          drop-shadow(0 0 45px rgba(255, 0, 110, 0.4))
+          drop-shadow(0 4px 0px rgba(0, 0, 0, 0.1));
   letter-spacing: 0.15em;
   text-transform: uppercase;
   position: relative;
+  -webkit-text-stroke: 0px;
+  text-shadow:
+    3px 3px 0px rgba(0, 0, 0, 0.05),
+    -1px -1px 0px rgba(255, 255, 255, 0.1);
 }
 
 @keyframes rainbow-shift {
