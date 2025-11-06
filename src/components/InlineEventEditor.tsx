@@ -48,8 +48,10 @@ export default function InlineEventEditor({
     description: event.description || '',
   });
 
-  const dateInputRef = useRef<HTMLInputElement>(null);
-  const timeInputRef = useRef<HTMLInputElement>(null);
+  const startDateInputRef = useRef<HTMLInputElement>(null);
+  const startTimeInputRef = useRef<HTMLInputElement>(null);
+  const endDateInputRef = useRef<HTMLInputElement>(null);
+  const endTimeInputRef = useRef<HTMLInputElement>(null);
   const locationInputRef = useRef<HTMLInputElement>(null);
   const descriptionInputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -65,10 +67,14 @@ export default function InlineEventEditor({
   }, [event]);
 
   useEffect(() => {
-    if (editingField === 'startDate' && dateInputRef.current) {
-      dateInputRef.current.focus();
-    } else if (editingField === 'startTime' && timeInputRef.current) {
-      timeInputRef.current.focus();
+    if (editingField === 'startDate' && startDateInputRef.current) {
+      startDateInputRef.current.focus();
+    } else if (editingField === 'startTime' && startTimeInputRef.current) {
+      startTimeInputRef.current.focus();
+    } else if (editingField === 'endDate' && endDateInputRef.current) {
+      endDateInputRef.current.focus();
+    } else if (editingField === 'endTime' && endTimeInputRef.current) {
+      endTimeInputRef.current.focus();
     } else if (editingField === 'location' && locationInputRef.current) {
       locationInputRef.current.focus();
       locationInputRef.current.select();
@@ -103,13 +109,13 @@ export default function InlineEventEditor({
         <span className="font-semibold">Start:</span>{' '}
         {editingField === 'startDate' ? (
           <input
-            ref={dateInputRef}
+            ref={startDateInputRef}
             type="date"
             value={formData.startDate}
             onChange={(e) => handleFieldChange('startDate', e.target.value)}
             onBlur={() => setEditingField(null)}
             className="inline-block border border-black px-1 text-sm focus:outline-none focus:ring-1 focus:ring-black align-baseline"
-            style={{ height: '1.5rem', lineHeight: '1.5rem', verticalAlign: 'baseline' }}
+            style={{ height: '1.5rem', lineHeight: '1.5rem', verticalAlign: 'baseline', width: '140px' }}
           />
         ) : (
           <span
@@ -122,13 +128,13 @@ export default function InlineEventEditor({
         at{' '}
         {editingField === 'startTime' ? (
           <input
-            ref={timeInputRef}
+            ref={startTimeInputRef}
             type="time"
             value={formData.startTime}
             onChange={(e) => handleFieldChange('startTime', e.target.value)}
             onBlur={() => setEditingField(null)}
             className="inline-block border border-black px-1 text-sm focus:outline-none focus:ring-1 focus:ring-black align-baseline"
-            style={{ height: '1.5rem', lineHeight: '1.5rem', verticalAlign: 'baseline' }}
+            style={{ height: '1.5rem', lineHeight: '1.5rem', verticalAlign: 'baseline', width: '100px' }}
           />
         ) : (
           <span
@@ -144,13 +150,13 @@ export default function InlineEventEditor({
         <span className="font-semibold">End:</span>{' '}
         {editingField === 'endDate' ? (
           <input
-            ref={dateInputRef}
+            ref={endDateInputRef}
             type="date"
             value={formData.endDate}
             onChange={(e) => handleFieldChange('endDate', e.target.value)}
             onBlur={() => setEditingField(null)}
             className="inline-block border border-black px-1 text-sm focus:outline-none focus:ring-1 focus:ring-black align-baseline"
-            style={{ height: '1.5rem', lineHeight: '1.5rem', verticalAlign: 'baseline' }}
+            style={{ height: '1.5rem', lineHeight: '1.5rem', verticalAlign: 'baseline', width: '140px' }}
           />
         ) : (
           <span
@@ -163,13 +169,13 @@ export default function InlineEventEditor({
         at{' '}
         {editingField === 'endTime' ? (
           <input
-            ref={timeInputRef}
+            ref={endTimeInputRef}
             type="time"
             value={formData.endTime}
             onChange={(e) => handleFieldChange('endTime', e.target.value)}
             onBlur={() => setEditingField(null)}
             className="inline-block border border-black px-1 text-sm focus:outline-none focus:ring-1 focus:ring-black align-baseline"
-            style={{ height: '1.5rem', lineHeight: '1.5rem', verticalAlign: 'baseline' }}
+            style={{ height: '1.5rem', lineHeight: '1.5rem', verticalAlign: 'baseline', width: '100px' }}
           />
         ) : (
           <span
