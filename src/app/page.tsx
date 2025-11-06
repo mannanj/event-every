@@ -686,8 +686,7 @@ export default function Home() {
           onCancelAll={handleCancelBatch}
           onExportComplete={(events) => {
             events.forEach(event => addEvent(event));
-            const savedEventIds = new Set(events.map(e => e.id));
-            setUnsavedEvents(prev => prev.filter(e => !savedEventIds.has(e.id)));
+            setUnsavedEvents([]);
           }}
         />
 

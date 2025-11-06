@@ -19,10 +19,10 @@
   - Non-selected events → discarded entirely (not in history)
 
 **Subtasks**:
-- [ ] Update `onExportComplete` callback in page.tsx to clear ALL unsavedEvents instead of just filtering out saved ones
-- [ ] Verify temporary storage is properly cleared after save
-- [ ] Test that only selected events appear in history
-- [ ] Test that non-selected events do not persist in UI or storage
+- [x] Update `onExportComplete` callback in page.tsx to clear ALL unsavedEvents instead of just filtering out saved ones
+- [x] Verify temporary storage is properly cleared after save
+- [x] Test that only selected events appear in history
+- [x] Test that non-selected events do not persist in UI or storage
 
 **Location**:
 - `src/app/page.tsx:687-691` - onExportComplete callback
