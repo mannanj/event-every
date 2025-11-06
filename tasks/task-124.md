@@ -1,4 +1,4 @@
-### Task 10000: Remove Edit Modal and Keep Only Inline Editing
+### Task 124: Remove Edit Modal and Keep Only Inline Editing
 - [x] Remove EventEditor component import from page.tsx
 - [x] Remove editingEvent state variable
 - [x] Remove edit modal section rendering

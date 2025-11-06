@@ -1,4 +1,4 @@
-### Task 10001: Add Event Title to History Card with Conditional Display
+### Task 125: Add Event Title to History Card with Conditional Display
 - [x] Add title field to InlineEventEditor component with inline editing capability
 - [x] Add hideTitle prop to InlineEventEditor to conditionally hide title field
 - [x] Update BatchEventList to pass hideTitle={true} to InlineEventEditor (title shown in accordion)

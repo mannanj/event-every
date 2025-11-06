@@ -14,6 +14,7 @@ export default function HistoryPanel({ onEventSelect }: HistoryPanelProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const { events, isLoading, error, deleteEvent, clearHistory, searchEvents, updateEvent } = useHistory();
 
   const handleSearchChange = (query: string) => {
@@ -30,9 +31,18 @@ export default function HistoryPanel({ onEventSelect }: HistoryPanelProps) {
   };
 
   const handleDeleteEvent = (id: string) => {
-    if (confirm('Delete this created event?')) {
-      deleteEvent(id);
+    setDeleteConfirmId(id);
+  };
+
+  const confirmDelete = () => {
+    if (deleteConfirmId) {
+      deleteEvent(deleteConfirmId);
+      setDeleteConfirmId(null);
     }
+  };
+
+  const cancelDelete = () => {
+    setDeleteConfirmId(null);
   };
 
   const handleClearHistory = () => {
@@ -189,6 +199,38 @@ export default function HistoryPanel({ onEventSelect }: HistoryPanelProps) {
           </div>
         </div>
       </div>
+
+      {deleteConfirmId && (
+        <>
+          <div
+            className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center"
+            onClick={cancelDelete}
+          >
+            <div
+              className="bg-white border-2 border-black p-8 max-w-sm mx-4"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <p className="text-center mb-6 font-semibold">
+                Do you want to delete this event? This is irreversible.
+              </p>
+              <div className="flex gap-4">
+                <button
+                  onClick={cancelDelete}
+                  className="flex-1 px-6 py-2 bg-white text-black border-2 border-black hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-black"
+                >
+                  No
+                </button>
+                <button
+                  onClick={confirmDelete}
+                  className="flex-1 px-6 py-2 bg-black text-white border-2 border-black hover:bg-white hover:text-black transition-colors focus:outline-none focus:ring-2 focus:ring-black"
+                >
+                  Yes
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </>
   );
 }
