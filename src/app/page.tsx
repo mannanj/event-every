@@ -3,7 +3,6 @@
 import { useState, useRef, useEffect } from 'react';
 import SmartInput, { SmartInputHandle } from '@/components/SmartInput';
 import EventEditor from '@/components/EventEditor';
-import ProcessingSection from '@/components/ProcessingSection';
 import UnsavedEventsSection from '@/components/UnsavedEventsSection';
 import ErrorNotification from '@/components/ErrorNotification';
 import RateLimitBanner from '@/components/RateLimitBanner';
@@ -675,16 +674,12 @@ export default function Home() {
           onDismiss={handleRemoveFromQueue}
         />
 
-        {/* Processing status section */}
-        <ProcessingSection
+        {/* Unified processing and unsaved events section */}
+        <UnsavedEventsSection
+          events={unsavedEvents}
           imageProcessingStatuses={imageProcessingStatuses}
           urlProcessingStatus={urlProcessingStatus}
           isProcessing={batchProcessing?.isProcessing || false}
-        />
-
-        {/* Unsaved events section */}
-        <UnsavedEventsSection
-          events={unsavedEvents}
           onEdit={handleBatchEventEdit}
           onDelete={handleBatchEventDelete}
           onExport={handleBatchEventExport}
