@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import { CalendarEvent } from '@/types/event';
 import { exportToICS, exportMultipleToICS } from '@/services/exporter';
+import InlineEventEditor from './InlineEventEditor';
+import EditableField from './EditableField';
 
 /**
  * Batch event list component for reviewing and exporting multiple events.
@@ -21,6 +23,19 @@ interface BatchEventListProps {
   onCancel: () => void;
   onExportComplete: (events: CalendarEvent[]) => void;
   showHeader?: boolean;
+}
+
+function formatDateForInput(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function formatTimeForInput(date: Date): string {
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  return `${hours}:${minutes}`;
 }
 
 export default function BatchEventList({
@@ -146,33 +161,57 @@ export default function BatchEventList({
                         e.stopPropagation();
                         toggleSelection(event.id);
                       }}
-                      className="w-5 h-5 border-2 border-black cursor-pointer focus:ring-2 focus:ring-black"
+                      className="w-5 h-5 border-2 border-black cursor-pointer focus:ring-2 focus:ring-black flex-shrink-0"
                       aria-label={`Select ${event.title}`}
                     />
 
-                    {/* Event info */}
-                    <div
-                      className="flex-1 min-w-0 cursor-pointer"
-                      onClick={() => toggleExpand(event.id)}
-                    >
-                      <div className="flex items-center gap-2">
-                        <h3 className="font-bold text-base truncate">{event.title}</h3>
-                        {isNew && (
-                          <span className="text-xs bg-green-600 text-white px-2 py-0.5 rounded">
-                            NEW
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-sm text-gray-600 truncate">
-                        {formatCompactDate(event.startDate)}
-                        {event.location && ` • ${event.location}`}
-                      </p>
+                    {/* Event info - editable in collapsed view */}
+                    <div className="flex-1 min-w-0">
+                      {!isExpanded ? (
+                        <div onClick={() => toggleExpand(event.id)} className="cursor-pointer">
+                          <div className="flex items-center gap-2 mb-1">
+                            <div
+                              className="font-bold text-base truncate hover:bg-gray-100 px-1 rounded cursor-text"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleExpand(event.id);
+                              }}
+                            >
+                              {event.title}
+                            </div>
+                            {isNew && (
+                              <span className="text-xs bg-green-600 text-white px-2 py-0.5 rounded flex-shrink-0">
+                                NEW
+                              </span>
+                            )}
+                          </div>
+                          <p
+                            className="text-sm text-gray-600 truncate hover:bg-gray-100 px-1 rounded cursor-text"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleExpand(event.id);
+                            }}
+                          >
+                            {formatCompactDate(event.startDate)}
+                            {event.location && ` • ${event.location}`}
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-bold text-base">{event.title}</h3>
+                          {isNew && (
+                            <span className="text-xs bg-green-600 text-white px-2 py-0.5 rounded">
+                              NEW
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
 
                   {/* Expand/collapse icon */}
                   <button
-                    className="p-1 hover:bg-gray-200 rounded transition-colors focus:outline-none"
+                    className="p-1 hover:bg-gray-200 rounded transition-colors focus:outline-none flex-shrink-0"
                     aria-label={isExpanded ? 'Collapse' : 'Expand'}
                     onClick={(e) => {
                       e.stopPropagation();
@@ -198,37 +237,16 @@ export default function BatchEventList({
                 </div>
               </div>
 
-              {/* Expanded details */}
+              {/* Expanded details with inline editing */}
               {isExpanded && (
                 <div className="border-t-2 border-black p-4 bg-gray-50">
-                  <div className="space-y-2 text-sm">
-                    <p className="text-gray-700">
-                      <span className="font-semibold">Start:</span> {formatDate(event.startDate)}
-                    </p>
-                    <p className="text-gray-700">
-                      <span className="font-semibold">End:</span> {formatDate(event.endDate)}
-                    </p>
-                    {event.location && (
-                      <p className="text-gray-700">
-                        <span className="font-semibold">Location:</span> {event.location}
-                      </p>
-                    )}
-                    {event.description && (
-                      <p className="text-gray-700">
-                        <span className="font-semibold">Description:</span> {event.description}
-                      </p>
-                    )}
-                    {event.attachments && event.attachments.length > 0 && (
-                      <div>
-                        <p className="font-semibold text-gray-700 mb-1">Attachments:</p>
-                        {event.attachments.map((attachment, index) => (
-                          <p key={attachment.id} className="text-gray-700 ml-2">
-                            [{attachment.type === 'original-image' ? 'Image' : attachment.type === 'original-text' ? 'Text' : 'Metadata'} #{index + 1}] {attachment.filename} ({(attachment.size / 1024).toFixed(1)} KB)
-                          </p>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                  <InlineEventEditor
+                    event={event}
+                    onChange={(updatedEvent) => {
+                      onEdit(updatedEvent);
+                    }}
+                    showAttachments={true}
+                  />
                 </div>
               )}
             </div>

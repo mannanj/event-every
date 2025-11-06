@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { CalendarEvent } from '@/types/event';
 import { useHistory } from '@/hooks/useHistory';
 import { exportToICS } from '@/services/exporter';
-import { downloadAttachment } from '@/utils/downloadAttachment';
+import InlineEventEditor from './InlineEventEditor';
 
 interface HistoryPanelProps {
   onEventSelect?: (event: CalendarEvent) => void;
@@ -14,7 +14,7 @@ export default function HistoryPanel({ onEventSelect }: HistoryPanelProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showClearConfirm, setShowClearConfirm] = useState(false);
-  const { events, isLoading, error, deleteEvent, clearHistory, searchEvents } = useHistory();
+  const { events, isLoading, error, deleteEvent, clearHistory, searchEvents, updateEvent } = useHistory();
 
   const handleSearchChange = (query: string) => {
     setSearchQuery(query);
@@ -139,13 +139,19 @@ export default function HistoryPanel({ onEventSelect }: HistoryPanelProps) {
               {events.map((event) => (
                 <div
                   key={event.id}
-                  className="border-2 border-black p-4 bg-white hover:bg-gray-50 transition-colors"
+                  className="border-2 border-black p-4 bg-white transition-colors"
                 >
-                  <div className="flex justify-between items-start mb-2">
-                    <h3 className="font-bold text-lg flex-1">{event.title}</h3>
+                  <div className="flex justify-between items-start mb-3">
+                    <div className="flex-1">
+                      <InlineEventEditor
+                        event={event}
+                        onChange={(updatedEvent) => updateEvent(updatedEvent)}
+                        showAttachments={true}
+                      />
+                    </div>
                     <button
                       onClick={() => handleDeleteEvent(event.id)}
-                      className="ml-2 text-black hover:text-gray-600 focus:outline-none"
+                      className="ml-2 text-black hover:text-gray-600 focus:outline-none flex-shrink-0"
                       aria-label={`Delete ${event.title}`}
                     >
                       <svg
@@ -164,48 +170,9 @@ export default function HistoryPanel({ onEventSelect }: HistoryPanelProps) {
                     </button>
                   </div>
 
-                  <div className="space-y-1 mb-3 text-sm">
-                    <p className="text-gray-700">
-                      <span className="font-semibold">Start:</span> {formatDate(event.startDate)}
-                    </p>
-                    <p className="text-gray-700">
-                      <span className="font-semibold">End:</span> {formatDate(event.endDate)}
-                    </p>
-                    {event.location && (
-                      <p className="text-gray-700">
-                        <span className="font-semibold">Location:</span> {event.location}
-                      </p>
-                    )}
-                    {event.description && (
-                      <p className="text-gray-700 line-clamp-2">
-                        <span className="font-semibold">Description:</span> {event.description}
-                      </p>
-                    )}
-                    {event.attachments && event.attachments.length > 0 && (
-                      <div>
-                        <p className="font-semibold text-gray-700">Attachments:</p>
-                        <div className="space-y-1">
-                          {event.attachments.map((attachment, index) => (
-                            <div key={attachment.id} className="flex items-center justify-between text-xs">
-                              <span className="text-gray-700">
-                                [{attachment.type === 'original-image' ? 'Image' : attachment.type === 'original-text' ? 'Text' : 'Metadata'} #{index + 1}] {attachment.filename} ({(attachment.size / 1024).toFixed(1)} KB)
-                              </span>
-                              <button
-                                onClick={() => downloadAttachment(attachment)}
-                                className="ml-2 px-2 py-1 bg-black text-white text-xs hover:bg-gray-800 transition-colors focus:outline-none focus:ring-1 focus:ring-black"
-                                aria-label={`Download ${attachment.filename}`}
-                              >
-                                ↓
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    <p className="text-gray-500 text-xs mt-2">
-                      Created: {formatDate(event.created)}
-                    </p>
-                  </div>
+                  <p className="text-gray-500 text-xs mb-3">
+                    Created: {formatDate(event.created)}
+                  </p>
 
                   <div className="flex gap-2">
                     <button
@@ -215,18 +182,6 @@ export default function HistoryPanel({ onEventSelect }: HistoryPanelProps) {
                     >
                       Export
                     </button>
-                    {onEventSelect && (
-                      <button
-                        onClick={() => {
-                          onEventSelect(event);
-                          setIsOpen(false);
-                        }}
-                        className="flex-1 px-4 py-2 bg-white text-black border-2 border-black hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-black"
-                        aria-label={`Edit ${event.title}`}
-                      >
-                        Edit
-                      </button>
-                    )}
                   </div>
                 </div>
               ))}

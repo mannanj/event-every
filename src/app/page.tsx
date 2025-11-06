@@ -6,6 +6,7 @@ import EventEditor from '@/components/EventEditor';
 import UnsavedEventsSection from '@/components/UnsavedEventsSection';
 import ErrorNotification from '@/components/ErrorNotification';
 import RateLimitBanner from '@/components/RateLimitBanner';
+import InlineEventEditor from '@/components/InlineEventEditor';
 import { CalendarEvent, ParsedEvent, StreamedEventChunk, EventAttachment } from '@/types/event';
 import { exportToICS } from '@/services/exporter';
 import { useHistory } from '@/hooks/useHistory';
@@ -55,7 +56,7 @@ export default function Home() {
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
   const [rateLimitInfo, setRateLimitInfo] = useState<{ remaining: number; total: number; resetTime: number } | undefined>();
   const [hasLoadedTempEvents, setHasLoadedTempEvents] = useState(false);
-  const { events, addEvent, deleteEvent } = useHistory();
+  const { events, addEvent, deleteEvent, updateEvent } = useHistory();
   const { addToQueue, updateProgress } = useProcessingQueue();
   const smartInputRef = useRef<SmartInputHandle>(null);
 
@@ -707,11 +708,17 @@ export default function Home() {
                   key={event.id}
                   className={`p-4 bg-white ${index > 0 ? 'border-t-2 border-black' : ''}`}
                 >
-                  <div className="flex justify-between items-start mb-2">
-                    <h3 className="font-bold text-lg flex-1">{event.title}</h3>
+                  <div className="flex justify-between items-start mb-3">
+                    <div className="flex-1">
+                      <InlineEventEditor
+                        event={event}
+                        onChange={(updatedEvent) => updateEvent(updatedEvent)}
+                        showAttachments={true}
+                      />
+                    </div>
                     <button
                       onClick={() => deleteEvent(event.id)}
-                      className="ml-2 text-black hover:text-gray-600 focus:outline-none"
+                      className="ml-2 text-black hover:text-gray-600 focus:outline-none flex-shrink-0"
                       aria-label={`Delete ${event.title}`}
                     >
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -720,27 +727,9 @@ export default function Home() {
                     </button>
                   </div>
 
-                  <div className="space-y-1 mb-3 text-sm">
-                    <p className="text-gray-700">
-                      <span className="font-semibold">Start:</span> {formatDate(event.startDate)}
-                    </p>
-                    <p className="text-gray-700">
-                      <span className="font-semibold">End:</span> {formatDate(event.endDate)}
-                    </p>
-                    {event.location && (
-                      <p className="text-gray-700">
-                        <span className="font-semibold">Location:</span> {event.location}
-                      </p>
-                    )}
-                    {event.description && (
-                      <p className="text-gray-700 line-clamp-2">
-                        <span className="font-semibold">Description:</span> {event.description}
-                      </p>
-                    )}
-                    <p className="text-gray-500 text-xs mt-2">
-                      Created: {formatDate(event.created)}
-                    </p>
-                  </div>
+                  <p className="text-gray-500 text-xs mb-3">
+                    Created: {formatDate(event.created)}
+                  </p>
 
                   <div className="flex gap-2">
                     <button
@@ -749,13 +738,6 @@ export default function Home() {
                       aria-label={`Export ${event.title}`}
                     >
                       Export
-                    </button>
-                    <button
-                      onClick={() => handleEditFromHistory(event)}
-                      className="flex-1 px-4 py-2 bg-white text-black border-2 border-black hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-black"
-                      aria-label={`Edit ${event.title}`}
-                    >
-                      Edit
                     </button>
                   </div>
                 </div>
