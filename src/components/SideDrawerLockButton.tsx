@@ -92,23 +92,22 @@ export default function SideDrawerLockButton({ onLock }: SideDrawerLockButtonPro
 
       {showConfirmation && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60]">
-          <div className="bg-white border-4 border-black p-8 max-w-sm mx-4">
-            <h2 className="text-xl font-bold mb-4">Lock Screen?</h2>
-            <p className="text-sm mb-6">
-              Are you sure you want to lock the screen? You'll need to enter the pattern to unlock.
+          <div className="bg-white border-4 border-black p-6 max-w-sm mx-4">
+            <p className="text-sm mb-4">
+              Do you want to lock the screen? This will require a special pattern to unlock.
             </p>
-            <div className="flex gap-4">
+            <div className="flex gap-3">
               <button
                 onClick={handleCancel}
-                className="flex-1 px-4 py-2 bg-white border-2 border-black hover:bg-gray-100 transition-colors font-medium"
+                className="flex-1 px-3 py-1.5 bg-white border-2 border-black hover:bg-gray-100 transition-colors text-sm"
               >
-                Cancel
+                No
               </button>
               <button
                 onClick={handleConfirm}
-                className="flex-1 px-4 py-2 bg-black text-white hover:bg-gray-800 transition-colors font-medium"
+                className="flex-1 px-3 py-1.5 bg-black text-white hover:bg-gray-800 transition-colors text-sm"
               >
-                Lock
+                Yes
               </button>
             </div>
           </div>
