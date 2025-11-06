@@ -172,7 +172,8 @@ export default function BatchEventList({
             >
               {/* Card header - always visible */}
               <div
-                className={`p-3 transition-colors duration-200 ${!isNew ? 'hover:bg-gray-100' : ''}`}
+                className={`p-3 transition-colors duration-200 ${!isNew ? 'hover:bg-gray-100' : ''} cursor-pointer`}
+                onClick={() => toggleExpand(event.id)}
               >
                 <div className="flex justify-between items-start gap-3">
                   <div className="flex items-center gap-3 flex-1 min-w-0">
