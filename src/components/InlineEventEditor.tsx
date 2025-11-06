@@ -114,8 +114,8 @@ export default function InlineEventEditor({
             value={formData.startDate}
             onChange={(e) => handleFieldChange('startDate', e.target.value)}
             onBlur={() => setEditingField(null)}
-            className="inline-block border border-black px-0.5 text-sm focus:outline-none focus:ring-1 focus:ring-black align-baseline"
-            style={{ height: '1.3rem', lineHeight: '1.3rem', verticalAlign: 'baseline', width: '110px', padding: '0 2px' }}
+            className="inline-block border border-black px-1 text-sm focus:outline-none focus:ring-1 focus:ring-black align-baseline"
+            style={{ height: '1.5rem', lineHeight: '1.5rem', verticalAlign: 'baseline', width: '140px' }}
           />
         ) : (
           <span
@@ -133,8 +133,8 @@ export default function InlineEventEditor({
             value={formData.startTime}
             onChange={(e) => handleFieldChange('startTime', e.target.value)}
             onBlur={() => setEditingField(null)}
-            className="inline-block border border-black px-0.5 text-sm focus:outline-none focus:ring-1 focus:ring-black align-baseline"
-            style={{ height: '1.3rem', lineHeight: '1.3rem', verticalAlign: 'baseline', width: '75px', padding: '0 2px' }}
+            className="inline-block border border-black px-1 text-sm focus:outline-none focus:ring-1 focus:ring-black align-baseline"
+            style={{ height: '1.5rem', lineHeight: '1.5rem', verticalAlign: 'baseline', width: '100px' }}
           />
         ) : (
           <span
@@ -155,8 +155,8 @@ export default function InlineEventEditor({
             value={formData.endDate}
             onChange={(e) => handleFieldChange('endDate', e.target.value)}
             onBlur={() => setEditingField(null)}
-            className="inline-block border border-black px-0.5 text-sm focus:outline-none focus:ring-1 focus:ring-black align-baseline"
-            style={{ height: '1.3rem', lineHeight: '1.3rem', verticalAlign: 'baseline', width: '110px', padding: '0 2px' }}
+            className="inline-block border border-black px-1 text-sm focus:outline-none focus:ring-1 focus:ring-black align-baseline"
+            style={{ height: '1.5rem', lineHeight: '1.5rem', verticalAlign: 'baseline', width: '140px' }}
           />
         ) : (
           <span
@@ -174,8 +174,8 @@ export default function InlineEventEditor({
             value={formData.endTime}
             onChange={(e) => handleFieldChange('endTime', e.target.value)}
             onBlur={() => setEditingField(null)}
-            className="inline-block border border-black px-0.5 text-sm focus:outline-none focus:ring-1 focus:ring-black align-baseline"
-            style={{ height: '1.3rem', lineHeight: '1.3rem', verticalAlign: 'baseline', width: '75px', padding: '0 2px' }}
+            className="inline-block border border-black px-1 text-sm focus:outline-none focus:ring-1 focus:ring-black align-baseline"
+            style={{ height: '1.5rem', lineHeight: '1.5rem', verticalAlign: 'baseline', width: '100px' }}
           />
         ) : (
           <span
@@ -197,8 +197,8 @@ export default function InlineEventEditor({
               value={formData.location}
               onChange={(e) => handleFieldChange('location', e.target.value)}
               onBlur={() => setEditingField(null)}
-              className="inline-block border border-black text-sm focus:outline-none focus:ring-1 focus:ring-black align-baseline"
-              style={{ height: '1.3rem', lineHeight: '1.3rem', verticalAlign: 'baseline', width: 'calc(100% - 85px)', minWidth: '200px', padding: '0 2px' }}
+              className="inline-block border border-black px-1 text-sm focus:outline-none focus:ring-1 focus:ring-black align-baseline"
+              style={{ height: '1.5rem', lineHeight: '1.5rem', verticalAlign: 'baseline', width: 'calc(100% - 80px)', minWidth: '200px', maxWidth: '100%' }}
             />
           ) : (
             <span
@@ -212,7 +212,7 @@ export default function InlineEventEditor({
       )}
 
       {(event.description || editingField === 'description') && (
-        <div className="text-gray-700 leading-relaxed">
+        <div className="text-gray-700">
           <span className="font-semibold">Description:</span>{' '}
           {editingField === 'description' ? (
             <textarea
@@ -220,8 +220,7 @@ export default function InlineEventEditor({
               value={formData.description}
               onChange={(e) => handleFieldChange('description', e.target.value)}
               onBlur={() => setEditingField(null)}
-              className="block w-full border border-black text-sm focus:outline-none focus:ring-1 focus:ring-black mt-1"
-              style={{ padding: '2px 4px', lineHeight: '1.3' }}
+              className="block w-full border border-black px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-black mt-1"
               rows={3}
             />
           ) : (
