@@ -44,7 +44,7 @@ const FUN_MESSAGES = [
 
 function AnimatedEllipsis() {
   return (
-    <span className="inline-flex gap-[1px] items-end translate-y-[10px]">
+    <span className="inline-flex gap-[1px] items-end translate-y-[7px]">
       <span className="animate-[bounce_0.8s_ease-in-out_0s_infinite] inline-block translate-y-1">.</span>
       <span className="animate-[bounce_1.2s_ease-in-out_0.15s_infinite] inline-block translate-y-1">.</span>
       <span className="animate-[bounce_1s_ease-in-out_0.3s_infinite] inline-block translate-y-1">.</span>
