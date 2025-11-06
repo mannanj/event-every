@@ -2,7 +2,6 @@
 
 import { useState, useRef, useEffect } from 'react';
 import SmartInput, { SmartInputHandle } from '@/components/SmartInput';
-import EventEditor from '@/components/EventEditor';
 import UnsavedEventsSection from '@/components/UnsavedEventsSection';
 import ErrorNotification from '@/components/ErrorNotification';
 import RateLimitBanner from '@/components/RateLimitBanner';
@@ -53,7 +52,6 @@ export default function Home() {
   const [unsavedEvents, setUnsavedEvents] = useState<CalendarEvent[]>([]);
   const [imageProcessingStatuses, setImageProcessingStatuses] = useState<ImageProcessingStatus[]>([]);
   const [urlProcessingStatus, setUrlProcessingStatus] = useState<URLProcessingStatus | null>(null);
-  const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
   const [rateLimitInfo, setRateLimitInfo] = useState<{ remaining: number; total: number; resetTime: number } | undefined>();
   const [hasLoadedTempEvents, setHasLoadedTempEvents] = useState(false);
   const { events, addEvent, deleteEvent, updateEvent } = useHistory();
@@ -579,41 +577,10 @@ export default function Home() {
     exportToICS(event);
   };
 
-  const handleEditFromHistory = (event: CalendarEvent) => {
-    setEditingEvent(event);
-    setTimeout(() => {
-      const editSection = document.getElementById('edit-section');
-      editSection?.scrollIntoView({ behavior: 'smooth' });
-    }, 100);
-  };
-
-  const handleSaveEdit = (updatedEvent: CalendarEvent) => {
-    if (!editingEvent) return;
-
-    const isInUnsaved = unsavedEvents.some(e => e.id === editingEvent.id);
-    if (isInUnsaved) {
-      setUnsavedEvents(prev =>
-        prev.map(e => e.id === editingEvent.id ? updatedEvent : e)
-      );
-      setEditingEvent(null);
-      return;
-    }
-
-    deleteEvent(editingEvent.id);
-    addEvent(updatedEvent);
-    setEditingEvent(null);
-  };
-
-  const handleCancelEdit = () => {
-    setEditingEvent(null);
-  };
-
-  const handleBatchEventEdit = (event: CalendarEvent) => {
-    setEditingEvent(event);
-    setTimeout(() => {
-      const editSection = document.getElementById('edit-section');
-      editSection?.scrollIntoView({ behavior: 'smooth' });
-    }, 100);
+  const handleBatchEventEdit = (updatedEvent: CalendarEvent) => {
+    setUnsavedEvents(prev =>
+      prev.map(e => e.id === updatedEvent.id ? updatedEvent : e)
+    );
   };
 
   const handleBatchEventDelete = (eventId: string) => {
@@ -686,18 +653,6 @@ export default function Home() {
             setUnsavedEvents([]);
           }}
         />
-
-        {/* Event editor section */}
-        {editingEvent && (
-          <div id="edit-section" className="mb-12">
-            <h2 className="text-2xl font-bold mb-4 text-black">Edit Event</h2>
-            <EventEditor
-              event={editingEvent}
-              onSave={handleSaveEdit}
-              onCancel={handleCancelEdit}
-            />
-          </div>
-        )}
 
         {/* History section */}
         {events.length > 0 && (
