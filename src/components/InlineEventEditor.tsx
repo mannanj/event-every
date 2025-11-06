@@ -8,6 +8,7 @@ interface InlineEventEditorProps {
   event: CalendarEvent;
   onChange: (updatedEvent: CalendarEvent) => void;
   showAttachments?: boolean;
+  hideTitle?: boolean;
 }
 
 function formatDateForInput(date: Date): string {
@@ -37,9 +38,11 @@ export default function InlineEventEditor({
   event,
   onChange,
   showAttachments = true,
+  hideTitle = false,
 }: InlineEventEditorProps) {
   const [editingField, setEditingField] = useState<string | null>(null);
   const [formData, setFormData] = useState({
+    title: event.title || '',
     startDate: formatDateForInput(event.startDate),
     startTime: formatTimeForInput(event.startDate),
     endDate: formatDateForInput(event.endDate),
@@ -48,6 +51,7 @@ export default function InlineEventEditor({
     description: event.description || '',
   });
 
+  const titleInputRef = useRef<HTMLInputElement>(null);
   const startDateInputRef = useRef<HTMLInputElement>(null);
   const startTimeInputRef = useRef<HTMLInputElement>(null);
   const endDateInputRef = useRef<HTMLInputElement>(null);
@@ -57,6 +61,7 @@ export default function InlineEventEditor({
 
   useEffect(() => {
     setFormData({
+      title: event.title || '',
       startDate: formatDateForInput(event.startDate),
       startTime: formatTimeForInput(event.startDate),
       endDate: formatDateForInput(event.endDate),
@@ -67,7 +72,10 @@ export default function InlineEventEditor({
   }, [event]);
 
   useEffect(() => {
-    if (editingField === 'startDate' && startDateInputRef.current) {
+    if (editingField === 'title' && titleInputRef.current) {
+      titleInputRef.current.focus();
+      titleInputRef.current.select();
+    } else if (editingField === 'startDate' && startDateInputRef.current) {
       startDateInputRef.current.focus();
     } else if (editingField === 'startTime' && startTimeInputRef.current) {
       startTimeInputRef.current.focus();
@@ -94,6 +102,7 @@ export default function InlineEventEditor({
     if (!isNaN(startDateTime.getTime()) && !isNaN(endDateTime.getTime())) {
       const updatedEvent: CalendarEvent = {
         ...event,
+        title: updatedFormData.title.trim() || event.title,
         startDate: startDateTime,
         endDate: endDateTime,
         location: updatedFormData.location.trim() || undefined,
@@ -105,6 +114,28 @@ export default function InlineEventEditor({
 
   return (
     <div className="space-y-2 text-sm">
+      {!hideTitle && (
+        <div>
+          {editingField === 'title' ? (
+            <input
+              ref={titleInputRef}
+              type="text"
+              value={formData.title}
+              onChange={(e) => handleFieldChange('title', e.target.value)}
+              onBlur={() => setEditingField(null)}
+              className="font-bold text-base border border-black px-1 py-0 focus:outline-none focus:ring-1 focus:ring-black w-full"
+            />
+          ) : (
+            <h3
+              onClick={() => setEditingField('title')}
+              className="font-bold text-base cursor-pointer hover:bg-gray-200 rounded"
+            >
+              {event.title}
+            </h3>
+          )}
+        </div>
+      )}
+
       <div className="text-gray-700 leading-relaxed">
         <span className="font-semibold">Start:</span>{' '}
         {editingField === 'startDate' ? (

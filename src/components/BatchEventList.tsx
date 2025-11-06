@@ -362,6 +362,7 @@ export default function BatchEventList({
                       onEdit(updatedEvent);
                     }}
                     showAttachments={true}
+                    hideTitle={true}
                   />
                 </div>
               )}
