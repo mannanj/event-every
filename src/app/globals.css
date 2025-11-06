@@ -82,6 +82,7 @@ body {
     rgba(75, 0, 130, 0.15),
     rgba(148, 0, 211, 0.15)
   );
+  background-attachment: local;
 }
 
 @keyframes bounceUp1 {
