@@ -706,11 +706,11 @@ export default function Home() {
         {/* History section */}
         {events.length > 0 && (
           <div className="mb-12 max-h-[99vh] overflow-y-auto">
-              <div className="space-y-4">
-              {events.map((event) => (
+              <div className="border-2 border-black">
+              {events.map((event, index) => (
                 <div
                   key={event.id}
-                  className="border-2 border-black p-4 bg-white"
+                  className={`p-4 bg-white ${index > 0 ? 'border-t-2 border-black' : ''}`}
                 >
                   <div className="flex justify-between items-start mb-2">
                     <h3 className="font-bold text-lg flex-1">{event.title}</h3>
