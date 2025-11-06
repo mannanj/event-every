@@ -2,6 +2,14 @@
 @tailwind components;
 @tailwind utilities;
 
+@font-face {
+  font-family: 'Wichy Lover';
+  src: url('/fonts/WichyLover.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   --background: #ffffff;
   --foreground: #000000;
@@ -113,32 +121,16 @@ body {
 }
 
 .retro-rainbow-text {
-  font-family: var(--font-fredoka), 'Rounded Mplus 1c', 'Quicksand', 'Nunito', 'Arial Rounded MT Bold', sans-serif;
-  font-weight: 700;
-  background: linear-gradient(
-    135deg,
-    #ff006e,
-    #8338ec,
-    #3a86ff,
-    #06ffa5,
-    #8338ec,
-    #ff006e
-  );
-  background-size: 300% 300%;
-  background-clip: text;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  animation: vibrant-shift 4s ease infinite;
-  filter: drop-shadow(0 0 25px rgba(131, 56, 236, 0.6))
-          drop-shadow(0 0 45px rgba(255, 0, 110, 0.4))
-          drop-shadow(0 4px 0px rgba(0, 0, 0, 0.1));
-  letter-spacing: 0.15em;
+  font-family: 'Wichy Lover', var(--font-bubblegum), 'Rounded Mplus 1c', 'Quicksand', 'Nunito', 'Arial Rounded MT Bold', sans-serif;
+  font-weight: 400;
+  color: #ffffff;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
   position: relative;
-  -webkit-text-stroke: 0px;
-  text-shadow:
-    3px 3px 0px rgba(0, 0, 0, 0.05),
-    -1px -1px 0px rgba(255, 255, 255, 0.1);
+  -webkit-text-stroke: 3px #000000;
+  text-stroke: 3px #000000;
+  paint-order: stroke fill;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
 }
 
 @keyframes rainbow-shift {
@@ -156,5 +148,14 @@ body {
   }
   50% {
     background-position: 100% 50%;
+  }
+}
+
+@keyframes bubble-shift {
+  0%, 100% {
+    background-position: 0% 0%;
+  }
+  50% {
+    background-position: 100% 100%;
   }
 }
