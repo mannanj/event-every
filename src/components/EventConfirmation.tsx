@@ -2,6 +2,7 @@
 
 import { CalendarEvent } from '@/types/event';
 import { downloadAttachment } from '@/utils/downloadAttachment';
+import URLPill from './URLPill';
 
 interface EventConfirmationProps {
   event: CalendarEvent;
@@ -85,14 +86,7 @@ export default function EventConfirmation({ event, onEdit, onExport }: EventConf
         {event.url && (
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">URL</label>
-            <a
-              href={event.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-base text-blue-600 hover:text-blue-800 hover:underline break-all"
-            >
-              {event.url}
-            </a>
+            <URLPill url={event.url} large />
           </div>
         )}
 
