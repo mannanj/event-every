@@ -81,11 +81,11 @@ const URLPill = ({ url, onRemove, large = false }: URLPillProps) => {
     onRemove?.();
   };
 
-  const iconSize = large ? 'w-4 h-4' : 'w-2.5 h-2.5';
-  const textSize = large ? 'text-sm' : 'text-[10px]';
-  const padding = large ? 'px-2 py-1.5' : 'px-0.5 py-0.5';
-  const gap = large ? 'gap-1.5' : 'gap-0.5';
-  const closeIconSize = large ? 'w-3.5 h-3.5' : 'w-2 h-2';
+  const iconSize = large ? 'w-3 h-3' : 'w-2.5 h-2.5';
+  const textSize = large ? 'text-xs' : 'text-[10px]';
+  const padding = large ? 'px-1.5 py-1' : 'px-0.5 py-0.5';
+  const gap = large ? 'gap-1' : 'gap-0.5';
+  const closeIconSize = large ? 'w-2.5 h-2.5' : 'w-2 h-2';
 
   return (
     <>
