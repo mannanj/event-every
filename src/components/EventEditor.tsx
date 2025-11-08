@@ -25,6 +25,7 @@ export default function EventEditor({ event, onSave, onCancel }: EventEditorProp
     endTime: formatTimeForInput(event.endDate),
     location: event.location || '',
     description: event.description || '',
+    url: event.url || '',
     allDay: event.allDay,
     attachments: event.attachments || [],
   });
@@ -120,6 +121,7 @@ export default function EventEditor({ event, onSave, onCancel }: EventEditorProp
       endDate: endDateTime,
       location: formData.location.trim() || undefined,
       description: formData.description.trim() || undefined,
+      url: formData.url.trim() || undefined,
       allDay: formData.allDay,
       attachments: formData.attachments.length > 0 ? formData.attachments : undefined,
     };
@@ -277,6 +279,20 @@ export default function EventEditor({ event, onSave, onCancel }: EventEditorProp
             rows={4}
             className="w-full px-4 py-3 border-2 border-black focus:outline-none focus:ring-2 focus:ring-black text-black resize-none"
             placeholder="Additional details"
+          />
+        </div>
+
+        <div>
+          <label htmlFor="url" className="block text-xs font-medium text-black mb-2">
+            URL
+          </label>
+          <input
+            id="url"
+            type="url"
+            value={formData.url}
+            onChange={(e) => handleChange('url', e.target.value)}
+            className="w-full px-4 py-3 border-2 border-black focus:outline-none focus:ring-2 focus:ring-black text-black"
+            placeholder="https://example.com/event"
           />
         </div>
 

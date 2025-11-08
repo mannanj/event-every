@@ -14,6 +14,7 @@ export interface CalendarEvent {
   endDate: Date;
   location?: string;
   description?: string;
+  url?: string;
   allDay: boolean;
   created: Date;
   source: 'image' | 'text' | 'url';
@@ -33,6 +34,7 @@ export interface ParsedEvent {
   endDate?: string;
   location?: string;
   description?: string;
+  url?: string;
   confidence: number;
 }
 

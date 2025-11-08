@@ -13,6 +13,7 @@ Extract the following fields:
 - endDate: ISO 8601 format (YYYY-MM-DDTHH:mm:ss)
 - location: Physical or virtual location
 - description: Additional details about the event
+- url: Source URL if present (look for "Original Event:", event links, or any URLs in the text)
 
 Return ONLY valid JSON matching this schema:
 {
@@ -21,6 +22,7 @@ Return ONLY valid JSON matching this schema:
   "endDate": "string",
   "location": "string",
   "description": "string",
+  "url": "string",
   "confidence": number (0-1)
 }
 
@@ -40,6 +42,7 @@ Extract the following fields for EACH event:
 - endDate: ISO 8601 format (YYYY-MM-DDTHH:mm:ss)
 - location: Physical or virtual location
 - description: Additional details about the event
+- url: Source URL if present (look for "Original Event:", event links, or any URLs in the text)
 
 Return ONLY valid JSON matching this schema:
 {
@@ -50,6 +53,7 @@ Return ONLY valid JSON matching this schema:
       "endDate": "string",
       "location": "string",
       "description": "string",
+      "url": "string",
       "confidence": number (0-1)
     }
   ],

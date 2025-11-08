@@ -115,6 +115,7 @@ export default function Home() {
       endDate,
       location: parsed.location,
       description: parsed.description,
+      url: parsed.url,
       allDay: false,
       created: now,
       source,
