@@ -265,6 +265,20 @@ export default function InlineEventEditor({
         </div>
       )}
 
+      {event.url && (
+        <div className="text-gray-700 leading-relaxed">
+          <span className="font-semibold">URL:</span>{' '}
+          <a
+            href={event.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-600 hover:text-blue-800 hover:underline break-all"
+          >
+            {event.url}
+          </a>
+        </div>
+      )}
+
       {showAttachments && event.attachments && event.attachments.length > 0 && (
         <div>
           <p className="font-semibold text-gray-700">Attachments:</p>

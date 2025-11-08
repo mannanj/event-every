@@ -82,6 +82,20 @@ export default function EventConfirmation({ event, onEdit, onExport }: EventConf
           </div>
         )}
 
+        {event.url && (
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">URL</label>
+            <a
+              href={event.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-base text-blue-600 hover:text-blue-800 hover:underline break-all"
+            >
+              {event.url}
+            </a>
+          </div>
+        )}
+
         {event.attachments && event.attachments.length > 0 && (
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">ATTACHMENTS</label>
