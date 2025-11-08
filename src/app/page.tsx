@@ -6,7 +6,6 @@ import UnsavedEventsSection from '@/components/UnsavedEventsSection';
 import ErrorNotification from '@/components/ErrorNotification';
 import RateLimitBanner from '@/components/RateLimitBanner';
 import InlineEventEditor from '@/components/InlineEventEditor';
-import { TodayMarker } from '@/components/TodayMarker';
 import { CalendarEvent, ParsedEvent, StreamedEventChunk, EventAttachment } from '@/types/event';
 import { exportToICS } from '@/services/exporter';
 import { useHistory } from '@/hooks/useHistory';
@@ -15,7 +14,6 @@ import { detectURLs } from '@/services/urlDetector';
 import { scrapeURLsBatch } from '@/services/webScraper';
 import { QueueItem } from '@/services/processingQueue';
 import { eventStorage } from '@/services/storage';
-import { groupEventsByTimeline, formatEventDate } from '@/utils/timeline';
 
 interface ProcessingEvent {
   id: string;
@@ -78,19 +76,6 @@ export default function Home() {
       eventStorage.clearTempUnsavedEvents();
     }
   }, [unsavedEvents, hasLoadedTempEvents]);
-
-  useEffect(() => {
-    if (events.length === 0) return;
-
-    const timeoutId = setTimeout(() => {
-      const todayMarker = document.getElementById('timeline-today');
-      if (todayMarker) {
-        todayMarker.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }
-    }, 100);
-
-    return () => clearTimeout(timeoutId);
-  }, [events.length]);
 
   const updateRateLimitFromHeaders = (headers: Headers) => {
     const remaining = parseInt(headers.get('X-RateLimit-Remaining') || '5');
@@ -686,61 +671,47 @@ export default function Home() {
           }}
         />
 
-        {/* Timeline section */}
+        {/* History section */}
         {events.length > 0 && (
           <div className="mb-12 max-h-[99vh] overflow-y-auto">
-            <div className="border-2 border-black">
-              {groupEventsByTimeline(events).map((section, sectionIndex) => (
-                <div key={section.period}>
-                  {/* Section header */}
-                  {section.period !== 'today' && (
-                    <div className="px-4 py-2 bg-gray-50 border-b-2 border-black">
-                      <h3 className="font-bold text-sm tracking-wider">{section.label}</h3>
+              <div className="border-2 border-black">
+              {events.map((event, index) => (
+                <div
+                  key={event.id}
+                  className={`p-4 bg-white ${index > 0 ? 'border-t-2 border-black' : ''}`}
+                >
+                  <div className="flex justify-between items-start mb-3">
+                    <div className="flex-1">
+                      <InlineEventEditor
+                        event={event}
+                        onChange={(updatedEvent) => updateEvent(updatedEvent)}
+                        showAttachments={true}
+                      />
                     </div>
-                  )}
-
-                  {/* Today marker for today section */}
-                  {section.period === 'today' && <TodayMarker />}
-
-                  {/* Events in this section */}
-                  {section.events.map((event, eventIndex) => (
-                    <div
-                      key={event.id}
-                      className={`p-4 bg-white ${eventIndex > 0 || section.period !== 'today' ? 'border-t-2 border-black' : ''}`}
+                    <button
+                      onClick={() => handleDeleteEvent(event.id)}
+                      className="ml-2 text-black hover:text-gray-600 focus:outline-none flex-shrink-0"
+                      aria-label={`Delete ${event.title}`}
                     >
-                      <div className="flex justify-between items-start mb-3">
-                        <div className="flex-1">
-                          <p className="text-gray-500 text-xs mb-2">
-                            {formatEventDate(event)}
-                          </p>
-                          <InlineEventEditor
-                            event={event}
-                            onChange={(updatedEvent) => updateEvent(updatedEvent)}
-                            showAttachments={true}
-                          />
-                        </div>
-                        <button
-                          onClick={() => handleDeleteEvent(event.id)}
-                          className="ml-2 text-black hover:text-gray-600 focus:outline-none flex-shrink-0"
-                          aria-label={`Delete ${event.title}`}
-                        >
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                          </svg>
-                        </button>
-                      </div>
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
 
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => handleExportFromHistory(event)}
-                          className="flex-1 px-4 py-2 bg-black text-white border-2 border-black hover:bg-white hover:text-black transition-colors focus:outline-none focus:ring-2 focus:ring-black"
-                          aria-label={`Export ${event.title}`}
-                        >
-                          Export
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+                  <p className="text-gray-500 text-xs mb-3">
+                    Created: {formatDate(event.created)}
+                  </p>
+
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleExportFromHistory(event)}
+                      className="flex-1 px-4 py-2 bg-black text-white border-2 border-black hover:bg-white hover:text-black transition-colors focus:outline-none focus:ring-2 focus:ring-black"
+                      aria-label={`Export ${event.title}`}
+                    >
+                      Export
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
