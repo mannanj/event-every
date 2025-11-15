@@ -706,7 +706,7 @@ export default function Home() {
         {/* History section */}
         {totalEventsInStorage > 0 && (
           <div className="mb-12">
-            <div className="mb-4 flex gap-4 items-center">
+            <div className="mb-2 flex gap-4 items-center">
               <label htmlFor="sort-select" className="text-black font-semibold">
                 Sort by:
               </label>
@@ -720,7 +720,17 @@ export default function Home() {
                 <option value="created-newest">Recently Created</option>
                 <option value="created-oldest">Oldest First</option>
                 <option value="today">Today</option>
-                <option value="custom-range">Custom Date Range</option>
+                <option value="last-hour">Last Hour</option>
+                <option value="last-24h">Last 24 Hours</option>
+                <option value="last-48h">Last 48 Hours</option>
+                <option value="last-week">Last Week</option>
+                <option value="last-month">Last Month</option>
+                <option value="next-hour">Next Hour</option>
+                <option value="next-24h">Next 24 Hours</option>
+                <option value="next-48h">Next 48 Hours</option>
+                <option value="next-week">Next Week</option>
+                <option value="next-month">Next Month</option>
+                <option value="custom-range">Custom</option>
               </select>
             </div>
 
@@ -822,6 +832,134 @@ export default function Home() {
             onClick={(e) => e.stopPropagation()}
           >
             <h2 className="text-xl font-bold mb-6">Select Date Range</h2>
+
+            <div className="mb-6">
+              <p className="text-sm font-semibold mb-3">Quick Presets:</p>
+              <div className="grid grid-cols-2 gap-2 mb-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const now = new Date();
+                    const start = new Date(now.getTime() - 60 * 60 * 1000);
+                    handleDateRangeSubmit(start.toISOString().split('T')[0], now.toISOString().split('T')[0]);
+                  }}
+                  className="px-3 py-2 text-sm bg-white text-black border-2 border-black hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-black"
+                >
+                  Last Hour
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const now = new Date();
+                    const start = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+                    handleDateRangeSubmit(start.toISOString().split('T')[0], now.toISOString().split('T')[0]);
+                  }}
+                  className="px-3 py-2 text-sm bg-white text-black border-2 border-black hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-black"
+                >
+                  Last 24 Hours
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const now = new Date();
+                    const start = new Date(now.getTime() - 48 * 60 * 60 * 1000);
+                    handleDateRangeSubmit(start.toISOString().split('T')[0], now.toISOString().split('T')[0]);
+                  }}
+                  className="px-3 py-2 text-sm bg-white text-black border-2 border-black hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-black"
+                >
+                  Last 48 Hours
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const now = new Date();
+                    const start = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
+                    handleDateRangeSubmit(start.toISOString().split('T')[0], now.toISOString().split('T')[0]);
+                  }}
+                  className="px-3 py-2 text-sm bg-black text-white border-2 border-black hover:bg-white hover:text-black transition-colors focus:outline-none focus:ring-2 focus:ring-black"
+                >
+                  Last 3 Days
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const now = new Date();
+                    const start = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+                    handleDateRangeSubmit(start.toISOString().split('T')[0], now.toISOString().split('T')[0]);
+                  }}
+                  className="px-3 py-2 text-sm bg-white text-black border-2 border-black hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-black"
+                >
+                  Last Week
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const now = new Date();
+                    const start = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+                    handleDateRangeSubmit(start.toISOString().split('T')[0], now.toISOString().split('T')[0]);
+                  }}
+                  className="px-3 py-2 text-sm bg-white text-black border-2 border-black hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-black"
+                >
+                  Last Month
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const now = new Date();
+                    const end = new Date(now.getTime() + 60 * 60 * 1000);
+                    handleDateRangeSubmit(now.toISOString().split('T')[0], end.toISOString().split('T')[0]);
+                  }}
+                  className="px-3 py-2 text-sm bg-white text-black border-2 border-black hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-black"
+                >
+                  Next Hour
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const now = new Date();
+                    const end = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+                    handleDateRangeSubmit(now.toISOString().split('T')[0], end.toISOString().split('T')[0]);
+                  }}
+                  className="px-3 py-2 text-sm bg-white text-black border-2 border-black hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-black"
+                >
+                  Next 24 Hours
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const now = new Date();
+                    const end = new Date(now.getTime() + 48 * 60 * 60 * 1000);
+                    handleDateRangeSubmit(now.toISOString().split('T')[0], end.toISOString().split('T')[0]);
+                  }}
+                  className="px-3 py-2 text-sm bg-white text-black border-2 border-black hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-black"
+                >
+                  Next 48 Hours
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const now = new Date();
+                    const end = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+                    handleDateRangeSubmit(now.toISOString().split('T')[0], end.toISOString().split('T')[0]);
+                  }}
+                  className="px-3 py-2 text-sm bg-white text-black border-2 border-black hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-black"
+                >
+                  Next Week
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const now = new Date();
+                    const end = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+                    handleDateRangeSubmit(now.toISOString().split('T')[0], end.toISOString().split('T')[0]);
+                  }}
+                  className="px-3 py-2 text-sm bg-white text-black border-2 border-black hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-black"
+                >
+                  Next Month
+                </button>
+              </div>
+            </div>
+
             <form
               onSubmit={(e) => {
                 e.preventDefault();
@@ -841,6 +979,11 @@ export default function Home() {
                   type="date"
                   id="start-date"
                   name="start"
+                  defaultValue={(() => {
+                    const now = new Date();
+                    const threeDaysAgo = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
+                    return threeDaysAgo.toISOString().split('T')[0];
+                  })()}
                   required
                   className="w-full px-4 py-2 border-2 border-black focus:outline-none focus:ring-2 focus:ring-black"
                 />
@@ -853,6 +996,7 @@ export default function Home() {
                   type="date"
                   id="end-date"
                   name="end"
+                  defaultValue={new Date().toISOString().split('T')[0]}
                   required
                   className="w-full px-4 py-2 border-2 border-black focus:outline-none focus:ring-2 focus:ring-black"
                 />

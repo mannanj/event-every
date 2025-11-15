@@ -27,6 +27,34 @@ const sortEvents = (events: CalendarEvent[], sortOption: EventSortOption, dateRa
 
   let filtered = [...events];
 
+  const getPresetRange = (option: EventSortOption): { start: Date; end: Date } | null => {
+    const now = new Date();
+    switch (option) {
+      case 'last-hour':
+        return { start: new Date(now.getTime() - 60 * 60 * 1000), end: now };
+      case 'last-24h':
+        return { start: new Date(now.getTime() - 24 * 60 * 60 * 1000), end: now };
+      case 'last-48h':
+        return { start: new Date(now.getTime() - 48 * 60 * 60 * 1000), end: now };
+      case 'last-week':
+        return { start: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000), end: now };
+      case 'last-month':
+        return { start: new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000), end: now };
+      case 'next-hour':
+        return { start: now, end: new Date(now.getTime() + 60 * 60 * 1000) };
+      case 'next-24h':
+        return { start: now, end: new Date(now.getTime() + 24 * 60 * 60 * 1000) };
+      case 'next-48h':
+        return { start: now, end: new Date(now.getTime() + 48 * 60 * 60 * 1000) };
+      case 'next-week':
+        return { start: now, end: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000) };
+      case 'next-month':
+        return { start: now, end: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000) };
+      default:
+        return null;
+    }
+  };
+
   if (sortOption === 'today') {
     filtered = filtered.filter(event => {
       const eventDate = new Date(event.startDate);
@@ -37,6 +65,14 @@ const sortEvents = (events: CalendarEvent[], sortOption: EventSortOption, dateRa
       const eventDate = new Date(event.startDate);
       return eventDate >= dateRange.start && eventDate <= dateRange.end;
     });
+  } else {
+    const presetRange = getPresetRange(sortOption);
+    if (presetRange) {
+      filtered = filtered.filter(event => {
+        const eventDate = new Date(event.startDate);
+        return eventDate >= presetRange.start && eventDate <= presetRange.end;
+      });
+    }
   }
 
   filtered.sort((a, b) => {
@@ -48,7 +84,16 @@ const sortEvents = (events: CalendarEvent[], sortOption: EventSortOption, dateRa
       case 'created-oldest':
         return new Date(a.created).getTime() - new Date(b.created).getTime();
       case 'today':
-        return new Date(a.startDate).getTime() - new Date(b.startDate).getTime();
+      case 'last-hour':
+      case 'last-24h':
+      case 'last-48h':
+      case 'last-week':
+      case 'last-month':
+      case 'next-hour':
+      case 'next-24h':
+      case 'next-48h':
+      case 'next-week':
+      case 'next-month':
       case 'custom-range':
         return new Date(a.startDate).getTime() - new Date(b.startDate).getTime();
       default:

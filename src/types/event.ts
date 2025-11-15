@@ -55,6 +55,16 @@ export type EventSortOption =
   | 'created-newest'
   | 'created-oldest'
   | 'today'
+  | 'last-hour'
+  | 'last-24h'
+  | 'last-48h'
+  | 'last-week'
+  | 'last-month'
+  | 'next-hour'
+  | 'next-24h'
+  | 'next-48h'
+  | 'next-week'
+  | 'next-month'
   | 'custom-range';
 
 export interface DateRange {
