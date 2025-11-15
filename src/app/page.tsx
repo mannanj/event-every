@@ -667,7 +667,7 @@ export default function Home() {
       <div className="w-full px-[14.28%] py-12">
         <header className="text-center mb-12">
           <h1 className="text-5xl font-black retro-rainbow-text tracking-wider">Event Every</h1>
-          <p className="text-black text-sm">Transform image and text into calendar events</p>
+          <p className="text-black text-sm">From anything to your calendar. Instantly.</p>
         </header>
 
         {/* Smart input section */}
@@ -717,6 +717,11 @@ export default function Home() {
                 id="sort-select"
                 value={sortOption}
                 onChange={(e) => handleSortChange(e.target.value)}
+                onFocus={(e) => {
+                  if (e.target.value === 'custom-range') {
+                    setShowDateRangePicker(true);
+                  }
+                }}
                 className="px-4 py-2 border-2 border-black bg-white text-black focus:outline-none focus:ring-2 focus:ring-black"
               >
                 <option value="upcoming">Upcoming Events</option>
