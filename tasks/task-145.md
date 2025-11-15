@@ -1,0 +1,13 @@
+### Task 145: Support File Upload for Event Extraction (.ics, .txt, .csv, .xlsx, .pdf, .doc)
+- [ ] Add file upload component with drag-and-drop support
+- [ ] Implement file type validation (accept .ics, .txt, .csv, .xlsx, .pdf, .doc, .docx)
+- [ ] Create file parser service with type detection
+- [ ] Add .ics file parser to extract existing calendar events
+- [ ] Add .txt file parser for plain text event extraction
+- [ ] Add .csv/.xlsx parser for spreadsheet event data
+- [ ] Add .pdf parser for document event extraction
+- [ ] Add .doc/.docx parser for Word document event extraction
+- [ ] Update UI to show file upload option alongside image/text input
+- [ ] Add file size limits and error handling
+- [ ] Display parsed events in batch confirmation view
+- Location: `src/components/FileUpload.tsx`, `src/services/fileParser.ts`, `src/app/page.tsx`

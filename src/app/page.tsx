@@ -56,6 +56,7 @@ export default function Home() {
   const [hasLoadedTempEvents, setHasLoadedTempEvents] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const { events, addEvent, deleteEvent, updateEvent, sortOption, setSortOption, dateRange, setDateRange } = useHistory();
+  const [totalEventsInStorage, setTotalEventsInStorage] = useState(0);
   const { addToQueue, updateProgress } = useProcessingQueue();
   const smartInputRef = useRef<SmartInputHandle>(null);
   const [showDateRangePicker, setShowDateRangePicker] = useState(false);
@@ -66,6 +67,11 @@ export default function Home() {
       setUnsavedEvents(result.data);
     }
     setHasLoadedTempEvents(true);
+
+    const allEventsResult = eventStorage.getAllEvents();
+    if (allEventsResult.success && allEventsResult.data) {
+      setTotalEventsInStorage(allEventsResult.data.length);
+    }
   }, []);
 
   useEffect(() => {
@@ -588,6 +594,11 @@ export default function Home() {
     if (deleteConfirmId) {
       deleteEvent(deleteConfirmId);
       setDeleteConfirmId(null);
+
+      const allEventsResult = eventStorage.getAllEvents();
+      if (allEventsResult.success && allEventsResult.data) {
+        setTotalEventsInStorage(allEventsResult.data.length - 1);
+      }
     }
   };
 
@@ -688,11 +699,12 @@ export default function Home() {
           onExportComplete={(events) => {
             events.forEach(event => addEvent(event));
             setUnsavedEvents([]);
+            setTotalEventsInStorage(prev => prev + events.length);
           }}
         />
 
         {/* History section */}
-        {events.length > 0 && (
+        {totalEventsInStorage > 0 && (
           <div className="mb-12">
             <div className="mb-4 flex gap-4 items-center">
               <label htmlFor="sort-select" className="text-black font-semibold">
@@ -712,6 +724,7 @@ export default function Home() {
               </select>
             </div>
 
+            {events.length > 0 ? (
             <div className="max-h-[99vh] overflow-y-auto">
               <div className="border-2 border-black">
               {events.map((event, index) => (
@@ -755,6 +768,11 @@ export default function Home() {
               ))}
             </div>
           </div>
+            ) : (
+              <div className="border-2 border-black bg-white p-8 text-center">
+                <p className="text-gray-600">No events match the current filter. Try a different sort option.</p>
+              </div>
+            )}
           </div>
         )}
       </div>

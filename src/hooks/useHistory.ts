@@ -65,13 +65,7 @@ export const useHistory = (): UseHistoryResult => {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [sortOption, setSortOptionState] = useState<EventSortOption>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('event-sort-option');
-      return (saved as EventSortOption) || 'created-newest';
-    }
-    return 'created-newest';
-  });
+  const [sortOption, setSortOptionState] = useState<EventSortOption>('created-newest');
   const [dateRange, setDateRangeState] = useState<DateRange | null>(null);
 
   const loadEvents = useCallback(() => {
