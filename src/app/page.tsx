@@ -14,6 +14,7 @@ import { detectURLs } from '@/services/urlDetector';
 import { scrapeURLsBatch } from '@/services/webScraper';
 import { QueueItem } from '@/services/processingQueue';
 import { eventStorage } from '@/services/storage';
+import { parseICSFile } from '@/services/icsParser';
 
 interface ProcessingEvent {
   id: string;
@@ -550,11 +551,15 @@ export default function Home() {
     );
   };
 
-  const handleSmartInputSubmit = async (data: { text: string; images: File[] }) => {
-    const { text, images } = data;
+  const handleSmartInputSubmit = async (data: { text: string; images: File[]; calendarFiles: File[] }) => {
+    const { text, images, calendarFiles } = data;
 
     if (images.length > 0) {
       handleImageSelect(images);
+    }
+
+    if (calendarFiles.length > 0) {
+      handleCalendarFilesSubmit(calendarFiles);
     }
 
     if (text.trim().length > 0) {
@@ -562,6 +567,34 @@ export default function Home() {
     }
 
     smartInputRef.current?.clear();
+  };
+
+  const handleCalendarFilesSubmit = async (files: File[]) => {
+    for (const file of files) {
+      try {
+        const events = await parseICSFile(file);
+
+        if (events.length > 0) {
+          setUnsavedEvents(prev => [...prev, ...events]);
+        }
+      } catch (error) {
+        const errorMessage = error instanceof Error
+          ? `Failed to parse ${file.name}: ${error.message}`
+          : `Failed to parse ${file.name}`;
+
+        const processingId = `error-${Date.now()}`;
+        setProcessingEvents(prev => [...prev, {
+          id: processingId,
+          type: 'text',
+          status: 'error',
+          error: errorMessage,
+        }]);
+
+        setTimeout(() => {
+          setProcessingEvents(prev => prev.filter(p => p.id !== processingId));
+        }, 5000);
+      }
+    }
   };
 
   const handleError = (errorMessage: string) => {

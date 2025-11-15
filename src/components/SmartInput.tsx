@@ -4,9 +4,10 @@ import { useState, useRef, useCallback, useImperativeHandle, forwardRef, useEffe
 import URLPill from './URLPill';
 import ImageModal from './ImageModal';
 import ParticleButton from './ParticleButton';
+import { parseICSFile } from '@/services/icsParser';
 
 interface SmartInputProps {
-  onSubmit: (data: { text: string; images: File[] }) => void;
+  onSubmit: (data: { text: string; images: File[]; calendarFiles: File[] }) => void;
   onError: (error: string) => void;
 }
 
@@ -18,6 +19,7 @@ const MIN_TEXT_LENGTH = 3;
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const MAX_FILES = 25;
 const ACCEPTED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/heic'];
+const ACCEPTED_CALENDAR_TYPES = ['text/calendar', 'application/ics'];
 const URL_REGEX = /(https?:\/\/(?:www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b(?:[-a-zA-Z0-9()@:%_\+.~#?&\/=]*))/gi;
 
 interface ImagePreview {
@@ -25,10 +27,16 @@ interface ImagePreview {
   preview: string;
 }
 
+interface CalendarFilePreview {
+  file: File;
+  eventCount: number;
+}
+
 const SmartInput = forwardRef<SmartInputHandle, SmartInputProps>(
   function SmartInput({ onSubmit, onError }, ref) {
     const [text, setText] = useState('');
     const [images, setImages] = useState<ImagePreview[]>([]);
+    const [calendarFiles, setCalendarFiles] = useState<CalendarFilePreview[]>([]);
     const [error, setError] = useState<string | null>(null);
     const [detectedUrls, setDetectedUrls] = useState<string[]>([]);
     const [isDragging, setIsDragging] = useState(false);
@@ -41,6 +49,7 @@ const SmartInput = forwardRef<SmartInputHandle, SmartInputProps>(
       clear: () => {
         setText('');
         setImages([]);
+        setCalendarFiles([]);
         setError(null);
         setDetectedUrls([]);
         if (fileInputRef.current) {
@@ -59,9 +68,20 @@ const SmartInput = forwardRef<SmartInputHandle, SmartInputProps>(
       }
     }, [text]);
 
+    const isImageFile = (file: File): boolean => {
+      return ACCEPTED_IMAGE_TYPES.includes(file.type);
+    };
+
+    const isCalendarFile = (file: File): boolean => {
+      return ACCEPTED_CALENDAR_TYPES.includes(file.type) || file.name.toLowerCase().endsWith('.ics');
+    };
+
     const validateFile = (file: File): string | null => {
-      if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
-        return 'Please upload a valid image file (JPEG, PNG, WebP, or HEIC)';
+      const isImage = isImageFile(file);
+      const isCalendar = isCalendarFile(file);
+
+      if (!isImage && !isCalendar) {
+        return 'Please upload a valid image file (JPEG, PNG, WebP, HEIC) or calendar file (.ics)';
       }
       if (file.size > MAX_FILE_SIZE) {
         return 'File size must be less than 10MB';
@@ -69,15 +89,17 @@ const SmartInput = forwardRef<SmartInputHandle, SmartInputProps>(
       return null;
     };
 
-    const handleFiles = useCallback((files: File[]) => {
+    const handleFiles = useCallback(async (files: File[]) => {
       if (files.length === 0) return;
 
-      if (images.length + files.length > MAX_FILES) {
-        onError(`You can only upload up to ${MAX_FILES} images at once`);
+      const totalFiles = images.length + calendarFiles.length + files.length;
+      if (totalFiles > MAX_FILES) {
+        onError(`You can only upload up to ${MAX_FILES} files at once`);
         return;
       }
 
-      const validFiles: File[] = [];
+      const validImageFiles: File[] = [];
+      const validCalendarFiles: File[] = [];
       const errors: string[] = [];
 
       files.forEach(file => {
@@ -85,7 +107,11 @@ const SmartInput = forwardRef<SmartInputHandle, SmartInputProps>(
         if (errorMsg) {
           errors.push(`${file.name}: ${errorMsg}`);
         } else {
-          validFiles.push(file);
+          if (isImageFile(file)) {
+            validImageFiles.push(file);
+          } else if (isCalendarFile(file)) {
+            validCalendarFiles.push(file);
+          }
         }
       });
 
@@ -93,23 +119,49 @@ const SmartInput = forwardRef<SmartInputHandle, SmartInputProps>(
         onError(errors.join('\n'));
       }
 
-      if (validFiles.length === 0) return;
+      if (validImageFiles.length === 0 && validCalendarFiles.length === 0) return;
 
-      const newPreviews: ImagePreview[] = [];
-      validFiles.forEach((file) => {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          newPreviews.push({
-            file,
-            preview: reader.result as string,
-          });
-          if (newPreviews.length === validFiles.length) {
-            setImages(prev => [...prev, ...newPreviews]);
+      // Handle image files
+      if (validImageFiles.length > 0) {
+        const newPreviews: ImagePreview[] = [];
+        validImageFiles.forEach((file) => {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            newPreviews.push({
+              file,
+              preview: reader.result as string,
+            });
+            if (newPreviews.length === validImageFiles.length) {
+              setImages(prev => [...prev, ...newPreviews]);
+            }
+          };
+          reader.readAsDataURL(file);
+        });
+      }
+
+      // Handle calendar files
+      if (validCalendarFiles.length > 0) {
+        const newCalendarPreviews: CalendarFilePreview[] = [];
+        for (const file of validCalendarFiles) {
+          try {
+            const events = await parseICSFile(file);
+            newCalendarPreviews.push({
+              file,
+              eventCount: events.length,
+            });
+          } catch (error) {
+            errors.push(`${file.name}: Failed to parse calendar file`);
           }
-        };
-        reader.readAsDataURL(file);
-      });
-    }, [images.length, onError]);
+        }
+        if (newCalendarPreviews.length > 0) {
+          setCalendarFiles(prev => [...prev, ...newCalendarPreviews]);
+        }
+      }
+
+      if (errors.length > 0) {
+        onError(errors.join('\n'));
+      }
+    }, [images.length, calendarFiles.length, onError]);
 
     const handleDragOver = (e: React.DragEvent) => {
       e.preventDefault();
@@ -129,7 +181,7 @@ const SmartInput = forwardRef<SmartInputHandle, SmartInputProps>(
       setIsDragging(false);
 
       const files = Array.from(e.dataTransfer.files).filter(file =>
-        ACCEPTED_IMAGE_TYPES.includes(file.type)
+        isImageFile(file) || isCalendarFile(file)
       );
       if (files.length > 0) {
         handleFiles(files);
@@ -153,21 +205,27 @@ const SmartInput = forwardRef<SmartInputHandle, SmartInputProps>(
       setImages(prev => prev.filter((_, i) => i !== index));
     };
 
+    const handleRemoveCalendarFile = (e: React.MouseEvent, index: number) => {
+      e.stopPropagation();
+      setCalendarFiles(prev => prev.filter((_, i) => i !== index));
+    };
+
     const handleSubmit = useCallback(() => {
       setError(null);
 
       const trimmedText = text.trim();
 
-      if (trimmedText.length < MIN_TEXT_LENGTH && images.length === 0) {
-        setError('Please enter at least 3 characters or add an image');
+      if (trimmedText.length < MIN_TEXT_LENGTH && images.length === 0 && calendarFiles.length === 0) {
+        setError('Please enter at least 3 characters, add an image, or upload a calendar file');
         return;
       }
 
       onSubmit({
         text: trimmedText,
         images: images.map(img => img.file),
+        calendarFiles: calendarFiles.map(cal => cal.file),
       });
-    }, [text, images, onSubmit]);
+    }, [text, images, calendarFiles, onSubmit]);
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
       if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
@@ -191,7 +249,7 @@ const SmartInput = forwardRef<SmartInputHandle, SmartInputProps>(
       fileInputRef.current?.click();
     };
 
-    const isButtonEnabled = text.trim().length >= MIN_TEXT_LENGTH || images.length > 0;
+    const isButtonEnabled = text.trim().length >= MIN_TEXT_LENGTH || images.length > 0 || calendarFiles.length > 0;
 
     // Calculate content density (0 to 1) for sun-like color progression
     const calculateDensity = (): number => {
@@ -200,6 +258,11 @@ const SmartInput = forwardRef<SmartInputHandle, SmartInputProps>(
       // Images trigger immediate color (blue phase) - start at 0.15 for first image
       if (images.length > 0) {
         density += 0.15 + Math.min(0.35, (images.length - 1) / 10 * 0.35);
+      }
+
+      // Calendar files also trigger color
+      if (calendarFiles.length > 0) {
+        density += 0.15 + Math.min(0.35, (calendarFiles.length - 1) / 10 * 0.35);
       }
 
       // Text makes it darker - each character adds progression
@@ -226,13 +289,14 @@ const SmartInput = forwardRef<SmartInputHandle, SmartInputProps>(
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
         >
-          {/* Images row at top - scrollable horizontally up to attach icon */}
-          {images.length > 0 && (
+          {/* Files row at top - scrollable horizontally up to attach icon */}
+          {(images.length > 0 || calendarFiles.length > 0) && (
             <div className="flex-shrink-0 pt-3 pl-2 pr-12 pb-2">
               <div className="flex gap-2 overflow-x-auto pb-1">
+                {/* Images first */}
                 {images.map((img, index) => (
                   <div
-                    key={index}
+                    key={`img-${index}`}
                     className="relative group flex-shrink-0 pt-1 pr-1"
                     onMouseEnter={() => setHoveredImageIndex(index)}
                     onMouseLeave={() => setHoveredImageIndex(null)}
@@ -281,6 +345,43 @@ const SmartInput = forwardRef<SmartInputHandle, SmartInputProps>(
                     )}
                   </div>
                 ))}
+
+                {/* Calendar files second */}
+                {calendarFiles.map((cal, index) => (
+                  <div
+                    key={`cal-${index}`}
+                    className="relative group flex-shrink-0 pt-1 pr-1"
+                  >
+                    <div
+                      className="w-[128px] h-[128px] border-2 border-black bg-gray-100 overflow-hidden hover:border-gray-600 transition-colors relative flex items-center justify-center p-2"
+                    >
+                      {/* Calendar icon */}
+                      <svg className="w-12 h-12 text-gray-700 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+
+                      {/* Event count label on first calendar file only */}
+                      {index === 0 && (
+                        <div className="absolute top-1 left-1 bg-black text-white text-xs px-2 py-1 font-medium leading-tight">
+                          <div className="whitespace-nowrap">{calendarFiles.length} Calendar</div>
+                          <div className="whitespace-nowrap">{calendarFiles.length === 1 ? 'Event' : 'Events'}</div>
+                        </div>
+                      )}
+                      <div className="absolute bottom-1 left-1 bg-black bg-opacity-75 text-white text-xs px-1.5 py-0.5 rounded">
+                        #{index + 1}
+                      </div>
+                    </div>
+                    <button
+                      onClick={(e) => handleRemoveCalendarFile(e, index)}
+                      className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-600 text-white rounded-full flex items-center justify-center hover:bg-red-700 focus:outline-none z-50"
+                      aria-label={`Remove calendar file ${index + 1}`}
+                    >
+                      <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 12h12" />
+                      </svg>
+                    </button>
+                  </div>
+                ))}
               </div>
             </div>
           )}
@@ -289,14 +390,14 @@ const SmartInput = forwardRef<SmartInputHandle, SmartInputProps>(
           <button
             onClick={handleUploadClick}
             className="absolute top-2 right-2 z-20 p-2 text-gray-600 hover:text-black transition-colors focus:outline-none focus:ring-2 focus:ring-black rounded"
-            aria-label="Attach images"
+            aria-label="Attach files"
           >
             <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
             </svg>
-            {images.length > 0 && (
+            {(images.length > 0 || calendarFiles.length > 0) && (
               <span className="absolute -top-1 -right-1 bg-black text-white text-xs w-5 h-5 flex items-center justify-center rounded-full font-medium">
-                {images.length}
+                {images.length + calendarFiles.length}
               </span>
             )}
           </button>
@@ -307,7 +408,7 @@ const SmartInput = forwardRef<SmartInputHandle, SmartInputProps>(
             value={text}
             onChange={handleChange}
             onKeyDown={handleKeyDown}
-            placeholder="Transform images, text and more into calendar events. Just add and transform"
+            placeholder="Drop your screenshot, image, or text here. We'll turn it into events ✨"
             aria-label="Enter event details as text or drop images"
             aria-describedby={error ? 'smart-input-error' : undefined}
             aria-invalid={error ? 'true' : 'false'}
@@ -356,7 +457,7 @@ const SmartInput = forwardRef<SmartInputHandle, SmartInputProps>(
             ref={fileInputRef}
             type="file"
             className="hidden"
-            accept={ACCEPTED_IMAGE_TYPES.join(',')}
+            accept={[...ACCEPTED_IMAGE_TYPES, ...ACCEPTED_CALENDAR_TYPES, '.ics'].join(',')}
             multiple
             onChange={handleFileInputChange}
             aria-hidden="true"

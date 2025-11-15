@@ -1,0 +1,13 @@
+### Task 150: Support ICS File Import with Drag-and-Drop
+- [x] Add ICS file type to accepted file types in SmartInput drag-and-drop
+- [x] Create ICS parser service to extract calendar events from .ics files
+- [x] Update input preview to display ICS files as "(X Calendar Event)" with text wrapping
+- [x] Style ICS file previews with light heather gray background (similar to image preview UI)
+- [x] Group ICS file previews separately from images in preview row
+- [x] Implement file grouping logic: images appear first, then calendar events
+- [x] Extract all events from uploaded ICS files
+- [x] Display extracted events in the confirmation/review UI
+- [x] Handle multi-event ICS files (process all events)
+- [x] Add file size validation and error handling for ICS files
+- [x] Test with single-event and multi-event ICS files
+- Location: `src/components/SmartInput.tsx`, `src/services/icsParser.ts`, `src/types/event.ts`
