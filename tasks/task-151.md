@@ -1,12 +1,8 @@
-### Task 151: Add View Toggle Icons for Different Event Card Layouts
-- [ ] Add view toggle icons section in top-right corner, aligned with Sort dropdown
-- [ ] Create three view mode icons: Full Card (current), List, and Tile views
-- [ ] Position icons inline with "Sort by:" dropdown but right-aligned
-- [ ] Add state management for selected view mode
-- [ ] Implement Full Card view layout (current default)
-- [ ] Implement List view layout (compact, smaller cards)
-- [ ] Implement Tile view layout (square event cards)
-- [ ] Style icons to match minimal black & white design
-- [ ] Add hover/active states for view icons
-- [ ] Persist selected view preference to localStorage
-- Location: `src/components/BatchEventList.tsx`, `src/components/HistoryPanel.tsx`
+### Task 151: Integrate Timezone Parsing and Detection
+- [x] Update parser to extract timezone from event data (images, text, ICS)
+- [x] Modify ICS exporter to set TZID correctly from parsed timezone
+- [x] Implement browser timezone fallback when no timezone in event data
+- [x] Add timezone validation and conversion utilities
+- [x] Update Event interface to include timezone field
+- [x] Test with various timezone formats (PST, EST, UTC offsets, IANA codes)
+- Location: `src/services/parser.ts`, `src/services/exporter.ts`, `src/types/event.ts`, `src/utils/timezone.ts`

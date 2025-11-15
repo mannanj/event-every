@@ -14,6 +14,7 @@ Extract the following fields:
 - location: Physical or virtual location
 - description: Additional details about the event
 - url: Source URL if present (look for "Original Event:", event links, or any URLs in the text)
+- timezone: IANA timezone identifier (e.g., "America/New_York") or abbreviation (e.g., "EST", "PST", "UTC+5")
 
 Return ONLY valid JSON matching this schema:
 {
@@ -23,6 +24,7 @@ Return ONLY valid JSON matching this schema:
   "location": "string",
   "description": "string",
   "url": "string",
+  "timezone": "string",
   "confidence": number (0-1)
 }
 
@@ -43,6 +45,7 @@ Extract the following fields for EACH event:
 - location: Physical or virtual location
 - description: Additional details about the event
 - url: Source URL if present (look for "Original Event:", event links, or any URLs in the text)
+- timezone: IANA timezone identifier (e.g., "America/New_York") or abbreviation (e.g., "EST", "PST", "UTC+5")
 
 Return ONLY valid JSON matching this schema:
 {
@@ -54,6 +57,7 @@ Return ONLY valid JSON matching this schema:
       "location": "string",
       "description": "string",
       "url": "string",
+      "timezone": "string",
       "confidence": number (0-1)
     }
   ],
