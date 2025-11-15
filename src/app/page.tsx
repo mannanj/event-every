@@ -6,7 +6,7 @@ import UnsavedEventsSection from '@/components/UnsavedEventsSection';
 import ErrorNotification from '@/components/ErrorNotification';
 import RateLimitBanner from '@/components/RateLimitBanner';
 import InlineEventEditor from '@/components/InlineEventEditor';
-import { CalendarEvent, ParsedEvent, StreamedEventChunk, EventAttachment } from '@/types/event';
+import { CalendarEvent, ParsedEvent, StreamedEventChunk, EventAttachment, EventSortOption } from '@/types/event';
 import { exportToICS } from '@/services/exporter';
 import { useHistory } from '@/hooks/useHistory';
 import { useProcessingQueue } from '@/hooks/useProcessingQueue';
@@ -55,9 +55,10 @@ export default function Home() {
   const [rateLimitInfo, setRateLimitInfo] = useState<{ remaining: number; total: number; resetTime: number } | undefined>();
   const [hasLoadedTempEvents, setHasLoadedTempEvents] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
-  const { events, addEvent, deleteEvent, updateEvent } = useHistory();
+  const { events, addEvent, deleteEvent, updateEvent, sortOption, setSortOption, dateRange, setDateRange } = useHistory();
   const { addToQueue, updateProgress } = useProcessingQueue();
   const smartInputRef = useRef<SmartInputHandle>(null);
+  const [showDateRangePicker, setShowDateRangePicker] = useState(false);
 
   useEffect(() => {
     const result = eventStorage.getTempUnsavedEvents();
@@ -626,6 +627,25 @@ export default function Home() {
     }).format(date);
   };
 
+  const handleSortChange = (value: string) => {
+    const option = value as EventSortOption;
+    setSortOption(option);
+    if (option === 'custom-range') {
+      setShowDateRangePicker(true);
+    } else {
+      setShowDateRangePicker(false);
+      setDateRange(null);
+    }
+  };
+
+  const handleDateRangeSubmit = (start: string, end: string) => {
+    const startDate = new Date(start);
+    const endDate = new Date(end);
+    endDate.setHours(23, 59, 59, 999);
+    setDateRange({ start: startDate, end: endDate });
+    setShowDateRangePicker(false);
+  };
+
   return (
     <main className="min-h-screen rainbow-gradient-bg">
       <RateLimitBanner rateLimitInfo={rateLimitInfo} />
@@ -673,7 +693,26 @@ export default function Home() {
 
         {/* History section */}
         {events.length > 0 && (
-          <div className="mb-12 max-h-[99vh] overflow-y-auto">
+          <div className="mb-12">
+            <div className="mb-4 flex gap-4 items-center">
+              <label htmlFor="sort-select" className="text-black font-semibold">
+                Sort by:
+              </label>
+              <select
+                id="sort-select"
+                value={sortOption}
+                onChange={(e) => handleSortChange(e.target.value)}
+                className="px-4 py-2 border-2 border-black bg-white text-black focus:outline-none focus:ring-2 focus:ring-black"
+              >
+                <option value="upcoming">Upcoming Events</option>
+                <option value="created-newest">Recently Created</option>
+                <option value="created-oldest">Oldest First</option>
+                <option value="today">Today</option>
+                <option value="custom-range">Custom Date Range</option>
+              </select>
+            </div>
+
+            <div className="max-h-[99vh] overflow-y-auto">
               <div className="border-2 border-black">
               {events.map((event, index) => (
                 <div
@@ -716,8 +755,8 @@ export default function Home() {
               ))}
             </div>
           </div>
+          </div>
         )}
-
       </div>
 
       {deleteConfirmId && (
@@ -750,6 +789,77 @@ export default function Home() {
             </div>
           </div>
         </>
+      )}
+
+      {showDateRangePicker && (
+        <div
+          className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center"
+          onClick={() => {
+            setShowDateRangePicker(false);
+            setSortOption('created-newest');
+          }}
+        >
+          <div
+            className="bg-white border-2 border-black p-8 max-w-md mx-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-xl font-bold mb-6">Select Date Range</h2>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const formData = new FormData(e.currentTarget);
+                const start = formData.get('start') as string;
+                const end = formData.get('end') as string;
+                if (start && end) {
+                  handleDateRangeSubmit(start, end);
+                }
+              }}
+            >
+              <div className="mb-4">
+                <label htmlFor="start-date" className="block mb-2 font-semibold">
+                  Start Date
+                </label>
+                <input
+                  type="date"
+                  id="start-date"
+                  name="start"
+                  required
+                  className="w-full px-4 py-2 border-2 border-black focus:outline-none focus:ring-2 focus:ring-black"
+                />
+              </div>
+              <div className="mb-6">
+                <label htmlFor="end-date" className="block mb-2 font-semibold">
+                  End Date
+                </label>
+                <input
+                  type="date"
+                  id="end-date"
+                  name="end"
+                  required
+                  className="w-full px-4 py-2 border-2 border-black focus:outline-none focus:ring-2 focus:ring-black"
+                />
+              </div>
+              <div className="flex gap-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowDateRangePicker(false);
+                    setSortOption('created-newest');
+                  }}
+                  className="flex-1 px-6 py-2 bg-white text-black border-2 border-black hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-black"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 px-6 py-2 bg-black text-white border-2 border-black hover:bg-white hover:text-black transition-colors focus:outline-none focus:ring-2 focus:ring-black"
+                >
+                  Apply
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </main>
   );

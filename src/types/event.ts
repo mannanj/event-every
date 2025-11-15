@@ -49,3 +49,15 @@ export interface StreamedEventChunk {
   chunkIndex: number;
   isComplete: boolean;
 }
+
+export type EventSortOption =
+  | 'upcoming'
+  | 'created-newest'
+  | 'created-oldest'
+  | 'today'
+  | 'custom-range';
+
+export interface DateRange {
+  start: Date;
+  end: Date;
+}

@@ -1,0 +1,14 @@
+### Task 138: Advanced Event Merging and Organization Interface
+- [ ] Implement drag-and-drop event merging functionality
+- [ ] Add intelligent event merge detection (combine multiple events into one)
+- [ ] Create "drag here to save" section (right side or below main area)
+- [ ] Add event duplication capability for each card
+- [ ] Implement sorting/organization by date and time
+- [ ] Show visual indicators for saved vs. unsaved events
+- [ ] Allow saved events to still be used for merging
+- [ ] Add smart suggestions for merge operations (AI-powered merge logic)
+- [ ] Design two-panel layout: working area + saved area
+- [ ] Implement cross-panel drag operations (saved ↔ working area)
+- [ ] Add visual feedback for merge compatibility
+- [ ] Create merge preview before finalizing
+- Location: `src/components/EventMerger.tsx`, `src/components/EventCard.tsx`, `src/hooks/useEventMerge.ts`, `src/services/eventMerge.ts`
