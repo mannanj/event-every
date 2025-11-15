@@ -82,6 +82,15 @@ export default function BatchEventList({
     });
   };
 
+  const toggleSelectAll = () => {
+    const moreThanHalfSelected = selectedEventIds.size > events.length / 2;
+    if (moreThanHalfSelected) {
+      setSelectedEventIds(new Set());
+    } else {
+      setSelectedEventIds(new Set(events.map((e) => e.id)));
+    }
+  };
+
   const handleFieldEdit = (event: CalendarEvent, field: string, value: string) => {
     let updatedEvent = { ...event };
 
@@ -131,7 +140,7 @@ export default function BatchEventList({
 
   const handleExport = () => {
     if (selectedCount === 0) {
-      alert('Please select at least one event to export');
+      onCancel();
       return;
     }
 
@@ -147,6 +156,8 @@ export default function BatchEventList({
 
   const currentCount = events.length;
   const selectedCount = selectedEventIds.size;
+  const moreThanHalfSelected = selectedCount > events.length / 2;
+  const selectAllLabel = moreThanHalfSelected ? 'Unselect all' : 'Select all';
 
   return (
     <>
@@ -372,24 +383,39 @@ export default function BatchEventList({
         })}
       </div>
 
-      {/* Save button */}
+      {/* Save/Delete button */}
       {events.length > 0 && !isProcessing && (
         <div className="px-4 pt-4 pb-1 border-t-2 border-black">
           <button
             onClick={handleExport}
-            disabled={selectedCount === 0}
-            className="w-full py-3 px-6 bg-black text-white border-2 border-black hover:bg-white hover:text-black transition-colors focus:outline-none focus:ring-2 focus:ring-black disabled:bg-gray-300 disabled:text-gray-500 disabled:border-gray-300 disabled:cursor-not-allowed"
-            aria-label={`Save ${selectedCount} event${selectedCount !== 1 ? 's' : ''}`}
+            className={`w-full py-3 px-6 border-2 transition-colors focus:outline-none focus:ring-2 ${
+              selectedCount === 0
+                ? 'bg-red-500 text-white border-red-500 hover:bg-red-600 hover:border-red-600 focus:ring-red-500'
+                : 'bg-black text-white border-black hover:bg-white hover:text-black focus:ring-black'
+            }`}
+            aria-label={selectedCount === 0 ? 'Save none - delete all events' : `Save ${selectedCount} event${selectedCount !== 1 ? 's' : ''}`}
           >
-            Save {selectedCount > 0 && `(${selectedCount})`}
+            {selectedCount === 0 ? 'Save none' : `Save (${selectedCount})`}
           </button>
           <div className="text-xs text-center mt-1">
-            <p className="text-black">Pick what you want to keep</p>
-            {selectedCount < events.length && selectedCount > 0 && (
-              <p className="text-red-400">
-                {events.length - selectedCount} event{events.length - selectedCount !== 1 ? 's' : ''} will be lost
-              </p>
-            )}
+            <p className="text-black">
+              Pick what you want to keep •{' '}
+              <button
+                onClick={toggleSelectAll}
+                className="underline hover:no-underline focus:outline-none"
+                aria-label={selectAllLabel}
+              >
+                {selectAllLabel}
+              </button>
+              {selectedCount < events.length && (
+                <>
+                  {' '}•{' '}
+                  <span className="text-red-400">
+                    {events.length - selectedCount} event{events.length - selectedCount !== 1 ? 's' : ''} will be lost
+                  </span>
+                </>
+              )}
+            </p>
           </div>
         </div>
       )}

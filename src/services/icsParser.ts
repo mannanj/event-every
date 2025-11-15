@@ -124,7 +124,7 @@ function convertICSEventToCalendarEvent(icsEvent: ICSEvent): CalendarEvent | nul
   }
 
   return {
-    id: icsEvent.uid || crypto.randomUUID(),
+    id: crypto.randomUUID(),
     title: icsEvent.summary || 'Untitled Event',
     startDate,
     endDate,

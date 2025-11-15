@@ -825,22 +825,22 @@ export default function Home() {
             onClick={cancelDelete}
           >
             <div
-              className="bg-white border-2 border-black p-8 max-w-sm mx-4"
+              className="bg-white border-4 border-black pt-6 px-6 pb-4 max-w-sm mx-4"
               onClick={(e) => e.stopPropagation()}
             >
-              <p className="text-center mb-6 font-semibold">
-                Do you want to delete this event? This is irreversible.
+              <p className="text-lg font-bold text-center mb-4">
+                Delete forever?
               </p>
-              <div className="flex gap-4">
+              <div className="flex gap-3">
                 <button
                   onClick={cancelDelete}
-                  className="flex-1 px-6 py-2 bg-white text-black border-2 border-black hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-black"
+                  className="flex-1 py-1.5 px-4 bg-white text-black border-4 border-black hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-black text-sm font-bold"
                 >
                   No
                 </button>
                 <button
                   onClick={confirmDelete}
-                  className="flex-1 px-6 py-2 bg-black text-white border-2 border-black hover:bg-white hover:text-black transition-colors focus:outline-none focus:ring-2 focus:ring-black"
+                  className="flex-1 py-1.5 px-4 bg-red-500 text-white border-4 border-black hover:bg-red-600 transition-colors focus:outline-none focus:ring-2 focus:ring-black text-sm font-bold"
                 >
                   Yes
                 </button>

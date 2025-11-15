@@ -1,0 +1,12 @@
+### Task 151: Add View Toggle Icons for Different Event Card Layouts
+- [ ] Add view toggle icons section in top-right corner, aligned with Sort dropdown
+- [ ] Create three view mode icons: Full Card (current), List, and Tile views
+- [ ] Position icons inline with "Sort by:" dropdown but right-aligned
+- [ ] Add state management for selected view mode
+- [ ] Implement Full Card view layout (current default)
+- [ ] Implement List view layout (compact, smaller cards)
+- [ ] Implement Tile view layout (square event cards)
+- [ ] Style icons to match minimal black & white design
+- [ ] Add hover/active states for view icons
+- [ ] Persist selected view preference to localStorage
+- Location: `src/components/BatchEventList.tsx`, `src/components/HistoryPanel.tsx`
