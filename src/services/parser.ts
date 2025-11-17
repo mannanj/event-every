@@ -8,13 +8,22 @@ const anthropic = new Anthropic({
 function formatClientContext(context?: ClientContext): string {
   if (!context) return '';
 
-  return `\n\nCurrent context:
+  const offsetHours = Math.floor(Math.abs(context.timezoneOffset) / 60);
+  const offsetMinutes = Math.abs(context.timezoneOffset) % 60;
+  const offsetSign = context.timezoneOffset >= 0 ? '+' : '-';
+  const offsetString = `UTC${offsetSign}${offsetHours}${offsetMinutes > 0 ? `:${offsetMinutes.toString().padStart(2, '0')}` : ''}`;
+
+  const formattedContext = `\n\nCurrent context:
 - Date/Time: ${context.currentDateTime}
-- Timezone: ${context.timezone}
-- Timezone Offset: ${context.timezoneOffset} minutes from UTC
+- Timezone: ${context.timezone} (${offsetString})
 - Locale: ${context.locale}
 
-Use this context to interpret relative dates like "tomorrow", "next week", "yesterday", "3 days from now", etc. Convert all relative dates to absolute ISO 8601 dates.`;
+Use this context to interpret relative dates like "tomorrow", "next week", "yesterday", "3 days from now", etc. Convert all relative dates to absolute ISO 8601 dates in the user's timezone.`;
+
+  console.log('[DEBUG] Client Context:', JSON.stringify(context, null, 2));
+  console.log('[DEBUG] Formatted Context:', formattedContext);
+
+  return formattedContext;
 }
 
 const EVENT_PARSING_PROMPT = `You are an event extraction assistant. Extract event details from the provided text or image and return them in JSON format.
