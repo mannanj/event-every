@@ -63,6 +63,7 @@ export default function Home() {
   const [showDateRangePicker, setShowDateRangePicker] = useState(false);
   const [isCustomMode, setIsCustomMode] = useState(false);
   const [lastPresetDates, setLastPresetDates] = useState<{ start: Date; end: Date } | null>(null);
+  const [selectedPreset, setSelectedPreset] = useState<string>('last-3-days');
 
   useEffect(() => {
     const result = eventStorage.getTempUnsavedEvents();
@@ -876,9 +877,14 @@ export default function Home() {
                     const start = new Date(now.getTime() - 60 * 60 * 1000);
                     setLastPresetDates({ start, end: now });
                     setIsCustomMode(false);
+                    setSelectedPreset('last-hour');
                     handleDateRangeSubmit(start, now);
                   }}
-                  className="px-2 py-2 text-xs bg-white text-black border-2 border-black hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-black"
+                  className={`px-2 py-2 text-xs border-2 border-black transition-colors focus:outline-none focus:ring-2 focus:ring-black ${
+                    selectedPreset === 'last-hour'
+                      ? 'bg-black text-white'
+                      : 'bg-white text-black hover:bg-gray-100'
+                  }`}
                 >
                   Last Hour
                 </button>
@@ -889,9 +895,14 @@ export default function Home() {
                     const start = new Date(now.getTime() - 24 * 60 * 60 * 1000);
                     setLastPresetDates({ start, end: now });
                     setIsCustomMode(false);
+                    setSelectedPreset('last-24h');
                     handleDateRangeSubmit(start, now);
                   }}
-                  className="px-2 py-2 text-xs bg-white text-black border-2 border-black hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-black"
+                  className={`px-2 py-2 text-xs border-2 border-black transition-colors focus:outline-none focus:ring-2 focus:ring-black ${
+                    selectedPreset === 'last-24h'
+                      ? 'bg-black text-white'
+                      : 'bg-white text-black hover:bg-gray-100'
+                  }`}
                 >
                   Last 24h
                 </button>
@@ -902,9 +913,14 @@ export default function Home() {
                     const start = new Date(now.getTime() - 48 * 60 * 60 * 1000);
                     setLastPresetDates({ start, end: now });
                     setIsCustomMode(false);
+                    setSelectedPreset('last-48h');
                     handleDateRangeSubmit(start, now);
                   }}
-                  className="px-2 py-2 text-xs bg-white text-black border-2 border-black hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-black"
+                  className={`px-2 py-2 text-xs border-2 border-black transition-colors focus:outline-none focus:ring-2 focus:ring-black ${
+                    selectedPreset === 'last-48h'
+                      ? 'bg-black text-white'
+                      : 'bg-white text-black hover:bg-gray-100'
+                  }`}
                 >
                   Last 48h
                 </button>
@@ -915,9 +931,14 @@ export default function Home() {
                     const start = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
                     setLastPresetDates({ start, end: now });
                     setIsCustomMode(false);
+                    setSelectedPreset('last-week');
                     handleDateRangeSubmit(start, now);
                   }}
-                  className="px-2 py-2 text-xs bg-white text-black border-2 border-black hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-black"
+                  className={`px-2 py-2 text-xs border-2 border-black transition-colors focus:outline-none focus:ring-2 focus:ring-black ${
+                    selectedPreset === 'last-week'
+                      ? 'bg-black text-white'
+                      : 'bg-white text-black hover:bg-gray-100'
+                  }`}
                 >
                   Last Week
                 </button>
@@ -928,9 +949,14 @@ export default function Home() {
                     const start = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
                     setLastPresetDates({ start, end: now });
                     setIsCustomMode(false);
+                    setSelectedPreset('last-month');
                     handleDateRangeSubmit(start, now);
                   }}
-                  className="px-2 py-2 text-xs bg-white text-black border-2 border-black hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-black"
+                  className={`px-2 py-2 text-xs border-2 border-black transition-colors focus:outline-none focus:ring-2 focus:ring-black ${
+                    selectedPreset === 'last-month'
+                      ? 'bg-black text-white'
+                      : 'bg-white text-black hover:bg-gray-100'
+                  }`}
                 >
                   Last Month
                 </button>
@@ -941,9 +967,14 @@ export default function Home() {
                     const start = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
                     setLastPresetDates({ start, end: now });
                     setIsCustomMode(false);
+                    setSelectedPreset('last-3-days');
                     handleDateRangeSubmit(start, now);
                   }}
-                  className="px-2 py-2 text-xs bg-white text-black border-2 border-black hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-black"
+                  className={`px-2 py-2 text-xs border-2 border-black transition-colors focus:outline-none focus:ring-2 focus:ring-black ${
+                    selectedPreset === 'last-3-days'
+                      ? 'bg-black text-white'
+                      : 'bg-white text-black hover:bg-gray-100'
+                  }`}
                 >
                   Last 3 Days
                 </button>
@@ -954,9 +985,14 @@ export default function Home() {
                     const end = new Date(now.getTime() + 60 * 60 * 1000);
                     setLastPresetDates({ start: now, end });
                     setIsCustomMode(false);
+                    setSelectedPreset('next-hour');
                     handleDateRangeSubmit(now, end);
                   }}
-                  className="px-2 py-2 text-xs bg-white text-black border-2 border-black hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-black"
+                  className={`px-2 py-2 text-xs border-2 border-black transition-colors focus:outline-none focus:ring-2 focus:ring-black ${
+                    selectedPreset === 'next-hour'
+                      ? 'bg-black text-white'
+                      : 'bg-white text-black hover:bg-gray-100'
+                  }`}
                 >
                   Next Hour
                 </button>
@@ -967,9 +1003,14 @@ export default function Home() {
                     const end = new Date(now.getTime() + 24 * 60 * 60 * 1000);
                     setLastPresetDates({ start: now, end });
                     setIsCustomMode(false);
+                    setSelectedPreset('next-24h');
                     handleDateRangeSubmit(now, end);
                   }}
-                  className="px-2 py-2 text-xs bg-white text-black border-2 border-black hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-black"
+                  className={`px-2 py-2 text-xs border-2 border-black transition-colors focus:outline-none focus:ring-2 focus:ring-black ${
+                    selectedPreset === 'next-24h'
+                      ? 'bg-black text-white'
+                      : 'bg-white text-black hover:bg-gray-100'
+                  }`}
                 >
                   Next 24h
                 </button>
@@ -980,9 +1021,14 @@ export default function Home() {
                     const end = new Date(now.getTime() + 48 * 60 * 60 * 1000);
                     setLastPresetDates({ start: now, end });
                     setIsCustomMode(false);
+                    setSelectedPreset('next-48h');
                     handleDateRangeSubmit(now, end);
                   }}
-                  className="px-2 py-2 text-xs bg-white text-black border-2 border-black hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-black"
+                  className={`px-2 py-2 text-xs border-2 border-black transition-colors focus:outline-none focus:ring-2 focus:ring-black ${
+                    selectedPreset === 'next-48h'
+                      ? 'bg-black text-white'
+                      : 'bg-white text-black hover:bg-gray-100'
+                  }`}
                 >
                   Next 48h
                 </button>
@@ -993,9 +1039,14 @@ export default function Home() {
                     const end = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
                     setLastPresetDates({ start: now, end });
                     setIsCustomMode(false);
+                    setSelectedPreset('next-week');
                     handleDateRangeSubmit(now, end);
                   }}
-                  className="px-2 py-2 text-xs bg-white text-black border-2 border-black hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-black"
+                  className={`px-2 py-2 text-xs border-2 border-black transition-colors focus:outline-none focus:ring-2 focus:ring-black ${
+                    selectedPreset === 'next-week'
+                      ? 'bg-black text-white'
+                      : 'bg-white text-black hover:bg-gray-100'
+                  }`}
                 >
                   Next Week
                 </button>
@@ -1006,9 +1057,14 @@ export default function Home() {
                     const end = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
                     setLastPresetDates({ start: now, end });
                     setIsCustomMode(false);
+                    setSelectedPreset('next-month');
                     handleDateRangeSubmit(now, end);
                   }}
-                  className="px-2 py-2 text-xs bg-white text-black border-2 border-black hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-black"
+                  className={`px-2 py-2 text-xs border-2 border-black transition-colors focus:outline-none focus:ring-2 focus:ring-black ${
+                    selectedPreset === 'next-month'
+                      ? 'bg-black text-white'
+                      : 'bg-white text-black hover:bg-gray-100'
+                  }`}
                 >
                   Next Month
                 </button>
@@ -1016,9 +1072,10 @@ export default function Home() {
                   type="button"
                   onClick={() => {
                     setIsCustomMode(true);
+                    setSelectedPreset('custom');
                   }}
                   className={`px-2 py-2 text-xs border-2 border-black transition-colors focus:outline-none focus:ring-2 focus:ring-black ${
-                    isCustomMode
+                    selectedPreset === 'custom'
                       ? 'bg-black text-white shadow-[inset_4px_4px_0px_rgba(255,255,255,0.3)]'
                       : 'bg-white text-black hover:bg-gray-100'
                   }`}

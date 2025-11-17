@@ -5,4 +5,8 @@
 - [x] Show Start/End Date inputs only when Custom button is pressed
 - [x] Initialize custom dates with last selected preset values
 - [x] Update button styling to show selected/indented state
-- Location: `src/app/page.tsx:853-1058`
+- [x] Add state to track selected preset and persist across modal reopens
+- [x] Set "Last 3 Days" as default highlighted preset
+- [x] Highlight selected preset button when reopening modal
+- [x] Add Apply button in Custom mode section
+- Location: `src/app/page.tsx:853-1160`
