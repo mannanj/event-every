@@ -859,7 +859,6 @@ export default function Home() {
           onClick={() => {
             setShowDateRangePicker(false);
             setIsCustomMode(false);
-            setSortOption('created-newest');
           }}
         >
           <div
@@ -1121,7 +1120,6 @@ export default function Home() {
                 onClick={() => {
                   setShowDateRangePicker(false);
                   setIsCustomMode(false);
-                  setSortOption('created-newest');
                 }}
                 className="flex-1 px-6 py-2 bg-white text-black border-2 border-black hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-black"
               >
