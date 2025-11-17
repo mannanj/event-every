@@ -36,9 +36,21 @@ Extract the following fields:
 - description: Additional details about the event
 - url: Source URL if present (look for "Original Event:", event links, or any URLs in the text)
 - timezone: IANA timezone identifier (e.g., "America/New_York") or abbreviation (e.g., "EST", "PST", "UTC+5")
-- allDay: true if this is an all-day event (no specific times), false if it has specific start/end times
+- allDay: BOOLEAN - Set to true if this is an all-day event, false if it has specific times
 
-If the user explicitly requests to import events as "all-day" or "single-day" events, set allDay to true for all events even if times are present in the source.
+CRITICAL - All-Day Event Detection:
+If the user's instruction contains ANY of these phrases, you MUST set allDay to TRUE for all events:
+- "single day" / "single-day"
+- "all day" / "all-day"
+- "full day" / "full-day"
+- "whole day"
+- "import as all-day"
+- "import as single-day"
+
+When allDay is true:
+- Use YYYY-MM-DD format for startDate and endDate (no time component)
+- Ignore any times present in the source material
+- The event spans the entire day
 
 The confidence score should reflect how certain you are about the extracted information. Omit any fields that cannot be determined.`;
 
@@ -58,9 +70,21 @@ Extract the following fields for EACH event:
 - description: Additional details about the event
 - url: Source URL if present (look for "Original Event:", event links, or any URLs in the text)
 - timezone: IANA timezone identifier (e.g., "America/New_York") or abbreviation (e.g., "EST", "PST", "UTC+5")
-- allDay: true if this is an all-day event (no specific times), false if it has specific start/end times
+- allDay: BOOLEAN - Set to true if this is an all-day event, false if it has specific times
 
-If the user explicitly requests to import events as "all-day" or "single-day" events, set allDay to true for all events even if times are present in the source.
+CRITICAL - All-Day Event Detection:
+If the user's instruction contains ANY of these phrases, you MUST set allDay to TRUE for ALL events:
+- "single day" / "single-day" / "single day events"
+- "all day" / "all-day" / "all day events"
+- "full day" / "full-day"
+- "whole day"
+- "import as all-day"
+- "import as single-day"
+
+When allDay is true for an event:
+- Use YYYY-MM-DD format for startDate and endDate (no time component)
+- Ignore any times present in the source material
+- The event spans the entire day
 
 The totalCount should be the number of events detected. The top-level confidence should reflect overall certainty about all extracted events. Omit any fields that cannot be determined for an event.`;
 
