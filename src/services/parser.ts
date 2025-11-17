@@ -146,12 +146,16 @@ export async function parseEvent(input: ParseEventInput): Promise<ParsedEvent> {
     );
 
     if (!toolUse) {
+      console.error('[DEBUG] No tool use in response. Content:', JSON.stringify(message.content, null, 2));
       throw new Error('No tool use found in API response');
     }
+
+    console.log('[DEBUG] Tool use input:', JSON.stringify(toolUse.input, null, 2));
 
     const parsed = toolUse.input as ParsedEvent;
 
     if (!parsed.title && !parsed.startDate) {
+      console.error('[DEBUG] Parsed result has no title or startDate:', JSON.stringify(parsed, null, 2));
       throw new Error('No event information could be extracted');
     }
 
@@ -260,12 +264,16 @@ export async function* parseEventsBatch(
     );
 
     if (!toolUse) {
+      console.error('[DEBUG] No tool use in response. Content:', JSON.stringify(message.content, null, 2));
       throw new Error('No tool use found in API response');
     }
+
+    console.log('[DEBUG] Tool use input:', JSON.stringify(toolUse.input, null, 2));
 
     const parsed = toolUse.input as BatchParsedEvents;
 
     if (!parsed.events || parsed.events.length === 0) {
+      console.error('[DEBUG] Parsed result has no events:', JSON.stringify(parsed, null, 2));
       throw new Error('No events could be extracted');
     }
 

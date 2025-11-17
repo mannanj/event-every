@@ -252,12 +252,13 @@ export default function Home() {
     }
   };
 
-  const handleImageSelect = async (files: File[]) => {
+  const handleImageSelect = async (files: File[], additionalText?: string) => {
     if (files.length === 0) return;
 
     addToQueue(
       'image',
       files,
+      additionalText,
       async (queueItem: QueueItem) => {
         const imageFiles = queueItem.payload as File[];
         const allEvents: CalendarEvent[] = [];
@@ -319,6 +320,7 @@ export default function Home() {
               body: JSON.stringify({
                 imageBase64: base64,
                 imageMimeType: mimeType,
+                text: queueItem.text,
                 batch: true,
                 clientContext,
               }),
@@ -406,6 +408,7 @@ export default function Home() {
     addToQueue(
       'text',
       text,
+      undefined,
       async (queueItem: QueueItem) => {
         const inputText = queueItem.payload as string;
 
@@ -582,14 +585,14 @@ export default function Home() {
     const { text, images, calendarFiles } = data;
 
     if (images.length > 0) {
-      handleImageSelect(images);
+      handleImageSelect(images, text.trim().length > 0 ? text.trim() : undefined);
     }
 
     if (calendarFiles.length > 0) {
       handleCalendarFilesSubmit(calendarFiles);
     }
 
-    if (text.trim().length > 0) {
+    if (text.trim().length > 0 && images.length === 0) {
       handleTextSubmit(text);
     }
 

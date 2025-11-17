@@ -6,6 +6,7 @@ export interface QueueItem {
   status: 'queued' | 'processing' | 'complete' | 'error' | 'cancelled';
   progress: number;
   payload: File[] | string;
+  text?: string;
   result?: CalendarEvent[];
   error?: string;
   created: Date;
@@ -41,7 +42,8 @@ class ProcessingQueue {
     type: 'image' | 'text',
     payload: File[] | string,
     processor: (item: QueueItem) => Promise<CalendarEvent[]>,
-    metadata?: QueueItem['metadata']
+    metadata?: QueueItem['metadata'],
+    text?: string
   ): string {
     const id = `queue-${Date.now()}-${Math.random().toString(36).substring(7)}`;
 
@@ -51,6 +53,7 @@ class ProcessingQueue {
       status: 'queued',
       progress: 0,
       payload,
+      text,
       created: new Date(),
       metadata,
     };

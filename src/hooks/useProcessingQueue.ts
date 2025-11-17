@@ -17,10 +17,11 @@ export function useProcessingQueue() {
     (
       type: 'image' | 'text',
       payload: File[] | string,
+      text: string | undefined,
       processor: (item: QueueItem) => Promise<CalendarEvent[]>,
       metadata?: QueueItem['metadata']
     ): string => {
-      return processingQueue.add(type, payload, processor, metadata);
+      return processingQueue.add(type, payload, processor, metadata, text);
     },
     []
   );
