@@ -1,10 +1,12 @@
-### Task 165: Migrate Storage from localStorage to IndexedDB - Fix Lost Unsaved Events
+### Task 165: Fix Unsaved Events Persistence in IndexedDB
+
+#### Prerequisites:
+⚠️ **This task assumes IndexedDB migration is already complete** (see separate IndexedDB migration task in backlog)
 
 #### Issue:
 - "Unsaved events" (temp events pending save) are lost on page refresh
-- Previously worked with localStorage but now broken
-- Need reliable persistence that survives page refreshes
-- localStorage has 5-10MB limit, insufficient for many events with attachments
+- Need to ensure temp events persist in IndexedDB after migration
+- Currently saving to localStorage, need to verify IndexedDB equivalent works
 
 #### Current Behavior:
 1. User creates events via Transform
@@ -18,148 +20,89 @@
 3. User refreshes page
 4. ✅ Unsaved events still visible (loaded from IndexedDB)
 
-#### Root Cause Analysis Needed:
-- Check if `saveTempUnsavedEvents()` is being called correctly in page.tsx:105
-- Check if `getTempUnsavedEvents()` is being called on mount
-- Verify localStorage quota isn't exceeded
-- Verify events are actually being written to localStorage
-- Check browser console for storage errors
-
-#### Migration Plan: localStorage → IndexedDB
-
-**Why IndexedDB:**
-- No practical size limit (hundreds of MB available)
-- Handles large attachments (base64 images) efficiently
-- Better performance for bulk operations
-- Asynchronous API (doesn't block UI)
-- Structured data storage
-
-**Current localStorage Keys:**
-- `event_every_history` - Saved event history
-- `event_every_temp_unsaved` - Temporary unsaved events
+#### Current Implementation (localStorage):
+- Save location: `page.tsx:105` - `eventStorage.saveTempUnsavedEvents(unsavedEvents)`
+- Load location: **MISSING** - No code to load temp events on mount
+- Storage key: `event_every_temp_unsaved`
 
 #### Subtasks:
 
-**Phase 1: Investigation**
+**Phase 1: Root Cause Analysis**
 - [ ] Debug why temp unsaved events are lost on refresh
-- [ ] Check if useEffect on line 102-109 is running
-- [ ] Verify `saveTempUnsavedEvents` is writing to localStorage
-- [ ] Check browser console for storage quota errors
-- [ ] Test if problem is localStorage size limit
+- [ ] Check if useEffect on line 102-109 is running and saving
+- [ ] **CRITICAL**: Check if there's code to LOAD temp events on mount (likely missing!)
+- [ ] Add console.log to verify save/load cycle
 - [ ] Document exact reproduction steps
 
-**Phase 2: IndexedDB Implementation**
-- [ ] Create `src/services/indexedDBStorage.ts` service
-- [ ] Define IndexedDB schema (database name, object stores, indexes)
-- [ ] Implement database initialization and migration logic
-- [ ] Implement CRUD operations for events
-- [ ] Implement operations for temp unsaved events
-- [ ] Add proper error handling for quota exceeded
-- [ ] Add proper error handling for private browsing mode
+**Phase 2: Fix Implementation (Using IndexedDB)**
+- [ ] Add useEffect to load temp unsaved events on component mount
+- [ ] Ensure `getTempUnsavedEvents()` is called when page loads
+- [ ] Verify IndexedDB storage service has `saveTempUnsavedEvents()` method
+- [ ] Verify IndexedDB storage service has `getTempUnsavedEvents()` method
+- [ ] Handle async loading with loading state if needed
+- [ ] Clear temp events from IndexedDB when user clicks "Save All"
 
-**Phase 3: Migration Logic**
-- [ ] Create migration function to move existing localStorage data to IndexedDB
-- [ ] Run migration automatically on first load after update
-- [ ] Preserve all existing event data during migration
-- [ ] Clean up old localStorage keys after successful migration
-- [ ] Add migration status tracking
-
-**Phase 4: Update Storage Service**
-- [ ] Update `src/services/storage.ts` to use IndexedDB instead of localStorage
-- [ ] Keep same API interface for backward compatibility
-- [ ] Update all storage calls to be async
-- [ ] Update components using storage to handle async operations
-- [ ] Add loading states where needed
-
-**Phase 5: Testing**
-- [ ] Test: Create events, refresh, verify they persist
-- [ ] Test: Large attachments (5MB+ images) work
-- [ ] Test: Migration from existing localStorage data
-- [ ] Test: Private browsing mode (should show warning)
-- [ ] Test: Storage quota exceeded handling
-- [ ] Test: Multiple tabs open simultaneously
-- [ ] Test: Import large batch of events (50+ events)
+**Phase 3: Testing**
+- [ ] Test: Create events, refresh, verify they persist in IndexedDB
+- [ ] Test: Save All button clears temp events from IndexedDB
+- [ ] Test: Multiple events persist correctly
+- [ ] Test: Events with attachments persist correctly
 
 #### Technical Details:
 
-**IndexedDB Schema:**
+**Required Code Addition (page.tsx):**
 ```typescript
-Database: 'EventEveryDB'
-Version: 1
-
-Object Stores:
-1. 'events' (saved history)
-   - keyPath: 'id'
-   - indexes: ['created', 'startDate', 'title']
-
-2. 'tempEvents' (unsaved events)
-   - keyPath: 'id'
-   - indexes: ['created']
-```
-
-**New Service Interface:**
-```typescript
-// src/services/indexedDBStorage.ts
-export const indexedDBStorage = {
-  // Initialize database
-  init(): Promise<void>
-
-  // Events CRUD
-  saveEvent(event: CalendarEvent): Promise<StorageResult<void>>
-  saveEvents(events: CalendarEvent[]): Promise<StorageResult<void>>
-  getAllEvents(): Promise<StorageResult<CalendarEvent[]>>
-  updateEvent(event: CalendarEvent): Promise<StorageResult<void>>
-  deleteEvent(id: string): Promise<StorageResult<void>>
-
-  // Temp unsaved events
-  saveTempUnsavedEvents(events: CalendarEvent[]): Promise<StorageResult<void>>
-  getTempUnsavedEvents(): Promise<StorageResult<CalendarEvent[]>>
-  clearTempUnsavedEvents(): Promise<StorageResult<void>>
-
-  // Migration
-  migrateFromLocalStorage(): Promise<StorageResult<void>>
-}
-```
-
-**Update storage.ts to proxy to IndexedDB:**
-```typescript
-// Keep same synchronous-looking API but use IndexedDB underneath
-export const eventStorage = {
-  saveEvent: async (event: CalendarEvent): Promise<StorageResult<void>> => {
-    return await indexedDBStorage.saveEvent(event);
-  },
-  // ... rest of methods
-}
-```
-
-**Handle async in components:**
-```typescript
-// page.tsx - Update to handle async
+// Add this useEffect to LOAD temp unsaved events on mount
 useEffect(() => {
   const loadTempEvents = async () => {
-    const result = await eventStorage.getTempUnsavedEvents();
-    if (result.success && result.data) {
-      setUnsavedEvents(result.data);
+    if (!hasLoadedTempEvents) {
+      const result = await eventStorage.getTempUnsavedEvents();
+      if (result.success && result.data && result.data.length > 0) {
+        setUnsavedEvents(result.data);
+      }
+      setHasLoadedTempEvents(true);
     }
   };
   loadTempEvents();
-}, []);
+}, [hasLoadedTempEvents]);
+
+// Existing save useEffect (already exists around line 102-109)
+useEffect(() => {
+  if (!hasLoadedTempEvents) return;
+
+  if (unsavedEvents.length > 0) {
+    eventStorage.saveTempUnsavedEvents(unsavedEvents);
+  } else {
+    eventStorage.clearTempUnsavedEvents();
+  }
+}, [unsavedEvents, hasLoadedTempEvents]);
 ```
 
-#### Quick Fix (Before Full Migration):
-If IndexedDB migration is too large, first fix localStorage issue:
-- [ ] Add debug logging to saveTempUnsavedEvents
-- [ ] Add debug logging to getTempUnsavedEvents on load
-- [ ] Check if useEffect dependencies are correct
-- [ ] Verify localStorage.setItem is not throwing errors
-- [ ] Add try-catch with console.error around storage calls
+**Storage Service Requirements (Handled by IndexedDB Migration):**
+The IndexedDB storage service must implement:
+- `saveTempUnsavedEvents(events: CalendarEvent[]): Promise<StorageResult<void>>`
+- `getTempUnsavedEvents(): Promise<StorageResult<CalendarEvent[]>>`
+- `clearTempUnsavedEvents(): Promise<StorageResult<void>>`
+
+**Clear Temp Events on Save All:**
+```typescript
+// When user clicks "Save All" button
+const handleSaveAll = async () => {
+  await eventStorage.saveEvents(unsavedEvents);
+  await eventStorage.clearTempUnsavedEvents(); // Clear from IndexedDB
+  setUnsavedEvents([]); // Clear from UI state
+};
+```
 
 #### References:
 - Current storage: `src/services/storage.ts`
-- Usage in page: `src/app/page.tsx:102-109` (save), needs load on mount
-- IndexedDB API: https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API
+- Usage in page: `src/app/page.tsx:102-109` (save only - MISSING load on mount!)
+- Related: IndexedDB migration task (separate ticket in backlog)
 
 #### Priority:
 **HIGH** - Users losing work on refresh is critical UX issue
 
-- Location: `src/services/storage.ts`, `src/services/indexedDBStorage.ts` (new), `src/app/page.tsx`
+#### Likely Root Cause:
+The code saves temp events but **never loads them back** when the page mounts. Need to add a useEffect to call `getTempUnsavedEvents()` on component mount.
+
+- Location: `src/app/page.tsx` (add load useEffect)
