@@ -66,8 +66,9 @@ export default function Home() {
   const [isCustomMode, setIsCustomMode] = useState(false);
   const [lastPresetDates, setLastPresetDates] = useState<{ start: Date; end: Date } | null>(null);
   const [selectedPreset, setSelectedPreset] = useState<string>('last-3-days');
-  const [isExportingAll, setIsExportingAll] = useState(false);
-  const [exportAllMessage, setExportAllMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [exportAllState, setExportAllState] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [exportAllError, setExportAllError] = useState<string | null>(null);
+  const [exportCooldownRemaining, setExportCooldownRemaining] = useState(0);
 
   useEffect(() => {
     const result = eventStorage.getTempUnsavedEvents();
@@ -80,7 +81,22 @@ export default function Home() {
     if (allEventsResult.success && allEventsResult.data) {
       setTotalEventsInStorage(allEventsResult.data.length);
     }
+
+    checkExportCooldown();
   }, []);
+
+  useEffect(() => {
+    if (exportCooldownRemaining > 0) {
+      const timer = setInterval(() => {
+        const remaining = checkExportCooldown();
+        if (remaining === 0) {
+          clearInterval(timer);
+        }
+      }, 1000);
+
+      return () => clearInterval(timer);
+    }
+  }, [exportCooldownRemaining]);
 
   useEffect(() => {
     if (!hasLoadedTempEvents) return;
@@ -704,29 +720,79 @@ export default function Home() {
     setShowDateRangePicker(false);
   };
 
+  const checkExportCooldown = (): number => {
+    const COOLDOWN_WINDOW = 5 * 60 * 1000;
+    const MAX_EXPORTS = 3;
+    const storageKey = 'exportAllTimestamps';
+
+    const storedData = localStorage.getItem(storageKey);
+    const timestamps: number[] = storedData ? JSON.parse(storedData) : [];
+
+    const now = Date.now();
+    const validTimestamps = timestamps.filter(ts => now - ts < COOLDOWN_WINDOW);
+
+    if (validTimestamps.length >= MAX_EXPORTS) {
+      const oldestTimestamp = Math.min(...validTimestamps);
+      const timeUntilReset = COOLDOWN_WINDOW - (now - oldestTimestamp);
+      const secondsRemaining = Math.ceil(timeUntilReset / 1000);
+      setExportCooldownRemaining(secondsRemaining);
+      return secondsRemaining;
+    }
+
+    setExportCooldownRemaining(0);
+    return 0;
+  };
+
+  const recordExportTimestamp = () => {
+    const COOLDOWN_WINDOW = 5 * 60 * 1000;
+    const storageKey = 'exportAllTimestamps';
+
+    const storedData = localStorage.getItem(storageKey);
+    const timestamps: number[] = storedData ? JSON.parse(storedData) : [];
+
+    const now = Date.now();
+    const validTimestamps = timestamps.filter(ts => now - ts < COOLDOWN_WINDOW);
+    validTimestamps.push(now);
+
+    localStorage.setItem(storageKey, JSON.stringify(validTimestamps));
+  };
+
   const handleExportAll = async () => {
-    setIsExportingAll(true);
-    setExportAllMessage(null);
+    const cooldown = checkExportCooldown();
+    if (cooldown > 0) {
+      return;
+    }
+
+    setExportAllState('loading');
+    setExportAllError(null);
 
     try {
       const result = await exportAllEvents();
 
       if (result.success) {
-        setExportAllMessage({ type: 'success', text: 'All events exported successfully!' });
+        recordExportTimestamp();
+        setExportAllState('success');
+
+        setTimeout(() => {
+          setExportAllState('idle');
+        }, 5000);
       } else {
-        setExportAllMessage({ type: 'error', text: result.error || 'Failed to export events' });
+        setExportAllState('error');
+        setExportAllError(result.error || 'Failed to export events');
+
+        setTimeout(() => {
+          setExportAllState('idle');
+          setExportAllError(null);
+        }, 3000);
       }
     } catch (error) {
-      setExportAllMessage({
-        type: 'error',
-        text: error instanceof Error ? error.message : 'Failed to export events',
-      });
-    } finally {
-      setIsExportingAll(false);
+      setExportAllState('error');
+      setExportAllError(error instanceof Error ? error.message : 'Failed to export events');
 
       setTimeout(() => {
-        setExportAllMessage(null);
-      }, 5000);
+        setExportAllState('idle');
+        setExportAllError(null);
+      }, 3000);
     }
   };
 
@@ -805,24 +871,35 @@ export default function Home() {
 
               <button
                 onClick={handleExportAll}
-                disabled={isExportingAll}
-                className="px-6 py-2 bg-black text-white border-2 border-black hover:bg-white hover:text-black transition-colors focus:outline-none focus:ring-2 focus:ring-black disabled:bg-gray-400 disabled:border-gray-400 disabled:cursor-not-allowed"
+                disabled={exportAllState === 'loading' || exportAllState === 'success' || exportCooldownRemaining > 0}
+                className="px-6 py-2 bg-black text-white border-2 border-black hover:bg-white hover:text-black transition-colors focus:outline-none focus:ring-2 focus:ring-black disabled:bg-gray-400 disabled:border-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
+                title={exportCooldownRemaining > 0 ? `Cooldown: ${exportCooldownRemaining}s remaining` : undefined}
               >
-                {isExportingAll ? 'Exporting...' : 'Export all'}
+                {exportAllState === 'loading' && (
+                  <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                )}
+                {exportAllState === 'success' && (
+                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                )}
+                {exportAllState === 'error' && (
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                )}
+                <span>
+                  {exportAllState === 'loading' && 'Exporting...'}
+                  {exportAllState === 'success' && 'Exported!'}
+                  {exportAllState === 'error' && (exportAllError || 'Error')}
+                  {exportAllState === 'idle' && exportCooldownRemaining > 0 && `Breather ${exportCooldownRemaining}s`}
+                  {exportAllState === 'idle' && exportCooldownRemaining === 0 && 'Export all'}
+                </span>
               </button>
             </div>
-
-            {exportAllMessage && (
-              <div
-                className={`mb-4 p-4 border-2 ${
-                  exportAllMessage.type === 'success'
-                    ? 'bg-green-50 border-green-500 text-green-800'
-                    : 'bg-red-50 border-red-500 text-red-800'
-                }`}
-              >
-                {exportAllMessage.text}
-              </div>
-            )}
 
             {events.length > 0 ? (
             <div className="max-h-[99vh] overflow-y-auto">
