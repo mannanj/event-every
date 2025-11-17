@@ -82,8 +82,8 @@ export function exportToICS(event: CalendarEvent): ExportResult {
     const timezone = normalizeTimezone(event.timezone);
 
     const eventAttributes: EventAttributes = {
-      start: dateToArray(event.startDate),
-      end: dateToArray(event.endDate),
+      start: dateToArray(event.startDate, event.allDay),
+      end: dateToArray(event.endDate, event.allDay),
       title: event.title,
       description: event.description,
       location: event.location,
@@ -91,10 +91,10 @@ export function exportToICS(event: CalendarEvent): ExportResult {
       status: 'CONFIRMED',
       busyStatus: 'BUSY',
       productId: 'event-every/ics',
-      startInputType: 'utc',
-      startOutputType: 'utc',
-      endInputType: 'utc',
-      endOutputType: 'utc',
+      startInputType: event.allDay ? 'local' : 'utc',
+      startOutputType: event.allDay ? 'local' : 'utc',
+      endInputType: event.allDay ? 'local' : 'utc',
+      endOutputType: event.allDay ? 'local' : 'utc',
     };
 
     const { error, value } = createEvent(eventAttributes);
@@ -107,7 +107,10 @@ export function exportToICS(event: CalendarEvent): ExportResult {
       return { success: false, error: 'No calendar data generated' };
     }
 
-    let icsContent = addTimezoneToICS(value, timezone);
+    let icsContent = value;
+    if (!event.allDay) {
+      icsContent = addTimezoneToICS(value, timezone);
+    }
     icsContent = addAttachmentsToICS(icsContent, event.attachments);
     downloadICS(icsContent, event.title);
     return { success: true };
@@ -119,7 +122,14 @@ export function exportToICS(event: CalendarEvent): ExportResult {
   }
 }
 
-function dateToArray(date: Date): [number, number, number, number, number] {
+function dateToArray(date: Date, allDay: boolean = false): [number, number, number, number, number] | [number, number, number] {
+  if (allDay) {
+    return [
+      date.getFullYear(),
+      date.getMonth() + 1,
+      date.getDate(),
+    ];
+  }
   return [
     date.getFullYear(),
     date.getMonth() + 1,
@@ -212,8 +222,8 @@ export function exportMultipleToICS(events: CalendarEvent[], filename?: string):
     }
 
     const eventAttributesArray: EventAttributes[] = events.map((event) => ({
-      start: dateToArray(event.startDate),
-      end: dateToArray(event.endDate),
+      start: dateToArray(event.startDate, event.allDay),
+      end: dateToArray(event.endDate, event.allDay),
       title: event.title,
       description: event.description,
       location: event.location,
@@ -221,10 +231,10 @@ export function exportMultipleToICS(events: CalendarEvent[], filename?: string):
       status: 'CONFIRMED',
       busyStatus: 'BUSY',
       productId: 'event-every/ics',
-      startInputType: 'utc',
-      startOutputType: 'utc',
-      endInputType: 'utc',
-      endOutputType: 'utc',
+      startInputType: event.allDay ? 'local' : 'utc',
+      startOutputType: event.allDay ? 'local' : 'utc',
+      endInputType: event.allDay ? 'local' : 'utc',
+      endOutputType: event.allDay ? 'local' : 'utc',
     }));
 
     const { error, value } = createEvents(eventAttributesArray);
@@ -240,8 +250,10 @@ export function exportMultipleToICS(events: CalendarEvent[], filename?: string):
     let icsContent = value;
 
     events.forEach((event, index) => {
-      const timezone = normalizeTimezone(event.timezone);
-      icsContent = addTimezoneToICSAtIndex(icsContent, timezone, index);
+      if (!event.allDay) {
+        const timezone = normalizeTimezone(event.timezone);
+        icsContent = addTimezoneToICSAtIndex(icsContent, timezone, index);
+      }
 
       if (event.attachments && event.attachments.length > 0) {
         icsContent = addAttachmentsToICS(icsContent, event.attachments);

@@ -26,32 +26,23 @@ Use this context to interpret relative dates like "tomorrow", "next week", "yest
   return formattedContext;
 }
 
-const EVENT_PARSING_PROMPT = `You are an event extraction assistant. Extract event details from the provided text or image and return them in JSON format.
+const EVENT_PARSING_PROMPT = `You are an event extraction assistant. Extract event details from the provided text or image.
 
 Extract the following fields:
 - title: The event name or summary
-- startDate: ISO 8601 format (YYYY-MM-DDTHH:mm:ss)
-- endDate: ISO 8601 format (YYYY-MM-DDTHH:mm:ss)
+- startDate: ISO 8601 format (YYYY-MM-DDTHH:mm:ss) for timed events, or YYYY-MM-DD for all-day events
+- endDate: ISO 8601 format (YYYY-MM-DDTHH:mm:ss) for timed events, or YYYY-MM-DD for all-day events
 - location: Physical or virtual location
 - description: Additional details about the event
 - url: Source URL if present (look for "Original Event:", event links, or any URLs in the text)
 - timezone: IANA timezone identifier (e.g., "America/New_York") or abbreviation (e.g., "EST", "PST", "UTC+5")
+- allDay: true if this is an all-day event (no specific times), false if it has specific start/end times
 
-Return ONLY valid JSON matching this schema:
-{
-  "title": "string",
-  "startDate": "string",
-  "endDate": "string",
-  "location": "string",
-  "description": "string",
-  "url": "string",
-  "timezone": "string",
-  "confidence": number (0-1)
-}
+If the user explicitly requests to import events as "all-day" or "single-day" events, set allDay to true for all events even if times are present in the source.
 
-If any field cannot be determined, omit it from the response. The confidence score should reflect how certain you are about the extracted information.`;
+The confidence score should reflect how certain you are about the extracted information. Omit any fields that cannot be determined.`;
 
-const BATCH_EVENT_PARSING_PROMPT = `You are an event extraction assistant. Extract ALL event details from the provided text or image and return them in JSON format.
+const BATCH_EVENT_PARSING_PROMPT = `You are an event extraction assistant. Extract ALL event details from the provided text or image.
 
 IMPORTANT:
 - Detect and extract MULTIPLE events if present (maximum 50 events)
@@ -61,32 +52,17 @@ IMPORTANT:
 
 Extract the following fields for EACH event:
 - title: The event name or summary
-- startDate: ISO 8601 format (YYYY-MM-DDTHH:mm:ss)
-- endDate: ISO 8601 format (YYYY-MM-DDTHH:mm:ss)
+- startDate: ISO 8601 format (YYYY-MM-DDTHH:mm:ss) for timed events, or YYYY-MM-DD for all-day events
+- endDate: ISO 8601 format (YYYY-MM-DDTHH:mm:ss) for timed events, or YYYY-MM-DD for all-day events
 - location: Physical or virtual location
 - description: Additional details about the event
 - url: Source URL if present (look for "Original Event:", event links, or any URLs in the text)
 - timezone: IANA timezone identifier (e.g., "America/New_York") or abbreviation (e.g., "EST", "PST", "UTC+5")
+- allDay: true if this is an all-day event (no specific times), false if it has specific start/end times
 
-Return ONLY valid JSON matching this schema:
-{
-  "events": [
-    {
-      "title": "string",
-      "startDate": "string",
-      "endDate": "string",
-      "location": "string",
-      "description": "string",
-      "url": "string",
-      "timezone": "string",
-      "confidence": number (0-1)
-    }
-  ],
-  "totalCount": number,
-  "confidence": number (0-1)
-}
+If the user explicitly requests to import events as "all-day" or "single-day" events, set allDay to true for all events even if times are present in the source.
 
-The totalCount should be the number of events detected. The top-level confidence should reflect overall certainty about all extracted events. If any field cannot be determined for an event, omit it from that event object.`;
+The totalCount should be the number of events detected. The top-level confidence should reflect overall certainty about all extracted events. Omit any fields that cannot be determined for an event.`;
 
 interface ParseEventInput {
   text?: string;
@@ -135,6 +111,28 @@ export async function parseEvent(input: ParseEventInput): Promise<ParsedEvent> {
     const message = await anthropic.messages.create({
       model: 'claude-sonnet-4-5-20250929',
       max_tokens: 1024,
+      tools: [
+        {
+          name: 'extract_event',
+          description: 'Extract a single calendar event from text or image',
+          input_schema: {
+            type: 'object',
+            properties: {
+              title: { type: 'string', description: 'Event name or summary' },
+              startDate: { type: 'string', description: 'ISO 8601 format (YYYY-MM-DDTHH:mm:ss or YYYY-MM-DD)' },
+              endDate: { type: 'string', description: 'ISO 8601 format (YYYY-MM-DDTHH:mm:ss or YYYY-MM-DD)' },
+              location: { type: 'string', description: 'Physical or virtual location' },
+              description: { type: 'string', description: 'Additional details' },
+              url: { type: 'string', description: 'Source URL if present' },
+              timezone: { type: 'string', description: 'IANA timezone identifier or abbreviation' },
+              allDay: { type: 'boolean', description: 'True if all-day event, false if timed' },
+              confidence: { type: 'number', description: 'Confidence score (0-1)', minimum: 0, maximum: 1 },
+            },
+            required: ['confidence'],
+          },
+        },
+      ],
+      tool_choice: { type: 'tool', name: 'extract_event' },
       messages: [
         {
           role: 'user',
@@ -143,17 +141,15 @@ export async function parseEvent(input: ParseEventInput): Promise<ParsedEvent> {
       ],
     });
 
-    const responseText = message.content
-      .filter((block): block is Anthropic.TextBlock => block.type === 'text')
-      .map((block) => block.text)
-      .join('');
+    const toolUse = message.content.find(
+      (block): block is Anthropic.ToolUseBlock => block.type === 'tool_use'
+    );
 
-    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      throw new Error('Failed to extract JSON from API response');
+    if (!toolUse) {
+      throw new Error('No tool use found in API response');
     }
 
-    const parsed = JSON.parse(jsonMatch[0]) as ParsedEvent;
+    const parsed = toolUse.input as ParsedEvent;
 
     if (!parsed.title && !parsed.startDate) {
       throw new Error('No event information could be extracted');
@@ -166,10 +162,6 @@ export async function parseEvent(input: ParseEventInput): Promise<ParsedEvent> {
   } catch (error) {
     if (error instanceof Anthropic.APIError) {
       throw new Error(`Anthropic API error: ${error.message}`);
-    }
-
-    if (error instanceof SyntaxError) {
-      throw new Error('Failed to parse event data from API response');
     }
 
     throw error;
@@ -218,9 +210,43 @@ export async function* parseEventsBatch(
       throw new Error('No input provided for parsing');
     }
 
-    const stream = await anthropic.messages.stream({
+    const message = await anthropic.messages.create({
       model: 'claude-sonnet-4-5-20250929',
       max_tokens: 4096,
+      tools: [
+        {
+          name: 'extract_events',
+          description: 'Extract multiple calendar events from text or image',
+          input_schema: {
+            type: 'object',
+            properties: {
+              events: {
+                type: 'array',
+                description: 'Array of extracted events',
+                items: {
+                  type: 'object',
+                  properties: {
+                    title: { type: 'string', description: 'Event name or summary' },
+                    startDate: { type: 'string', description: 'ISO 8601 format (YYYY-MM-DDTHH:mm:ss or YYYY-MM-DD)' },
+                    endDate: { type: 'string', description: 'ISO 8601 format (YYYY-MM-DDTHH:mm:ss or YYYY-MM-DD)' },
+                    location: { type: 'string', description: 'Physical or virtual location' },
+                    description: { type: 'string', description: 'Additional details' },
+                    url: { type: 'string', description: 'Source URL if present' },
+                    timezone: { type: 'string', description: 'IANA timezone identifier or abbreviation' },
+                    allDay: { type: 'boolean', description: 'True if all-day event, false if timed' },
+                    confidence: { type: 'number', description: 'Confidence score (0-1)', minimum: 0, maximum: 1 },
+                  },
+                  required: ['confidence'],
+                },
+              },
+              totalCount: { type: 'number', description: 'Total number of events' },
+              confidence: { type: 'number', description: 'Overall confidence (0-1)', minimum: 0, maximum: 1 },
+            },
+            required: ['events', 'totalCount', 'confidence'],
+          },
+        },
+      ],
+      tool_choice: { type: 'tool', name: 'extract_events' },
       messages: [
         {
           role: 'user',
@@ -229,23 +255,15 @@ export async function* parseEventsBatch(
       ],
     });
 
-    let accumulatedText = '';
+    const toolUse = message.content.find(
+      (block): block is Anthropic.ToolUseBlock => block.type === 'tool_use'
+    );
 
-    for await (const chunk of stream) {
-      if (
-        chunk.type === 'content_block_delta' &&
-        chunk.delta.type === 'text_delta'
-      ) {
-        accumulatedText += chunk.delta.text;
-      }
+    if (!toolUse) {
+      throw new Error('No tool use found in API response');
     }
 
-    const jsonMatch = accumulatedText.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      throw new Error('Failed to extract JSON from API response');
-    }
-
-    const parsed = JSON.parse(jsonMatch[0]) as BatchParsedEvents;
+    const parsed = toolUse.input as BatchParsedEvents;
 
     if (!parsed.events || parsed.events.length === 0) {
       throw new Error('No events could be extracted');
@@ -269,10 +287,6 @@ export async function* parseEventsBatch(
   } catch (error) {
     if (error instanceof Anthropic.APIError) {
       throw new Error(`Anthropic API error: ${error.message}`);
-    }
-
-    if (error instanceof SyntaxError) {
-      throw new Error('Failed to parse event data from API response');
     }
 
     throw error;

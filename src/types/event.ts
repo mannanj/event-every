@@ -37,6 +37,7 @@ export interface ParsedEvent {
   description?: string;
   url?: string;
   timezone?: string;
+  allDay?: boolean;
   confidence: number;
 }
 

@@ -147,7 +147,7 @@ export default function Home() {
       location: parsed.location,
       description: parsed.description,
       url: parsed.url,
-      allDay: false,
+      allDay: parsed.allDay ?? false,
       created: now,
       source,
       originalInput,
