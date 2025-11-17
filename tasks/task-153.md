@@ -8,5 +8,8 @@
 - [x] Add state to track selected preset and persist across modal reopens
 - [x] Set "Last 3 Days" as default highlighted preset
 - [x] Highlight selected preset button when reopening modal
-- [x] Add Apply button in Custom mode section
-- Location: `src/app/page.tsx:853-1160`
+- [x] Add Apply button always visible at bottom of modal
+- [x] Make Apply button required before any date range changes are applied
+- [x] Preset buttons now only select the range without closing modal
+- [x] User must click Apply to apply the selected preset or custom dates
+- Location: `src/app/page.tsx:853-1153`

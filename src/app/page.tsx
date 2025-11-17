@@ -878,7 +878,6 @@ export default function Home() {
                     setLastPresetDates({ start, end: now });
                     setIsCustomMode(false);
                     setSelectedPreset('last-hour');
-                    handleDateRangeSubmit(start, now);
                   }}
                   className={`px-2 py-2 text-xs border-2 border-black transition-colors focus:outline-none focus:ring-2 focus:ring-black ${
                     selectedPreset === 'last-hour'
@@ -896,7 +895,6 @@ export default function Home() {
                     setLastPresetDates({ start, end: now });
                     setIsCustomMode(false);
                     setSelectedPreset('last-24h');
-                    handleDateRangeSubmit(start, now);
                   }}
                   className={`px-2 py-2 text-xs border-2 border-black transition-colors focus:outline-none focus:ring-2 focus:ring-black ${
                     selectedPreset === 'last-24h'
@@ -914,7 +912,6 @@ export default function Home() {
                     setLastPresetDates({ start, end: now });
                     setIsCustomMode(false);
                     setSelectedPreset('last-48h');
-                    handleDateRangeSubmit(start, now);
                   }}
                   className={`px-2 py-2 text-xs border-2 border-black transition-colors focus:outline-none focus:ring-2 focus:ring-black ${
                     selectedPreset === 'last-48h'
@@ -932,7 +929,6 @@ export default function Home() {
                     setLastPresetDates({ start, end: now });
                     setIsCustomMode(false);
                     setSelectedPreset('last-week');
-                    handleDateRangeSubmit(start, now);
                   }}
                   className={`px-2 py-2 text-xs border-2 border-black transition-colors focus:outline-none focus:ring-2 focus:ring-black ${
                     selectedPreset === 'last-week'
@@ -950,7 +946,6 @@ export default function Home() {
                     setLastPresetDates({ start, end: now });
                     setIsCustomMode(false);
                     setSelectedPreset('last-month');
-                    handleDateRangeSubmit(start, now);
                   }}
                   className={`px-2 py-2 text-xs border-2 border-black transition-colors focus:outline-none focus:ring-2 focus:ring-black ${
                     selectedPreset === 'last-month'
@@ -968,7 +963,6 @@ export default function Home() {
                     setLastPresetDates({ start, end: now });
                     setIsCustomMode(false);
                     setSelectedPreset('last-3-days');
-                    handleDateRangeSubmit(start, now);
                   }}
                   className={`px-2 py-2 text-xs border-2 border-black transition-colors focus:outline-none focus:ring-2 focus:ring-black ${
                     selectedPreset === 'last-3-days'
@@ -986,7 +980,6 @@ export default function Home() {
                     setLastPresetDates({ start: now, end });
                     setIsCustomMode(false);
                     setSelectedPreset('next-hour');
-                    handleDateRangeSubmit(now, end);
                   }}
                   className={`px-2 py-2 text-xs border-2 border-black transition-colors focus:outline-none focus:ring-2 focus:ring-black ${
                     selectedPreset === 'next-hour'
@@ -1004,7 +997,6 @@ export default function Home() {
                     setLastPresetDates({ start: now, end });
                     setIsCustomMode(false);
                     setSelectedPreset('next-24h');
-                    handleDateRangeSubmit(now, end);
                   }}
                   className={`px-2 py-2 text-xs border-2 border-black transition-colors focus:outline-none focus:ring-2 focus:ring-black ${
                     selectedPreset === 'next-24h'
@@ -1022,7 +1014,6 @@ export default function Home() {
                     setLastPresetDates({ start: now, end });
                     setIsCustomMode(false);
                     setSelectedPreset('next-48h');
-                    handleDateRangeSubmit(now, end);
                   }}
                   className={`px-2 py-2 text-xs border-2 border-black transition-colors focus:outline-none focus:ring-2 focus:ring-black ${
                     selectedPreset === 'next-48h'
@@ -1040,7 +1031,6 @@ export default function Home() {
                     setLastPresetDates({ start: now, end });
                     setIsCustomMode(false);
                     setSelectedPreset('next-week');
-                    handleDateRangeSubmit(now, end);
                   }}
                   className={`px-2 py-2 text-xs border-2 border-black transition-colors focus:outline-none focus:ring-2 focus:ring-black ${
                     selectedPreset === 'next-week'
@@ -1058,7 +1048,6 @@ export default function Home() {
                     setLastPresetDates({ start: now, end });
                     setIsCustomMode(false);
                     setSelectedPreset('next-month');
-                    handleDateRangeSubmit(now, end);
                   }}
                   className={`px-2 py-2 text-xs border-2 border-black transition-colors focus:outline-none focus:ring-2 focus:ring-black ${
                     selectedPreset === 'next-month'
@@ -1086,79 +1075,78 @@ export default function Home() {
             </div>
 
             {isCustomMode && (
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  const formData = new FormData(e.currentTarget);
-                  const start = formData.get('start') as string;
-                  const end = formData.get('end') as string;
-                  if (start && end) {
-                    handleDateRangeSubmit(start, end);
-                    setIsCustomMode(false);
+              <div className="grid grid-cols-2 gap-6 mb-6">
+                <div>
+                  <label htmlFor="start-date" className="block mb-2 font-semibold">
+                    Start Date
+                  </label>
+                  <input
+                    type="date"
+                    id="start-date"
+                    name="start"
+                    defaultValue={(() => {
+                      if (lastPresetDates) {
+                        return lastPresetDates.start.toISOString().split('T')[0];
+                      }
+                      const now = new Date();
+                      const threeDaysAgo = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
+                      return threeDaysAgo.toISOString().split('T')[0];
+                    })()}
+                    className="w-full px-4 py-2 border-2 border-black focus:outline-none focus:ring-2 focus:ring-black"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="end-date" className="block mb-2 font-semibold">
+                    End Date
+                  </label>
+                  <input
+                    type="date"
+                    id="end-date"
+                    name="end"
+                    defaultValue={(() => {
+                      if (lastPresetDates) {
+                        return lastPresetDates.end.toISOString().split('T')[0];
+                      }
+                      return new Date().toISOString().split('T')[0];
+                    })()}
+                    className="w-full px-4 py-2 border-2 border-black focus:outline-none focus:ring-2 focus:ring-black"
+                  />
+                </div>
+              </div>
+            )}
+
+            <div className="flex gap-4">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowDateRangePicker(false);
+                  setIsCustomMode(false);
+                  setSortOption('created-newest');
+                }}
+                className="flex-1 px-6 py-2 bg-white text-black border-2 border-black hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-black"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (isCustomMode) {
+                    const startInput = document.getElementById('start-date') as HTMLInputElement;
+                    const endInput = document.getElementById('end-date') as HTMLInputElement;
+                    if (startInput && endInput && startInput.value && endInput.value) {
+                      handleDateRangeSubmit(startInput.value, endInput.value);
+                      setShowDateRangePicker(false);
+                    }
+                  } else if (lastPresetDates) {
+                    handleDateRangeSubmit(lastPresetDates.start, lastPresetDates.end);
+                    setShowDateRangePicker(false);
                   }
                 }}
+                className="flex-1 px-6 py-2 bg-black text-white border-2 border-black hover:bg-white hover:text-black transition-colors focus:outline-none focus:ring-2 focus:ring-black"
               >
-                <div className="grid grid-cols-2 gap-6 mb-6">
-                  <div>
-                    <label htmlFor="start-date" className="block mb-2 font-semibold">
-                      Start Date
-                    </label>
-                    <input
-                      type="date"
-                      id="start-date"
-                      name="start"
-                      defaultValue={(() => {
-                        if (lastPresetDates) {
-                          return lastPresetDates.start.toISOString().split('T')[0];
-                        }
-                        const now = new Date();
-                        const threeDaysAgo = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
-                        return threeDaysAgo.toISOString().split('T')[0];
-                      })()}
-                      required
-                      className="w-full px-4 py-2 border-2 border-black focus:outline-none focus:ring-2 focus:ring-black"
-                    />
-                  </div>
-                  <div>
-                    <label htmlFor="end-date" className="block mb-2 font-semibold">
-                      End Date
-                    </label>
-                    <input
-                      type="date"
-                      id="end-date"
-                      name="end"
-                      defaultValue={(() => {
-                        if (lastPresetDates) {
-                          return lastPresetDates.end.toISOString().split('T')[0];
-                        }
-                        return new Date().toISOString().split('T')[0];
-                      })()}
-                      required
-                      className="w-full px-4 py-2 border-2 border-black focus:outline-none focus:ring-2 focus:ring-black"
-                    />
-                  </div>
-                </div>
-                <div className="flex gap-4">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowDateRangePicker(false);
-                      setIsCustomMode(false);
-                      setSortOption('created-newest');
-                    }}
-                    className="flex-1 px-6 py-2 bg-white text-black border-2 border-black hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-black"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="flex-1 px-6 py-2 bg-black text-white border-2 border-black hover:bg-white hover:text-black transition-colors focus:outline-none focus:ring-2 focus:ring-black"
-                  >
-                    Apply
-                  </button>
-                </div>
-              </form>
-            )}
+                Apply
+              </button>
+            </div>
           </div>
         </div>
       )}
