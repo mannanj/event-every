@@ -61,6 +61,8 @@ export default function Home() {
   const { addToQueue, updateProgress } = useProcessingQueue();
   const smartInputRef = useRef<SmartInputHandle>(null);
   const [showDateRangePicker, setShowDateRangePicker] = useState(false);
+  const [isCustomMode, setIsCustomMode] = useState(false);
+  const [lastPresetDates, setLastPresetDates] = useState<{ start: Date; end: Date } | null>(null);
 
   useEffect(() => {
     const result = eventStorage.getTempUnsavedEvents();
@@ -855,6 +857,7 @@ export default function Home() {
           className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center p-4"
           onClick={() => {
             setShowDateRangePicker(false);
+            setIsCustomMode(false);
             setSortOption('created-newest');
           }}
         >
@@ -865,13 +868,14 @@ export default function Home() {
             <h2 className="text-xl font-bold mb-6">Select Date Range</h2>
 
             <div className="mb-6">
-              <p className="text-sm font-semibold mb-3">Quick Presets:</p>
               <div className="grid grid-cols-6 gap-2 mb-4">
                 <button
                   type="button"
                   onClick={() => {
                     const now = new Date();
                     const start = new Date(now.getTime() - 60 * 60 * 1000);
+                    setLastPresetDates({ start, end: now });
+                    setIsCustomMode(false);
                     handleDateRangeSubmit(start, now);
                   }}
                   className="px-2 py-2 text-xs bg-white text-black border-2 border-black hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-black"
@@ -883,6 +887,8 @@ export default function Home() {
                   onClick={() => {
                     const now = new Date();
                     const start = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+                    setLastPresetDates({ start, end: now });
+                    setIsCustomMode(false);
                     handleDateRangeSubmit(start, now);
                   }}
                   className="px-2 py-2 text-xs bg-white text-black border-2 border-black hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-black"
@@ -894,6 +900,8 @@ export default function Home() {
                   onClick={() => {
                     const now = new Date();
                     const start = new Date(now.getTime() - 48 * 60 * 60 * 1000);
+                    setLastPresetDates({ start, end: now });
+                    setIsCustomMode(false);
                     handleDateRangeSubmit(start, now);
                   }}
                   className="px-2 py-2 text-xs bg-white text-black border-2 border-black hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-black"
@@ -905,6 +913,8 @@ export default function Home() {
                   onClick={() => {
                     const now = new Date();
                     const start = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+                    setLastPresetDates({ start, end: now });
+                    setIsCustomMode(false);
                     handleDateRangeSubmit(start, now);
                   }}
                   className="px-2 py-2 text-xs bg-white text-black border-2 border-black hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-black"
@@ -916,6 +926,8 @@ export default function Home() {
                   onClick={() => {
                     const now = new Date();
                     const start = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+                    setLastPresetDates({ start, end: now });
+                    setIsCustomMode(false);
                     handleDateRangeSubmit(start, now);
                   }}
                   className="px-2 py-2 text-xs bg-white text-black border-2 border-black hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-black"
@@ -927,9 +939,11 @@ export default function Home() {
                   onClick={() => {
                     const now = new Date();
                     const start = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
+                    setLastPresetDates({ start, end: now });
+                    setIsCustomMode(false);
                     handleDateRangeSubmit(start, now);
                   }}
-                  className="px-2 py-2 text-xs bg-black text-white border-2 border-black hover:bg-white hover:text-black transition-colors focus:outline-none focus:ring-2 focus:ring-black"
+                  className="px-2 py-2 text-xs bg-white text-black border-2 border-black hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-black"
                 >
                   Last 3 Days
                 </button>
@@ -938,6 +952,8 @@ export default function Home() {
                   onClick={() => {
                     const now = new Date();
                     const end = new Date(now.getTime() + 60 * 60 * 1000);
+                    setLastPresetDates({ start: now, end });
+                    setIsCustomMode(false);
                     handleDateRangeSubmit(now, end);
                   }}
                   className="px-2 py-2 text-xs bg-white text-black border-2 border-black hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-black"
@@ -949,6 +965,8 @@ export default function Home() {
                   onClick={() => {
                     const now = new Date();
                     const end = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+                    setLastPresetDates({ start: now, end });
+                    setIsCustomMode(false);
                     handleDateRangeSubmit(now, end);
                   }}
                   className="px-2 py-2 text-xs bg-white text-black border-2 border-black hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-black"
@@ -960,6 +978,8 @@ export default function Home() {
                   onClick={() => {
                     const now = new Date();
                     const end = new Date(now.getTime() + 48 * 60 * 60 * 1000);
+                    setLastPresetDates({ start: now, end });
+                    setIsCustomMode(false);
                     handleDateRangeSubmit(now, end);
                   }}
                   className="px-2 py-2 text-xs bg-white text-black border-2 border-black hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-black"
@@ -971,6 +991,8 @@ export default function Home() {
                   onClick={() => {
                     const now = new Date();
                     const end = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+                    setLastPresetDates({ start: now, end });
+                    setIsCustomMode(false);
                     handleDateRangeSubmit(now, end);
                   }}
                   className="px-2 py-2 text-xs bg-white text-black border-2 border-black hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-black"
@@ -982,77 +1004,104 @@ export default function Home() {
                   onClick={() => {
                     const now = new Date();
                     const end = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+                    setLastPresetDates({ start: now, end });
+                    setIsCustomMode(false);
                     handleDateRangeSubmit(now, end);
                   }}
                   className="px-2 py-2 text-xs bg-white text-black border-2 border-black hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-black"
                 >
                   Next Month
                 </button>
-              </div>
-            </div>
-
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                const formData = new FormData(e.currentTarget);
-                const start = formData.get('start') as string;
-                const end = formData.get('end') as string;
-                if (start && end) {
-                  handleDateRangeSubmit(start, end);
-                }
-              }}
-            >
-              <div className="grid grid-cols-2 gap-6 mb-6">
-                <div>
-                  <label htmlFor="start-date" className="block mb-2 font-semibold">
-                    Start Date
-                  </label>
-                  <input
-                    type="date"
-                    id="start-date"
-                    name="start"
-                    defaultValue={(() => {
-                      const now = new Date();
-                      const threeDaysAgo = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
-                      return threeDaysAgo.toISOString().split('T')[0];
-                    })()}
-                    required
-                    className="w-full px-4 py-2 border-2 border-black focus:outline-none focus:ring-2 focus:ring-black"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="end-date" className="block mb-2 font-semibold">
-                    End Date
-                  </label>
-                  <input
-                    type="date"
-                    id="end-date"
-                    name="end"
-                    defaultValue={new Date().toISOString().split('T')[0]}
-                    required
-                    className="w-full px-4 py-2 border-2 border-black focus:outline-none focus:ring-2 focus:ring-black"
-                  />
-                </div>
-              </div>
-              <div className="flex gap-4">
                 <button
                   type="button"
                   onClick={() => {
-                    setShowDateRangePicker(false);
-                    setSortOption('created-newest');
+                    setIsCustomMode(true);
                   }}
-                  className="flex-1 px-6 py-2 bg-white text-black border-2 border-black hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-black"
+                  className={`px-2 py-2 text-xs border-2 border-black transition-colors focus:outline-none focus:ring-2 focus:ring-black ${
+                    isCustomMode
+                      ? 'bg-black text-white shadow-[inset_4px_4px_0px_rgba(255,255,255,0.3)]'
+                      : 'bg-white text-black hover:bg-gray-100'
+                  }`}
                 >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 px-6 py-2 bg-black text-white border-2 border-black hover:bg-white hover:text-black transition-colors focus:outline-none focus:ring-2 focus:ring-black"
-                >
-                  Apply
+                  Custom
                 </button>
               </div>
-            </form>
+            </div>
+
+            {isCustomMode && (
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const formData = new FormData(e.currentTarget);
+                  const start = formData.get('start') as string;
+                  const end = formData.get('end') as string;
+                  if (start && end) {
+                    handleDateRangeSubmit(start, end);
+                    setIsCustomMode(false);
+                  }
+                }}
+              >
+                <div className="grid grid-cols-2 gap-6 mb-6">
+                  <div>
+                    <label htmlFor="start-date" className="block mb-2 font-semibold">
+                      Start Date
+                    </label>
+                    <input
+                      type="date"
+                      id="start-date"
+                      name="start"
+                      defaultValue={(() => {
+                        if (lastPresetDates) {
+                          return lastPresetDates.start.toISOString().split('T')[0];
+                        }
+                        const now = new Date();
+                        const threeDaysAgo = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
+                        return threeDaysAgo.toISOString().split('T')[0];
+                      })()}
+                      required
+                      className="w-full px-4 py-2 border-2 border-black focus:outline-none focus:ring-2 focus:ring-black"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="end-date" className="block mb-2 font-semibold">
+                      End Date
+                    </label>
+                    <input
+                      type="date"
+                      id="end-date"
+                      name="end"
+                      defaultValue={(() => {
+                        if (lastPresetDates) {
+                          return lastPresetDates.end.toISOString().split('T')[0];
+                        }
+                        return new Date().toISOString().split('T')[0];
+                      })()}
+                      required
+                      className="w-full px-4 py-2 border-2 border-black focus:outline-none focus:ring-2 focus:ring-black"
+                    />
+                  </div>
+                </div>
+                <div className="flex gap-4">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowDateRangePicker(false);
+                      setIsCustomMode(false);
+                      setSortOption('created-newest');
+                    }}
+                    className="flex-1 px-6 py-2 bg-white text-black border-2 border-black hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-black"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 px-6 py-2 bg-black text-white border-2 border-black hover:bg-white hover:text-black transition-colors focus:outline-none focus:ring-2 focus:ring-black"
+                  >
+                    Apply
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       )}

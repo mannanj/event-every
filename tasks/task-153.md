@@ -1,0 +1,8 @@
+### Task 153: Improve Custom Date Range Filter UI
+- [x] Remove "Quick Presets:" label from date range modal
+- [x] Add "Custom" button as a preset option
+- [x] Hide Start/End Date inputs by default
+- [x] Show Start/End Date inputs only when Custom button is pressed
+- [x] Initialize custom dates with last selected preset values
+- [x] Update button styling to show selected/indented state
+- Location: `src/app/page.tsx:853-1058`
