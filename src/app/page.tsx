@@ -16,6 +16,7 @@ import { QueueItem } from '@/services/processingQueue';
 import { eventStorage } from '@/services/storage';
 import { parseICSFile } from '@/services/icsParser';
 import { getClientContext } from '@/utils/clientContext';
+import { exportAllEvents } from '@/services/exportAll';
 
 interface ProcessingEvent {
   id: string;
@@ -65,6 +66,8 @@ export default function Home() {
   const [isCustomMode, setIsCustomMode] = useState(false);
   const [lastPresetDates, setLastPresetDates] = useState<{ start: Date; end: Date } | null>(null);
   const [selectedPreset, setSelectedPreset] = useState<string>('last-3-days');
+  const [isExportingAll, setIsExportingAll] = useState(false);
+  const [exportAllMessage, setExportAllMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   useEffect(() => {
     const result = eventStorage.getTempUnsavedEvents();
@@ -701,6 +704,32 @@ export default function Home() {
     setShowDateRangePicker(false);
   };
 
+  const handleExportAll = async () => {
+    setIsExportingAll(true);
+    setExportAllMessage(null);
+
+    try {
+      const result = await exportAllEvents();
+
+      if (result.success) {
+        setExportAllMessage({ type: 'success', text: 'All events exported successfully!' });
+      } else {
+        setExportAllMessage({ type: 'error', text: result.error || 'Failed to export events' });
+      }
+    } catch (error) {
+      setExportAllMessage({
+        type: 'error',
+        text: error instanceof Error ? error.message : 'Failed to export events',
+      });
+    } finally {
+      setIsExportingAll(false);
+
+      setTimeout(() => {
+        setExportAllMessage(null);
+      }, 5000);
+    }
+  };
+
   return (
     <main className="min-h-screen rainbow-gradient-bg">
       <RateLimitBanner rateLimitInfo={rateLimitInfo} />
@@ -750,28 +779,50 @@ export default function Home() {
         {/* History section */}
         {totalEventsInStorage > 0 && (
           <div className="mb-12">
-            <div className="mb-2 flex gap-4 items-center">
-              <label htmlFor="sort-select" className="text-black font-semibold">
-                Sort by:
-              </label>
-              <select
-                id="sort-select"
-                value={sortOption}
-                onChange={(e) => handleSortChange(e.target.value)}
-                onFocus={(e) => {
-                  if (e.target.value === 'custom-range') {
-                    setShowDateRangePicker(true);
-                  }
-                }}
-                className="px-4 py-2 border-2 border-black bg-white text-black focus:outline-none focus:ring-2 focus:ring-black"
+            <div className="mb-4 flex gap-4 items-center justify-between">
+              <div className="flex gap-4 items-center">
+                <label htmlFor="sort-select" className="text-black font-semibold">
+                  Sort by:
+                </label>
+                <select
+                  id="sort-select"
+                  value={sortOption}
+                  onChange={(e) => handleSortChange(e.target.value)}
+                  onFocus={(e) => {
+                    if (e.target.value === 'custom-range') {
+                      setShowDateRangePicker(true);
+                    }
+                  }}
+                  className="px-4 py-2 border-2 border-black bg-white text-black focus:outline-none focus:ring-2 focus:ring-black"
+                >
+                  <option value="upcoming">Upcoming Events</option>
+                  <option value="created-newest">Recently Created</option>
+                  <option value="created-oldest">Oldest First</option>
+                  <option value="today">Today</option>
+                  <option value="custom-range">Custom</option>
+                </select>
+              </div>
+
+              <button
+                onClick={handleExportAll}
+                disabled={isExportingAll}
+                className="px-6 py-2 bg-black text-white border-2 border-black hover:bg-white hover:text-black transition-colors focus:outline-none focus:ring-2 focus:ring-black disabled:bg-gray-400 disabled:border-gray-400 disabled:cursor-not-allowed"
               >
-                <option value="upcoming">Upcoming Events</option>
-                <option value="created-newest">Recently Created</option>
-                <option value="created-oldest">Oldest First</option>
-                <option value="today">Today</option>
-                <option value="custom-range">Custom</option>
-              </select>
+                {isExportingAll ? 'Exporting...' : 'Export all'}
+              </button>
             </div>
+
+            {exportAllMessage && (
+              <div
+                className={`mb-4 p-4 border-2 ${
+                  exportAllMessage.type === 'success'
+                    ? 'bg-green-50 border-green-500 text-green-800'
+                    : 'bg-red-50 border-red-500 text-red-800'
+                }`}
+              >
+                {exportAllMessage.text}
+              </div>
+            )}
 
             {events.length > 0 ? (
             <div className="max-h-[99vh] overflow-y-auto">
