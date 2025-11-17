@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { text, imageBase64, imageMimeType, batch = false } = body;
+    const { text, imageBase64, imageMimeType, batch = false, clientContext } = body;
 
     if (!text && !imageBase64) {
       return NextResponse.json(
@@ -74,6 +74,7 @@ export async function POST(request: NextRequest) {
               text,
               imageBase64,
               imageMimeType,
+              clientContext,
             })) {
               const chunk = {
                 events: eventChunk,
@@ -125,6 +126,7 @@ export async function POST(request: NextRequest) {
       text,
       imageBase64,
       imageMimeType,
+      clientContext,
     });
 
     const updatedRateLimit = await incrementRateLimit(clientIP);

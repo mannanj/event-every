@@ -73,3 +73,10 @@ export interface DateRange {
   start: Date;
   end: Date;
 }
+
+export interface ClientContext {
+  currentDateTime: string;
+  timezone: string;
+  timezoneOffset: number;
+  locale: string;
+}

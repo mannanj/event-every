@@ -15,6 +15,7 @@ import { scrapeURLsBatch } from '@/services/webScraper';
 import { QueueItem } from '@/services/processingQueue';
 import { eventStorage } from '@/services/storage';
 import { parseICSFile } from '@/services/icsParser';
+import { getClientContext } from '@/utils/clientContext';
 
 interface ProcessingEvent {
   id: string;
@@ -150,10 +151,11 @@ export default function Home() {
     }));
 
     try {
+      const clientContext = getClientContext();
       const response = await fetch('/api/parse', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...body, batch: true }),
+        body: JSON.stringify({ ...body, batch: true, clientContext }),
       });
 
       if (!response.ok) {
@@ -291,6 +293,7 @@ export default function Home() {
               size: file.size,
             };
 
+            const clientContext = getClientContext();
             const response = await fetch('/api/parse', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -298,6 +301,7 @@ export default function Home() {
                 imageBase64: base64,
                 imageMimeType: mimeType,
                 batch: true,
+                clientContext,
               }),
             });
 
@@ -459,10 +463,11 @@ export default function Home() {
             source: 'text',
           });
 
+          const clientContext = getClientContext();
           const response = await fetch('/api/parse', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text: combinedText, batch: true }),
+            body: JSON.stringify({ text: combinedText, batch: true, clientContext }),
           });
 
           if (!response.ok) {

@@ -1,9 +1,21 @@
 import Anthropic from '@anthropic-ai/sdk';
-import { ParsedEvent, BatchParsedEvents } from '@/types/event';
+import { ParsedEvent, BatchParsedEvents, ClientContext } from '@/types/event';
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
+
+function formatClientContext(context?: ClientContext): string {
+  if (!context) return '';
+
+  return `\n\nCurrent context:
+- Date/Time: ${context.currentDateTime}
+- Timezone: ${context.timezone}
+- Timezone Offset: ${context.timezoneOffset} minutes from UTC
+- Locale: ${context.locale}
+
+Use this context to interpret relative dates like "tomorrow", "next week", "yesterday", "3 days from now", etc. Convert all relative dates to absolute ISO 8601 dates.`;
+}
 
 const EVENT_PARSING_PROMPT = `You are an event extraction assistant. Extract event details from the provided text or image and return them in JSON format.
 
@@ -71,6 +83,7 @@ interface ParseEventInput {
   text?: string;
   imageBase64?: string;
   imageMimeType?: string;
+  clientContext?: ClientContext;
 }
 
 export async function parseEvent(input: ParseEventInput): Promise<ParsedEvent> {
@@ -84,7 +97,7 @@ export async function parseEvent(input: ParseEventInput): Promise<ParsedEvent> {
     if (input.text) {
       content.push({
         type: 'text',
-        text: `${EVENT_PARSING_PROMPT}\n\nExtract event details from this text:\n${input.text}`,
+        text: `${EVENT_PARSING_PROMPT}${formatClientContext(input.clientContext)}\n\nExtract event details from this text:\n${input.text}`,
       });
     }
 
@@ -101,7 +114,7 @@ export async function parseEvent(input: ParseEventInput): Promise<ParsedEvent> {
       if (!input.text) {
         content.unshift({
           type: 'text',
-          text: EVENT_PARSING_PROMPT,
+          text: `${EVENT_PARSING_PROMPT}${formatClientContext(input.clientContext)}`,
         });
       }
     }
@@ -170,7 +183,7 @@ export async function* parseEventsBatch(
     if (input.text) {
       content.push({
         type: 'text',
-        text: `${BATCH_EVENT_PARSING_PROMPT}\n\nExtract event details from this text:\n${input.text}`,
+        text: `${BATCH_EVENT_PARSING_PROMPT}${formatClientContext(input.clientContext)}\n\nExtract event details from this text:\n${input.text}`,
       });
     }
 
@@ -187,7 +200,7 @@ export async function* parseEventsBatch(
       if (!input.text) {
         content.unshift({
           type: 'text',
-          text: BATCH_EVENT_PARSING_PROMPT,
+          text: `${BATCH_EVENT_PARSING_PROMPT}${formatClientContext(input.clientContext)}`,
         });
       }
     }

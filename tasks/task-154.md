@@ -25,7 +25,7 @@
 
 **Subtasks**:
 
-- [ ] **Frontend: Capture Client Context**
+- [x] **Frontend: Capture Client Context**
   - Add utility function `getClientContext()` in new file `src/utils/clientContext.ts`
   - **REUSE existing `getBrowserTimezone()` from `src/utils/timezone.ts`** (do NOT duplicate)
   - Capture: ISO timestamp, timezone (via `getBrowserTimezone()`), timezone offset, browser locale
@@ -33,22 +33,22 @@
   - Include fields: `currentDateTime`, `timezone`, `timezoneOffset`, `locale`
   - Do NOT include userAgent (privacy concern, not needed for LLM)
 
-- [ ] **Frontend: Pass Context to API**
+- [x] **Frontend: Pass Context to API**
   - Modify API calls in `src/app/page.tsx` to include `clientContext` in request body
   - Update both single and batch parsing calls
 
-- [ ] **API Route: Accept Client Context**
+- [x] **API Route: Accept Client Context**
   - Update `src/app/api/parse/route.ts` to receive `clientContext` from request body
   - Pass context through to parser service functions
 
-- [ ] **Parser Service: Integrate Context into Prompts**
+- [x] **Parser Service: Integrate Context into Prompts**
   - Modify `parseEvent()` in `src/services/parser.ts` to accept optional `clientContext`
   - Modify `parseEventsBatch()` to accept optional `clientContext`
   - Update `EVENT_PARSING_PROMPT` to include context information when available
   - Update `BATCH_EVENT_PARSING_PROMPT` to include context information when available
   - Format context as: "Current context: Date/Time: [ISO], Timezone: [IANA], Locale: [locale]"
 
-- [ ] **TypeScript Interfaces**
+- [x] **TypeScript Interfaces**
   - Define `ClientContext` interface in `src/types/event.ts` with fields:
     - `currentDateTime: string` (ISO 8601 format from `new Date().toISOString()`)
     - `timezone: string` (IANA identifier from `getBrowserTimezone()`, e.g., "America/New_York")
@@ -56,13 +56,13 @@
     - `locale: string` (from `navigator.language`, e.g., "en-US")
   - Update `ParseEventInput` interface in `src/services/parser.ts` to include optional `clientContext?: ClientContext`
 
-- [ ] **Testing**
+- [x] **Testing**
   - Test with relative date expressions: "tomorrow", "next week", "yesterday"
   - Test with time-offset expressions: "3 days from now", "2 hours ago"
   - Test timezone-aware parsing across different client timezones
   - Verify backwards compatibility (works without context)
 
-- [ ] **Documentation**
+- [x] **Documentation**
   - Update inline comments explaining context usage
   - Document context structure in code comments
 
