@@ -61,6 +61,9 @@ export default function Home() {
   const { addToQueue, updateProgress } = useProcessingQueue();
   const smartInputRef = useRef<SmartInputHandle>(null);
   const [showDateRangePicker, setShowDateRangePicker] = useState(false);
+  const [selectedPreset, setSelectedPreset] = useState<string>('last-3-days');
+  const [tempStartDate, setTempStartDate] = useState<string>('');
+  const [tempEndDate, setTempEndDate] = useState<string>('');
 
   useEffect(() => {
     const result = eventStorage.getTempUnsavedEvents();
@@ -671,14 +674,62 @@ export default function Home() {
     }).format(date);
   };
 
+  const getPresetDateRange = (preset: string): { start: Date; end: Date } | null => {
+    const now = new Date();
+    switch (preset) {
+      case 'last-hour':
+        return { start: new Date(now.getTime() - 60 * 60 * 1000), end: now };
+      case 'last-24h':
+        return { start: new Date(now.getTime() - 24 * 60 * 60 * 1000), end: now };
+      case 'last-48h':
+        return { start: new Date(now.getTime() - 48 * 60 * 60 * 1000), end: now };
+      case 'last-week':
+        return { start: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000), end: now };
+      case 'last-month':
+        return { start: new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000), end: now };
+      case 'last-3-days':
+        return { start: new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000), end: now };
+      case 'next-hour':
+        return { start: now, end: new Date(now.getTime() + 60 * 60 * 1000) };
+      case 'next-24h':
+        return { start: now, end: new Date(now.getTime() + 24 * 60 * 60 * 1000) };
+      case 'next-48h':
+        return { start: now, end: new Date(now.getTime() + 48 * 60 * 60 * 1000) };
+      case 'next-week':
+        return { start: now, end: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000) };
+      case 'next-month':
+        return { start: now, end: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000) };
+      default:
+        return null;
+    }
+  };
+
   const handleSortChange = (value: string) => {
     const option = value as EventSortOption;
     setSortOption(option);
     if (option === 'custom-range') {
+      const range = dateRange || getPresetDateRange(selectedPreset);
+      if (range) {
+        setTempStartDate(range.start.toISOString().split('T')[0]);
+        setTempEndDate(range.end.toISOString().split('T')[0]);
+      } else {
+        const defaultRange = getPresetDateRange('last-3-days')!;
+        setTempStartDate(defaultRange.start.toISOString().split('T')[0]);
+        setTempEndDate(defaultRange.end.toISOString().split('T')[0]);
+      }
       setShowDateRangePicker(true);
     } else {
       setShowDateRangePicker(false);
       setDateRange(null);
+    }
+  };
+
+  const handlePresetClick = (preset: string) => {
+    const range = getPresetDateRange(preset);
+    if (range) {
+      setSelectedPreset(preset);
+      setTempStartDate(range.start.toISOString().split('T')[0]);
+      setTempEndDate(range.end.toISOString().split('T')[0]);
     }
   };
 
@@ -869,124 +920,135 @@ export default function Home() {
               <div className="grid grid-cols-6 gap-2 mb-4">
                 <button
                   type="button"
-                  onClick={() => {
-                    const now = new Date();
-                    const start = new Date(now.getTime() - 60 * 60 * 1000);
-                    handleDateRangeSubmit(start, now);
-                  }}
-                  className="px-2 py-2 text-xs bg-white text-black border-2 border-black hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-black"
+                  onClick={() => handlePresetClick('last-hour')}
+                  className={`px-2 py-2 text-xs border-2 border-black transition-colors focus:outline-none focus:ring-2 focus:ring-black ${
+                    selectedPreset === 'last-hour'
+                      ? 'bg-black text-white'
+                      : 'bg-white text-black hover:bg-gray-100'
+                  }`}
                 >
                   Last Hour
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    const now = new Date();
-                    const start = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-                    handleDateRangeSubmit(start, now);
-                  }}
-                  className="px-2 py-2 text-xs bg-white text-black border-2 border-black hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-black"
+                  onClick={() => handlePresetClick('last-24h')}
+                  className={`px-2 py-2 text-xs border-2 border-black transition-colors focus:outline-none focus:ring-2 focus:ring-black ${
+                    selectedPreset === 'last-24h'
+                      ? 'bg-black text-white'
+                      : 'bg-white text-black hover:bg-gray-100'
+                  }`}
                 >
                   Last 24h
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    const now = new Date();
-                    const start = new Date(now.getTime() - 48 * 60 * 60 * 1000);
-                    handleDateRangeSubmit(start, now);
-                  }}
-                  className="px-2 py-2 text-xs bg-white text-black border-2 border-black hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-black"
+                  onClick={() => handlePresetClick('last-48h')}
+                  className={`px-2 py-2 text-xs border-2 border-black transition-colors focus:outline-none focus:ring-2 focus:ring-black ${
+                    selectedPreset === 'last-48h'
+                      ? 'bg-black text-white'
+                      : 'bg-white text-black hover:bg-gray-100'
+                  }`}
                 >
                   Last 48h
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    const now = new Date();
-                    const start = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-                    handleDateRangeSubmit(start, now);
-                  }}
-                  className="px-2 py-2 text-xs bg-white text-black border-2 border-black hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-black"
+                  onClick={() => handlePresetClick('last-week')}
+                  className={`px-2 py-2 text-xs border-2 border-black transition-colors focus:outline-none focus:ring-2 focus:ring-black ${
+                    selectedPreset === 'last-week'
+                      ? 'bg-black text-white'
+                      : 'bg-white text-black hover:bg-gray-100'
+                  }`}
                 >
                   Last Week
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    const now = new Date();
-                    const start = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-                    handleDateRangeSubmit(start, now);
-                  }}
-                  className="px-2 py-2 text-xs bg-white text-black border-2 border-black hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-black"
+                  onClick={() => handlePresetClick('last-month')}
+                  className={`px-2 py-2 text-xs border-2 border-black transition-colors focus:outline-none focus:ring-2 focus:ring-black ${
+                    selectedPreset === 'last-month'
+                      ? 'bg-black text-white'
+                      : 'bg-white text-black hover:bg-gray-100'
+                  }`}
                 >
                   Last Month
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    const now = new Date();
-                    const start = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
-                    handleDateRangeSubmit(start, now);
-                  }}
-                  className="px-2 py-2 text-xs bg-black text-white border-2 border-black hover:bg-white hover:text-black transition-colors focus:outline-none focus:ring-2 focus:ring-black"
+                  onClick={() => handlePresetClick('last-3-days')}
+                  className={`px-2 py-2 text-xs border-2 border-black transition-colors focus:outline-none focus:ring-2 focus:ring-black ${
+                    selectedPreset === 'last-3-days'
+                      ? 'bg-black text-white'
+                      : 'bg-white text-black hover:bg-gray-100'
+                  }`}
                 >
                   Last 3 Days
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    const now = new Date();
-                    const end = new Date(now.getTime() + 60 * 60 * 1000);
-                    handleDateRangeSubmit(now, end);
-                  }}
-                  className="px-2 py-2 text-xs bg-white text-black border-2 border-black hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-black"
+                  onClick={() => handlePresetClick('next-hour')}
+                  className={`px-2 py-2 text-xs border-2 border-black transition-colors focus:outline-none focus:ring-2 focus:ring-black ${
+                    selectedPreset === 'next-hour'
+                      ? 'bg-black text-white'
+                      : 'bg-white text-black hover:bg-gray-100'
+                  }`}
                 >
                   Next Hour
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    const now = new Date();
-                    const end = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-                    handleDateRangeSubmit(now, end);
-                  }}
-                  className="px-2 py-2 text-xs bg-white text-black border-2 border-black hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-black"
+                  onClick={() => handlePresetClick('next-24h')}
+                  className={`px-2 py-2 text-xs border-2 border-black transition-colors focus:outline-none focus:ring-2 focus:ring-black ${
+                    selectedPreset === 'next-24h'
+                      ? 'bg-black text-white'
+                      : 'bg-white text-black hover:bg-gray-100'
+                  }`}
                 >
                   Next 24h
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    const now = new Date();
-                    const end = new Date(now.getTime() + 48 * 60 * 60 * 1000);
-                    handleDateRangeSubmit(now, end);
-                  }}
-                  className="px-2 py-2 text-xs bg-white text-black border-2 border-black hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-black"
+                  onClick={() => handlePresetClick('next-48h')}
+                  className={`px-2 py-2 text-xs border-2 border-black transition-colors focus:outline-none focus:ring-2 focus:ring-black ${
+                    selectedPreset === 'next-48h'
+                      ? 'bg-black text-white'
+                      : 'bg-white text-black hover:bg-gray-100'
+                  }`}
                 >
                   Next 48h
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    const now = new Date();
-                    const end = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-                    handleDateRangeSubmit(now, end);
-                  }}
-                  className="px-2 py-2 text-xs bg-white text-black border-2 border-black hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-black"
+                  onClick={() => handlePresetClick('next-week')}
+                  className={`px-2 py-2 text-xs border-2 border-black transition-colors focus:outline-none focus:ring-2 focus:ring-black ${
+                    selectedPreset === 'next-week'
+                      ? 'bg-black text-white'
+                      : 'bg-white text-black hover:bg-gray-100'
+                  }`}
                 >
                   Next Week
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    const now = new Date();
-                    const end = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
-                    handleDateRangeSubmit(now, end);
-                  }}
-                  className="px-2 py-2 text-xs bg-white text-black border-2 border-black hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-black"
+                  onClick={() => handlePresetClick('next-month')}
+                  className={`px-2 py-2 text-xs border-2 border-black transition-colors focus:outline-none focus:ring-2 focus:ring-black ${
+                    selectedPreset === 'next-month'
+                      ? 'bg-black text-white'
+                      : 'bg-white text-black hover:bg-gray-100'
+                  }`}
                 >
                   Next Month
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedPreset('custom')}
+                  className={`px-2 py-2 text-xs border-2 border-black transition-colors focus:outline-none focus:ring-2 focus:ring-black ${
+                    selectedPreset === 'custom'
+                      ? 'bg-black text-white'
+                      : 'bg-white text-black hover:bg-gray-100'
+                  }`}
+                >
+                  Custom
                 </button>
               </div>
             </div>
@@ -994,11 +1056,8 @@ export default function Home() {
             <form
               onSubmit={(e) => {
                 e.preventDefault();
-                const formData = new FormData(e.currentTarget);
-                const start = formData.get('start') as string;
-                const end = formData.get('end') as string;
-                if (start && end) {
-                  handleDateRangeSubmit(start, end);
+                if (tempStartDate && tempEndDate) {
+                  handleDateRangeSubmit(tempStartDate, tempEndDate);
                 }
               }}
             >
@@ -1011,11 +1070,11 @@ export default function Home() {
                     type="date"
                     id="start-date"
                     name="start"
-                    defaultValue={(() => {
-                      const now = new Date();
-                      const threeDaysAgo = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
-                      return threeDaysAgo.toISOString().split('T')[0];
-                    })()}
+                    value={tempStartDate}
+                    onChange={(e) => {
+                      setTempStartDate(e.target.value);
+                      setSelectedPreset('custom');
+                    }}
                     required
                     className="w-full px-4 py-2 border-2 border-black focus:outline-none focus:ring-2 focus:ring-black"
                   />
@@ -1028,7 +1087,11 @@ export default function Home() {
                     type="date"
                     id="end-date"
                     name="end"
-                    defaultValue={new Date().toISOString().split('T')[0]}
+                    value={tempEndDate}
+                    onChange={(e) => {
+                      setTempEndDate(e.target.value);
+                      setSelectedPreset('custom');
+                    }}
                     required
                     className="w-full px-4 py-2 border-2 border-black focus:outline-none focus:ring-2 focus:ring-black"
                   />
