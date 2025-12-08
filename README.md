@@ -111,7 +111,28 @@ event-every/
 
 ## Getting Started
 
-*Setup instructions will be added during implementation*
+### Quick Start
+
+```bash
+./run.sh
+```
+
+This script handles everything: installs dependencies, pulls environment variables from Vercel, and starts the dev server.
+
+### Manual Setup
+
+```bash
+pnpm i                 # Install dependencies
+vercel link            # Link to Vercel project (first time only)
+vercel env pull        # Pull env variables to .env.local
+pnpm dev               # Start dev server
+```
+
+### Requirements
+
+- Node.js 18+
+- [pnpm](https://pnpm.io/) (`npm install -g pnpm`)
+- [Vercel CLI](https://vercel.com/cli) (`npm install -g vercel`)
 
 ## Contributing
 
