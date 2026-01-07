@@ -1,9 +1,34 @@
-import Anthropic from '@anthropic-ai/sdk';
 import { ParsedEvent, BatchParsedEvents, ClientContext } from '@/types/event';
 
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
+const OPENROUTER_BASE_URL = process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1';
+const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || 'mistralai/pixtral-large-2411';
+
+type ToolDefinition = {
+  type: 'function';
+  function: {
+    name: string;
+    description: string;
+    parameters: Record<string, unknown>;
+  };
+};
+
+type OpenRouterToolCall = {
+  function: {
+    name: string;
+    arguments: string;
+  };
+};
+
+type OpenRouterResponse = {
+  choices: Array<{
+    message: {
+      tool_calls?: OpenRouterToolCall[];
+    };
+  }>;
+  error?: {
+    message?: string;
+  };
+};
 
 function formatClientContext(context?: ClientContext): string {
   if (!context) return '';
@@ -95,13 +120,56 @@ interface ParseEventInput {
   clientContext?: ClientContext;
 }
 
+async function callOpenRouter(
+  content: Array<{ type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } }>,
+  tools: ToolDefinition[],
+  toolName: string
+): Promise<OpenRouterToolCall> {
+  if (!process.env.OPENROUTER_API_KEY) {
+    throw new Error('OPENROUTER_API_KEY environment variable is not set');
+  }
+
+  const response = await fetch(`${OPENROUTER_BASE_URL}/chat/completions`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+      'Content-Type': 'application/json',
+      'X-Title': 'event-every',
+    },
+    body: JSON.stringify({
+      model: OPENROUTER_MODEL,
+      messages: [
+        {
+          role: 'user',
+          content,
+        },
+      ],
+      tools,
+      tool_choice: {
+        type: 'function',
+        function: { name: toolName },
+      },
+    }),
+  });
+
+  const data = (await response.json()) as OpenRouterResponse;
+
+  if (!response.ok) {
+    const errorMessage = data.error?.message || 'OpenRouter API error';
+    throw new Error(errorMessage);
+  }
+
+  const toolCalls = data.choices?.[0]?.message?.tool_calls;
+  if (!toolCalls || toolCalls.length === 0) {
+    throw new Error('No tool calls found in OpenRouter response');
+  }
+
+  return toolCalls[0];
+}
+
 export async function parseEvent(input: ParseEventInput): Promise<ParsedEvent> {
   try {
-    if (!process.env.ANTHROPIC_API_KEY) {
-      throw new Error('ANTHROPIC_API_KEY environment variable is not set');
-    }
-
-    const content: Anthropic.MessageParam['content'] = [];
+    const content: Array<{ type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } }> = [];
 
     if (input.text) {
       content.push({
@@ -112,11 +180,9 @@ export async function parseEvent(input: ParseEventInput): Promise<ParsedEvent> {
 
     if (input.imageBase64 && input.imageMimeType) {
       content.push({
-        type: 'image',
-        source: {
-          type: 'base64',
-          media_type: input.imageMimeType as 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp',
-          data: input.imageBase64,
+        type: 'image_url',
+        image_url: {
+          url: `data:${input.imageMimeType};base64,${input.imageBase64}`,
         },
       });
 
@@ -132,14 +198,13 @@ export async function parseEvent(input: ParseEventInput): Promise<ParsedEvent> {
       throw new Error('No input provided for parsing');
     }
 
-    const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-5-20250929',
-      max_tokens: 1024,
-      tools: [
-        {
+    const tools: ToolDefinition[] = [
+      {
+        type: 'function',
+        function: {
           name: 'extract_event',
           description: 'Extract a single calendar event from text or image',
-          input_schema: {
+          parameters: {
             type: 'object',
             properties: {
               title: { type: 'string', description: 'Event name or summary' },
@@ -155,28 +220,11 @@ export async function parseEvent(input: ParseEventInput): Promise<ParsedEvent> {
             required: ['confidence'],
           },
         },
-      ],
-      tool_choice: { type: 'tool', name: 'extract_event' },
-      messages: [
-        {
-          role: 'user',
-          content,
-        },
-      ],
-    });
+      },
+    ];
 
-    const toolUse = message.content.find(
-      (block): block is Anthropic.ToolUseBlock => block.type === 'tool_use'
-    );
-
-    if (!toolUse) {
-      console.error('[DEBUG] No tool use in response. Content:', JSON.stringify(message.content, null, 2));
-      throw new Error('No tool use found in API response');
-    }
-
-    console.log('[DEBUG] Tool use input:', JSON.stringify(toolUse.input, null, 2));
-
-    const parsed = toolUse.input as ParsedEvent;
+    const toolCall = await callOpenRouter(content, tools, 'extract_event');
+    const parsed = JSON.parse(toolCall.function.arguments) as ParsedEvent;
 
     if (!parsed.title && !parsed.startDate) {
       console.error('[DEBUG] Parsed result has no title or startDate:', JSON.stringify(parsed, null, 2));
@@ -188,10 +236,6 @@ export async function parseEvent(input: ParseEventInput): Promise<ParsedEvent> {
       confidence: parsed.confidence ?? 0.5,
     };
   } catch (error) {
-    if (error instanceof Anthropic.APIError) {
-      throw new Error(`Anthropic API error: ${error.message}`);
-    }
-
     throw error;
   }
 }
@@ -203,11 +247,7 @@ export async function* parseEventsBatch(
   input: ParseEventInput
 ): AsyncGenerator<ParsedEvent[], void, unknown> {
   try {
-    if (!process.env.ANTHROPIC_API_KEY) {
-      throw new Error('ANTHROPIC_API_KEY environment variable is not set');
-    }
-
-    const content: Anthropic.MessageParam['content'] = [];
+    const content: Array<{ type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } }> = [];
 
     if (input.text) {
       content.push({
@@ -218,11 +258,9 @@ export async function* parseEventsBatch(
 
     if (input.imageBase64 && input.imageMimeType) {
       content.push({
-        type: 'image',
-        source: {
-          type: 'base64',
-          media_type: input.imageMimeType as 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp',
-          data: input.imageBase64,
+        type: 'image_url',
+        image_url: {
+          url: `data:${input.imageMimeType};base64,${input.imageBase64}`,
         },
       });
 
@@ -238,14 +276,13 @@ export async function* parseEventsBatch(
       throw new Error('No input provided for parsing');
     }
 
-    const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-5-20250929',
-      max_tokens: 4096,
-      tools: [
-        {
+    const tools: ToolDefinition[] = [
+      {
+        type: 'function',
+        function: {
           name: 'extract_events',
           description: 'Extract multiple calendar events from text or image',
-          input_schema: {
+          parameters: {
             type: 'object',
             properties: {
               events: {
@@ -273,28 +310,11 @@ export async function* parseEventsBatch(
             required: ['events', 'totalCount', 'confidence'],
           },
         },
-      ],
-      tool_choice: { type: 'tool', name: 'extract_events' },
-      messages: [
-        {
-          role: 'user',
-          content,
-        },
-      ],
-    });
+      },
+    ];
 
-    const toolUse = message.content.find(
-      (block): block is Anthropic.ToolUseBlock => block.type === 'tool_use'
-    );
-
-    if (!toolUse) {
-      console.error('[DEBUG] No tool use in response. Content:', JSON.stringify(message.content, null, 2));
-      throw new Error('No tool use found in API response');
-    }
-
-    console.log('[DEBUG] Tool use input:', JSON.stringify(toolUse.input, null, 2));
-
-    const parsed = toolUse.input as BatchParsedEvents;
+    const toolCall = await callOpenRouter(content, tools, 'extract_events');
+    const parsed = JSON.parse(toolCall.function.arguments) as BatchParsedEvents;
 
     if (!parsed.events || parsed.events.length === 0) {
       console.error('[DEBUG] Parsed result has no events:', JSON.stringify(parsed, null, 2));
@@ -317,10 +337,6 @@ export async function* parseEventsBatch(
       yield chunk;
     }
   } catch (error) {
-    if (error instanceof Anthropic.APIError) {
-      throw new Error(`Anthropic API error: ${error.message}`);
-    }
-
     throw error;
   }
 }
