@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import Anthropic from '@anthropic-ai/sdk';
 
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
+const OPENROUTER_BASE_URL = process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1';
+const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || 'mistralai/pixtral-large-2411';
 
 const URL_DETECTION_PROMPT = `You are a URL detection assistant. Analyze the provided text and extract ALL URLs.
 
@@ -13,13 +11,6 @@ IMPORTANT:
 - Return the remaining text with URLs removed
 - Preserve the structure and formatting of non-URL content
 
-Return ONLY valid JSON matching this schema:
-{
-  "urls": ["string"],
-  "remainingText": "string",
-  "hasUrls": boolean
-}
-
 If no URLs are found, return an empty array for urls and set hasUrls to false.`;
 
 interface URLDetectionResult {
@@ -28,10 +19,37 @@ interface URLDetectionResult {
   hasUrls: boolean;
 }
 
+type ToolDefinition = {
+  type: 'function';
+  function: {
+    name: string;
+    description: string;
+    parameters: Record<string, unknown>;
+  };
+};
+
+type OpenRouterToolCall = {
+  function: {
+    name: string;
+    arguments: string;
+  };
+};
+
+interface OpenRouterResponse {
+  choices: Array<{
+    message: {
+      tool_calls?: OpenRouterToolCall[];
+    };
+  }>;
+  error?: {
+    message?: string;
+  };
+}
+
 export async function POST(request: NextRequest) {
   try {
-    if (!process.env.ANTHROPIC_API_KEY) {
-      throw new Error('ANTHROPIC_API_KEY environment variable is not set');
+    if (!process.env.OPENROUTER_API_KEY) {
+      throw new Error('OPENROUTER_API_KEY environment variable is not set');
     }
 
     const body = await request.json();
@@ -44,28 +62,71 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-5-20250929',
-      max_tokens: 2048,
-      messages: [
-        {
-          role: 'user',
-          content: `${URL_DETECTION_PROMPT}\n\nExtract URLs from this text:\n${text}`,
+    const tools: ToolDefinition[] = [
+      {
+        type: 'function',
+        function: {
+          name: 'extract_urls',
+          description: 'Extract URLs from text and return structured result',
+          parameters: {
+            type: 'object',
+            properties: {
+              urls: {
+                type: 'array',
+                items: { type: 'string' },
+                description: 'Array of extracted URLs',
+              },
+              remainingText: {
+                type: 'string',
+                description: 'Text with URLs removed',
+              },
+              hasUrls: {
+                type: 'boolean',
+                description: 'Whether any URLs were found',
+              },
+            },
+            required: ['urls', 'remainingText', 'hasUrls'],
+          },
         },
-      ],
+      },
+    ];
+
+    const response = await fetch(`${OPENROUTER_BASE_URL}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        'Content-Type': 'application/json',
+        'X-Title': 'event-every',
+      },
+      body: JSON.stringify({
+        model: OPENROUTER_MODEL,
+        messages: [
+          {
+            role: 'user',
+            content: `${URL_DETECTION_PROMPT}\n\nExtract URLs from this text:\n${text}`,
+          },
+        ],
+        tools,
+        tool_choice: {
+          type: 'function',
+          function: { name: 'extract_urls' },
+        },
+      }),
     });
 
-    const responseText = message.content
-      .filter((block): block is Anthropic.TextBlock => block.type === 'text')
-      .map((block) => block.text)
-      .join('');
+    const data = (await response.json()) as OpenRouterResponse;
 
-    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      throw new Error('Failed to extract JSON from API response');
+    if (!response.ok) {
+      const errorMessage = data.error?.message || 'OpenRouter API error';
+      throw new Error(errorMessage);
     }
 
-    const result = JSON.parse(jsonMatch[0]) as URLDetectionResult;
+    const toolCalls = data.choices?.[0]?.message?.tool_calls;
+    if (!toolCalls || toolCalls.length === 0) {
+      throw new Error('No tool calls found in OpenRouter response');
+    }
+
+    const result = JSON.parse(toolCalls[0].function.arguments) as URLDetectionResult;
 
     return NextResponse.json(result);
   } catch (error) {

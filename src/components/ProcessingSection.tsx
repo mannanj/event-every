@@ -79,7 +79,7 @@ function RainbowText({ children }: { children: string }) {
           key={index}
           className="inline-block animate-[rainbow_4s_linear_infinite]"
           style={{
-            animationDelay: `${index * 0.1}s`,
+            animationDelay: `${index * 0.033}s`,
           }}
         >
           {char === ' ' ? '\u00A0' : char}

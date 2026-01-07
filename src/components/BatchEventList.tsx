@@ -393,9 +393,9 @@ export default function BatchEventList({
                 ? 'bg-red-500 text-white border-red-500 hover:bg-red-600 hover:border-red-600 focus:ring-red-500'
                 : 'bg-black text-white border-black hover:bg-white hover:text-black focus:ring-black'
             }`}
-            aria-label={selectedCount === 0 ? 'Save none - delete all events' : `Save ${selectedCount} event${selectedCount !== 1 ? 's' : ''}`}
+            aria-label={selectedCount === 0 ? 'Discard all events' : `Save ${selectedCount} event${selectedCount !== 1 ? 's' : ''}`}
           >
-            {selectedCount === 0 ? 'Save none' : `Save (${selectedCount})`}
+            {selectedCount === 0 ? 'Discard all' : `Save (${selectedCount})`}
           </button>
           <div className="text-xs text-center mt-1">
             <p className="text-black">
