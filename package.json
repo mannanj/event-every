@@ -2,10 +2,9 @@
   "name": "event-every",
   "version": "0.1.0",
   "private": true,
-  "packageManager": "pnpm@9.15.0",
   "scripts": {
-    "i": "pnpm install",
-    "dev": "next dev",
+    "i": "bun install",
+    "dev": "next dev -p 3001",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
