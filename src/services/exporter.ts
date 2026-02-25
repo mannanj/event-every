@@ -55,6 +55,12 @@ function addTimezoneToICSAtIndex(icsContent: string, timezone: string, eventInde
   return modifiedLines.join('\n');
 }
 
+function normalizeUrl(url?: string): string | undefined {
+  if (!url) return undefined;
+  if (/^https?:\/\//i.test(url)) return url;
+  return `https://${url}`;
+}
+
 function addAttachmentsToICS(icsContent: string, attachments?: EventAttachment[]): string {
   if (!attachments || attachments.length === 0) {
     return icsContent;
@@ -87,7 +93,7 @@ export function exportToICS(event: CalendarEvent): ExportResult {
       title: event.title,
       description: event.description,
       location: event.location,
-      url: event.url,
+      url: normalizeUrl(event.url),
       status: 'CONFIRMED',
       busyStatus: 'BUSY',
       productId: 'event-every/ics',
@@ -227,7 +233,7 @@ export function exportMultipleToICS(events: CalendarEvent[], filename?: string):
       title: event.title,
       description: event.description,
       location: event.location,
-      url: event.url,
+      url: normalizeUrl(event.url),
       status: 'CONFIRMED',
       busyStatus: 'BUSY',
       productId: 'event-every/ics',
