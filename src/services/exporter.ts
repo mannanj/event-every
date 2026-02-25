@@ -61,6 +61,10 @@ function normalizeUrl(url?: string): string | undefined {
   return `https://${url}`;
 }
 
+function formatAttachmentLine(attachment: EventAttachment): string {
+  return `ATTACH;VALUE=BINARY;ENCODING=BASE64;FMTTYPE=${attachment.mimeType};X-FILENAME=${attachment.filename}:${attachment.data}`;
+}
+
 function addAttachmentsToICS(icsContent: string, attachments?: EventAttachment[]): string {
   if (!attachments || attachments.length === 0) {
     return icsContent;
@@ -70,14 +74,39 @@ function addAttachmentsToICS(icsContent: string, attachments?: EventAttachment[]
   const modifiedLines: string[] = [];
 
   for (let i = 0; i < lines.length; i++) {
-    modifiedLines.push(lines[i]);
-
     if (lines[i].trim() === 'END:VEVENT') {
       attachments.forEach(attachment => {
-        const dataUri = `data:${attachment.mimeType};base64,${attachment.data}`;
-        modifiedLines.push(`ATTACH;FILENAME=${attachment.filename}:${dataUri}`);
+        modifiedLines.push(formatAttachmentLine(attachment));
       });
     }
+    modifiedLines.push(lines[i]);
+  }
+
+  return modifiedLines.join('\n');
+}
+
+function addAttachmentsToICSAtIndex(icsContent: string, attachments: EventAttachment[], eventIndex: number): string {
+  if (!attachments || attachments.length === 0) {
+    return icsContent;
+  }
+
+  const lines = icsContent.split('\n');
+  const modifiedLines: string[] = [];
+  let currentEventIndex = -1;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    if (line.trim() === 'BEGIN:VEVENT') {
+      currentEventIndex++;
+    }
+
+    if (currentEventIndex === eventIndex && line.trim() === 'END:VEVENT') {
+      attachments.forEach(attachment => {
+        modifiedLines.push(formatAttachmentLine(attachment));
+      });
+    }
+    modifiedLines.push(line);
   }
 
   return modifiedLines.join('\n');
@@ -262,7 +291,7 @@ export function exportMultipleToICS(events: CalendarEvent[], filename?: string):
       }
 
       if (event.attachments && event.attachments.length > 0) {
-        icsContent = addAttachmentsToICS(icsContent, event.attachments);
+        icsContent = addAttachmentsToICSAtIndex(icsContent, event.attachments, index);
       }
     });
 
