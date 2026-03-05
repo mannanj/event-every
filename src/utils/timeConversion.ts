@@ -90,9 +90,19 @@ export function formatTimeInTimezone(date: Date, timezone: string): string {
   }
 }
 
+// Normalize US timezone abbreviations: EDT/EST→ET, CDT/CST→CT, MDT/MST→MT, PDT/PST→PT, etc.
+const US_TZ_NORMALIZE: Record<string, string> = {
+  'EDT': 'ET', 'EST': 'ET',
+  'CDT': 'CT', 'CST': 'CT',
+  'MDT': 'MT', 'MST': 'MT',
+  'PDT': 'PT', 'PST': 'PT',
+  'AKDT': 'AKT', 'AKST': 'AKT',
+  'HDT': 'HT', 'HST': 'HT',
+};
+
 /**
  * Get the short timezone abbreviation for a timezone at a given date.
- * Returns e.g. "ET", "UTC", "PST"
+ * US timezones are normalized to ET/CT/MT/PT (no daylight/standard distinction).
  */
 export function getTimezoneAbbreviation(date: Date, timezone: string): string {
   try {
@@ -100,7 +110,8 @@ export function getTimezoneAbbreviation(date: Date, timezone: string): string {
       timeZone: timezone,
       timeZoneName: 'short',
     }).formatToParts(date);
-    return parts.find(p => p.type === 'timeZoneName')?.value || timezone;
+    const raw = parts.find(p => p.type === 'timeZoneName')?.value || timezone;
+    return US_TZ_NORMALIZE[raw] || raw;
   } catch {
     return timezone;
   }

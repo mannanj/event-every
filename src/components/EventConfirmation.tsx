@@ -22,9 +22,8 @@ export default function EventConfirmation({ event, onEdit, onExport }: EventConf
     }).format(date);
   };
 
-  const tzAbbr = event.timezone
-    ? getTimezoneAbbreviation(event.startDate, event.timezone)
-    : getTimezoneAbbreviation(event.startDate, getBrowserTimezone());
+  // Always show browser timezone since times are displayed in local time
+  const tzAbbr = getTimezoneAbbreviation(event.startDate, getBrowserTimezone());
 
   const formatTime = (date: Date) => {
     const time = new Intl.DateTimeFormat('en-US', {

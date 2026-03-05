@@ -313,7 +313,7 @@ export default function BatchEventList({
                         )}
                         {!event.allDay && (
                           <span className="text-gray-400 ml-0.5">
-                            {getTimezoneAbbreviation(event.startDate, event.timezone || getBrowserTimezone())}
+                            {getTimezoneAbbreviation(event.startDate, getBrowserTimezone())}
                             {event.timezoneStatus === 'resolving' && (
                               <span className="inline-block ml-0.5 w-2.5 h-2.5 border border-gray-300 border-t-gray-600 rounded-full animate-spin align-middle" />
                             )}

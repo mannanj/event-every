@@ -177,9 +177,8 @@ export default function InlineEventEditor({
     }
   };
 
-  const tzAbbr = event.timezone
-    ? getTimezoneAbbreviation(event.startDate, event.timezone)
-    : getTimezoneAbbreviation(event.startDate, getBrowserTimezone());
+  // Always show browser timezone abbreviation since times are displayed in local time
+  const tzAbbr = getTimezoneAbbreviation(event.startDate, getBrowserTimezone());
 
   const isResolving = event.timezoneStatus === 'resolving';
 
@@ -320,10 +319,10 @@ export default function InlineEventEditor({
         {!event.allDay && <span className="text-gray-500 ml-1">{tzAbbr}</span>}
       </div>
 
-      {/* Timezone dropdown */}
+      {/* Source timezone dropdown — changing this reinterprets raw times */}
       {!event.allDay && (
         <div className="text-gray-700 leading-relaxed">
-          <span className="font-semibold">Timezone:</span>{' '}
+          <span className="font-semibold">Source TZ:</span>{' '}
           <select
             value={event.timezone || getBrowserTimezone()}
             onChange={(e) => handleTimezoneChange(e.target.value)}
@@ -335,6 +334,7 @@ export default function InlineEventEditor({
               </option>
             ))}
           </select>
+          <span className="text-xs text-gray-400 ml-1">original event timezone</span>
         </div>
       )}
 
