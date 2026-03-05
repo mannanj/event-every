@@ -314,7 +314,7 @@ export default function BatchEventList({
                       </div>
 
                       {/* Date, Time, Location - always visible on one line, editable */}
-                      <p className="text-sm text-gray-600 truncate overflow-hidden px-1">
+                      <p className="text-sm text-gray-600 px-1 overflow-visible">
                         {editingField?.eventId === event.id && editingField.field === 'startDate' ? (
                           <input
                             type="date"
@@ -423,7 +423,7 @@ export default function BatchEventList({
                                   </svg>
                                 </button>
                                 {(showTzInfo === event.id || tzInfoHover === event.id) && (
-                                  <span className="absolute left-0 top-4 z-10 bg-black text-white text-xs rounded px-2 py-1.5 whitespace-nowrap shadow-lg flex flex-col gap-0.5">
+                                  <span className="absolute left-0 bottom-full mb-1 z-50 bg-black text-white text-xs rounded px-2 py-1.5 whitespace-nowrap shadow-lg flex flex-col gap-0.5">
                                     {getTzInfoLines(event).map((line, i) => (
                                       <span key={i}>{line}</span>
                                     ))}
@@ -507,6 +507,7 @@ export default function BatchEventList({
                     }}
                     showAttachments={true}
                     hideTitle={true}
+                    hideTimezoneInfo={true}
                     tzSuggestion={tzSuggestions?.[event.id]}
                     onTzSuggestionApply={onTzSuggestionApply ? (tz) => onTzSuggestionApply(event.id, tz) : undefined}
                     onTzSuggestionDismiss={onTzSuggestionDismiss ? () => onTzSuggestionDismiss(event.id) : undefined}

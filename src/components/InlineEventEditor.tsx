@@ -37,6 +37,7 @@ interface InlineEventEditorProps {
   onTzSuggestionApply?: (timezone: string) => void;
   onTzSuggestionDismiss?: () => void;
   onTimezoneUserChange?: () => void;
+  hideTimezoneInfo?: boolean;
 }
 
 function formatDateForInput(date: Date): string {
@@ -71,6 +72,7 @@ export default function InlineEventEditor({
   onTzSuggestionApply,
   onTzSuggestionDismiss,
   onTimezoneUserChange,
+  hideTimezoneInfo = false,
 }: InlineEventEditorProps) {
   const [editingField, setEditingField] = useState<string | null>(null);
   const [showTzInfo, setShowTzInfo] = useState(false);
@@ -290,7 +292,7 @@ export default function InlineEventEditor({
         {!event.allDay && isResolving && (
           <span className="inline-block ml-1 w-3 h-3 border border-gray-400 border-t-black rounded-full animate-spin align-middle" />
         )}
-        {!event.allDay && !isResolving && (
+        {!event.allDay && !isResolving && !hideTimezoneInfo && (
           <span
             className="relative inline-block ml-1 align-middle"
             onMouseEnter={() => setTzInfoHover(true)}
