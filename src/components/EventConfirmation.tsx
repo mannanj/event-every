@@ -2,6 +2,8 @@
 
 import { CalendarEvent } from '@/types/event';
 import { downloadAttachment } from '@/utils/downloadAttachment';
+import { getTimezoneAbbreviation } from '@/utils/timeConversion';
+import { getBrowserTimezone } from '@/utils/timezone';
 import URLPill from './URLPill';
 
 interface EventConfirmationProps {
@@ -20,12 +22,17 @@ export default function EventConfirmation({ event, onEdit, onExport }: EventConf
     }).format(date);
   };
 
+  const tzAbbr = event.timezone
+    ? getTimezoneAbbreviation(event.startDate, event.timezone)
+    : getTimezoneAbbreviation(event.startDate, getBrowserTimezone());
+
   const formatTime = (date: Date) => {
-    return new Intl.DateTimeFormat('en-US', {
+    const time = new Intl.DateTimeFormat('en-US', {
       hour: 'numeric',
       minute: '2-digit',
       hour12: true,
     }).format(date);
+    return event.allDay ? time : `${time} ${tzAbbr}`;
   };
 
   return (

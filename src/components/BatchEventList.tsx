@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import { CalendarEvent } from '@/types/event';
 import { exportToICS, exportMultipleToICS } from '@/services/exporter';
+import { getTimezoneAbbreviation } from '@/utils/timeConversion';
+import { getBrowserTimezone } from '@/utils/timezone';
 import InlineEventEditor from './InlineEventEditor';
 import EditableField from './EditableField';
 
@@ -23,6 +25,10 @@ interface BatchEventListProps {
   onCancel: () => void;
   onExportComplete: (events: CalendarEvent[]) => void;
   showHeader?: boolean;
+  tzSuggestions?: Record<string, { timezone: string; confidence: number }>;
+  onTzSuggestionApply?: (eventId: string, timezone: string) => void;
+  onTzSuggestionDismiss?: (eventId: string) => void;
+  onTimezoneUserChange?: (eventId: string) => void;
 }
 
 function formatDateForInput(date: Date): string {
@@ -49,6 +55,10 @@ export default function BatchEventList({
   onCancel,
   onExportComplete,
   showHeader = true,
+  tzSuggestions,
+  onTzSuggestionApply,
+  onTzSuggestionDismiss,
+  onTimezoneUserChange,
 }: BatchEventListProps) {
   const [expandedEventIds, setExpandedEventIds] = useState<Set<string>>(new Set());
   const [selectedEventIds, setSelectedEventIds] = useState<Set<string>>(new Set());
@@ -301,6 +311,14 @@ export default function BatchEventList({
                             }).format(event.startDate)}
                           </span>
                         )}
+                        {!event.allDay && (
+                          <span className="text-gray-400 ml-0.5">
+                            {getTimezoneAbbreviation(event.startDate, event.timezone || getBrowserTimezone())}
+                            {event.timezoneStatus === 'resolving' && (
+                              <span className="inline-block ml-0.5 w-2.5 h-2.5 border border-gray-300 border-t-gray-600 rounded-full animate-spin align-middle" />
+                            )}
+                          </span>
+                        )}
                         {event.location && (
                           <>
                             {' '}•{' '}
@@ -375,6 +393,10 @@ export default function BatchEventList({
                     }}
                     showAttachments={true}
                     hideTitle={true}
+                    tzSuggestion={tzSuggestions?.[event.id]}
+                    onTzSuggestionApply={onTzSuggestionApply ? (tz) => onTzSuggestionApply(event.id, tz) : undefined}
+                    onTzSuggestionDismiss={onTzSuggestionDismiss ? () => onTzSuggestionDismiss(event.id) : undefined}
+                    onTimezoneUserChange={onTimezoneUserChange ? () => onTimezoneUserChange(event.id) : undefined}
                   />
                 </div>
               )}

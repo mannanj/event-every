@@ -3,13 +3,40 @@
 import { useState, useEffect, useRef } from 'react';
 import { CalendarEvent } from '@/types/event';
 import { downloadAttachment } from '@/utils/downloadAttachment';
+import { getTimezoneAbbreviation } from '@/utils/timeConversion';
+import { convertRawToDate } from '@/utils/timeConversion';
+import { getBrowserTimezone } from '@/utils/timezone';
 import URLPill from './URLPill';
+
+const COMMON_TIMEZONES = [
+  'America/New_York',
+  'America/Chicago',
+  'America/Denver',
+  'America/Los_Angeles',
+  'America/Anchorage',
+  'Pacific/Honolulu',
+  'UTC',
+  'Europe/London',
+  'Europe/Paris',
+  'Europe/Berlin',
+  'Europe/Athens',
+  'Asia/Kolkata',
+  'Asia/Tokyo',
+  'Asia/Seoul',
+  'Asia/Shanghai',
+  'Australia/Sydney',
+  'Pacific/Auckland',
+];
 
 interface InlineEventEditorProps {
   event: CalendarEvent;
   onChange: (updatedEvent: CalendarEvent) => void;
   showAttachments?: boolean;
   hideTitle?: boolean;
+  tzSuggestion?: { timezone: string; confidence: number };
+  onTzSuggestionApply?: (timezone: string) => void;
+  onTzSuggestionDismiss?: () => void;
+  onTimezoneUserChange?: () => void;
 }
 
 function formatDateForInput(date: Date): string {
@@ -40,6 +67,10 @@ export default function InlineEventEditor({
   onChange,
   showAttachments = true,
   hideTitle = false,
+  tzSuggestion,
+  onTzSuggestionApply,
+  onTzSuggestionDismiss,
+  onTimezoneUserChange,
 }: InlineEventEditorProps) {
   const [editingField, setEditingField] = useState<string | null>(null);
   const [formData, setFormData] = useState({
@@ -93,6 +124,14 @@ export default function InlineEventEditor({
     }
   }, [editingField]);
 
+  // Auto-dismiss TZ suggestion after 15s
+  useEffect(() => {
+    if (tzSuggestion && onTzSuggestionDismiss) {
+      const timer = setTimeout(onTzSuggestionDismiss, 15000);
+      return () => clearTimeout(timer);
+    }
+  }, [tzSuggestion, onTzSuggestionDismiss]);
+
   const handleFieldChange = (field: string, value: string) => {
     const updatedFormData = { ...formData, [field]: value };
     setFormData(updatedFormData);
@@ -112,6 +151,37 @@ export default function InlineEventEditor({
       onChange(updatedEvent);
     }
   };
+
+  const handleTimezoneChange = (newTimezone: string) => {
+    onTimezoneUserChange?.();
+
+    // Recalculate displayed times from raw dates in new timezone
+    if (event.rawStartDate && event.rawEndDate && !event.allDay) {
+      const newStart = convertRawToDate(event.rawStartDate, newTimezone);
+      const newEnd = convertRawToDate(event.rawEndDate, newTimezone);
+      onChange({
+        ...event,
+        timezone: newTimezone,
+        startDate: newStart,
+        endDate: newEnd,
+        timezoneSource: 'user',
+        timezoneStatus: 'resolved',
+      });
+    } else {
+      onChange({
+        ...event,
+        timezone: newTimezone,
+        timezoneSource: 'user',
+        timezoneStatus: 'resolved',
+      });
+    }
+  };
+
+  const tzAbbr = event.timezone
+    ? getTimezoneAbbreviation(event.startDate, event.timezone)
+    : getTimezoneAbbreviation(event.startDate, getBrowserTimezone());
+
+  const isResolving = event.timezoneStatus === 'resolving';
 
   return (
     <div className="space-y-2 text-sm">
@@ -137,7 +207,7 @@ export default function InlineEventEditor({
         </div>
       )}
 
-      <div className="text-gray-700 leading-relaxed">
+      <div className="text-gray-700 leading-relaxed relative">
         <span className="font-semibold">Start:</span>{' '}
         {editingField === 'startDate' ? (
           <input
@@ -174,6 +244,36 @@ export default function InlineEventEditor({
             className="cursor-pointer hover:bg-gray-200 px-1 rounded"
           >
             {formatDateDisplay(event.startDate).split(' at ')[1]}
+          </span>
+        )}
+        {!event.allDay && (
+          <span className="text-gray-500 ml-1">
+            {tzAbbr}
+            {isResolving && (
+              <span className="inline-block ml-1 w-3 h-3 border border-gray-400 border-t-black rounded-full animate-spin align-middle" />
+            )}
+          </span>
+        )}
+
+        {/* TZ suggestion pill */}
+        {tzSuggestion && onTzSuggestionApply && (
+          <span className="ml-2 inline-flex items-center gap-1 bg-blue-50 border border-blue-200 text-blue-700 text-xs px-2 py-0.5 rounded-full">
+            AI: {tzSuggestion.timezone.split('/').pop()?.replace('_', ' ')}
+            <button
+              onClick={() => onTzSuggestionApply(tzSuggestion.timezone)}
+              className="underline hover:no-underline font-medium"
+            >
+              Apply
+            </button>
+            {onTzSuggestionDismiss && (
+              <button
+                onClick={onTzSuggestionDismiss}
+                className="text-blue-400 hover:text-blue-600 ml-0.5"
+                aria-label="Dismiss suggestion"
+              >
+                x
+              </button>
+            )}
           </span>
         )}
       </div>
@@ -217,7 +317,26 @@ export default function InlineEventEditor({
             {formatDateDisplay(event.endDate).split(' at ')[1]}
           </span>
         )}
+        {!event.allDay && <span className="text-gray-500 ml-1">{tzAbbr}</span>}
       </div>
+
+      {/* Timezone dropdown */}
+      {!event.allDay && (
+        <div className="text-gray-700 leading-relaxed">
+          <span className="font-semibold">Timezone:</span>{' '}
+          <select
+            value={event.timezone || getBrowserTimezone()}
+            onChange={(e) => handleTimezoneChange(e.target.value)}
+            className="border border-black px-1 py-0 text-sm focus:outline-none focus:ring-1 focus:ring-black bg-white"
+          >
+            {COMMON_TIMEZONES.map(tz => (
+              <option key={tz} value={tz}>
+                {tz.replace('_', ' ')} ({getTimezoneAbbreviation(event.startDate, tz)})
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {(event.location || editingField === 'location') && (
         <div className="text-gray-700 leading-relaxed">

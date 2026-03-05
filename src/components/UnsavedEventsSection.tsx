@@ -29,6 +29,10 @@ interface UnsavedEventsSectionProps {
   onExport: (event: CalendarEvent) => void;
   onCancelAll: () => void;
   onExportComplete: (events: CalendarEvent[]) => void;
+  tzSuggestions?: Record<string, { timezone: string; confidence: number }>;
+  onTzSuggestionApply?: (eventId: string, timezone: string) => void;
+  onTzSuggestionDismiss?: (eventId: string) => void;
+  onTimezoneUserChange?: (eventId: string) => void;
 }
 
 const FUN_MESSAGES = [
@@ -116,6 +120,10 @@ export default function UnsavedEventsSection({
   onExport,
   onCancelAll,
   onExportComplete,
+  tzSuggestions,
+  onTzSuggestionApply,
+  onTzSuggestionDismiss,
+  onTimezoneUserChange,
 }: UnsavedEventsSectionProps) {
   const [currentMessageIndex, setCurrentMessageIndex] = useState(0);
 
@@ -183,6 +191,10 @@ export default function UnsavedEventsSection({
             onCancel={onCancelAll}
             onExportComplete={onExportComplete}
             showHeader={false}
+            tzSuggestions={tzSuggestions}
+            onTzSuggestionApply={onTzSuggestionApply}
+            onTzSuggestionDismiss={onTzSuggestionDismiss}
+            onTimezoneUserChange={onTimezoneUserChange}
           />
         )}
       </div>

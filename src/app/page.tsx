@@ -6,7 +6,7 @@ import UnsavedEventsSection from '@/components/UnsavedEventsSection';
 import ErrorNotification from '@/components/ErrorNotification';
 import RateLimitBanner from '@/components/RateLimitBanner';
 import InlineEventEditor from '@/components/InlineEventEditor';
-import { CalendarEvent, ParsedEvent, StreamedEventChunk, EventAttachment, EventSortOption } from '@/types/event';
+import { CalendarEvent, ParsedEvent, StreamedEventChunk, EventAttachment, EventSortOption, TimezoneStatus } from '@/types/event';
 import { exportToICS } from '@/services/exporter';
 import { useHistory } from '@/hooks/useHistory';
 import { useProcessingQueue } from '@/hooks/useProcessingQueue';
@@ -17,6 +17,9 @@ import { eventStorage } from '@/services/storage';
 import { parseICSFile } from '@/services/icsParser';
 import { getClientContext } from '@/utils/clientContext';
 import { exportAllEvents } from '@/services/exportAll';
+import { resolveTimezone } from '@/services/timezoneResolver';
+import { convertRawToDate } from '@/utils/timeConversion';
+import { getBrowserTimezone } from '@/utils/timezone';
 
 interface ProcessingEvent {
   id: string;
@@ -129,15 +132,38 @@ export default function Home() {
     attachments?: EventAttachment[]
   ): CalendarEvent => {
     const now = new Date();
+    const browserTZ = getBrowserTimezone();
 
-    const parseDate = (dateString: string | undefined, fallback: Date): Date => {
-      if (!dateString) return fallback;
-      const date = new Date(dateString);
-      return isNaN(date.getTime()) ? fallback : date;
-    };
+    const rawStart = parsed.startDate;
+    const rawEnd = parsed.endDate;
+    const rawTz = parsed.timezone || undefined;
 
-    const startDate = parseDate(parsed.startDate, now);
-    const endDate = parseDate(parsed.endDate, new Date(startDate.getTime() + 60 * 60 * 1000));
+    const tzResolution = resolveTimezone(rawTz, browserTZ);
+
+    let startDate: Date;
+    let endDate: Date;
+
+    if (parsed.allDay) {
+      // All-day events: parse as local date, no timezone conversion
+      startDate = rawStart ? new Date(rawStart + 'T00:00:00') : now;
+      const defaultEnd = new Date(startDate.getTime() + 24 * 60 * 60 * 1000);
+      endDate = rawEnd ? new Date(rawEnd + 'T00:00:00') : defaultEnd;
+    } else {
+      // Timed events: convert from source timezone to correct UTC moment
+      if (rawStart) {
+        startDate = convertRawToDate(rawStart, tzResolution.timezone);
+      } else {
+        startDate = now;
+      }
+      if (rawEnd) {
+        endDate = convertRawToDate(rawEnd, tzResolution.timezone);
+      } else {
+        endDate = new Date(startDate.getTime() + 60 * 60 * 1000);
+      }
+    }
+
+    if (isNaN(startDate.getTime())) startDate = now;
+    if (isNaN(endDate.getTime())) endDate = new Date(startDate.getTime() + 60 * 60 * 1000);
 
     return {
       id: `event-${Date.now()}-${Math.random().toString(36).substring(7)}`,
@@ -148,11 +174,95 @@ export default function Home() {
       description: parsed.description,
       url: parsed.url,
       allDay: parsed.allDay ?? false,
+      timezone: tzResolution.timezone,
+      rawStartDate: rawStart,
+      rawEndDate: rawEnd,
+      rawTimezone: rawTz,
+      timezoneStatus: tzResolution.status,
+      timezoneSource: tzResolution.source === 'unknown' ? undefined : tzResolution.source,
       created: now,
       source,
       originalInput,
       attachments,
     };
+  };
+
+  const [userTouchedTimezones, setUserTouchedTimezones] = useState<Set<string>>(new Set());
+  const [tzSuggestions, setTzSuggestions] = useState<Record<string, { timezone: string; confidence: number }>>({});
+
+  const resolveTimezoneAsync = async (events: CalendarEvent[]) => {
+    const unknownEvents = events.filter(
+      e => e.timezoneStatus === 'unknown' && e.rawTimezone && !e.allDay
+    );
+    if (unknownEvents.length === 0) return;
+
+    // Mark as resolving
+    const ids = new Set(unknownEvents.map(e => e.id));
+    setUnsavedEvents(prev =>
+      prev.map(e => ids.has(e.id) ? { ...e, timezoneStatus: 'resolving' as TimezoneStatus } : e)
+    );
+    setBatchProcessing(prev => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        events: prev.events.map(e => ids.has(e.id) ? { ...e, timezoneStatus: 'resolving' as TimezoneStatus } : e),
+      };
+    });
+
+    for (const event of unknownEvents) {
+      try {
+        const res = await fetch('/api/resolve-timezone', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            rawTimezone: event.rawTimezone,
+            rawStartDate: event.rawStartDate,
+            rawEndDate: event.rawEndDate,
+            eventTitle: event.title,
+            eventLocation: event.location,
+          }),
+        });
+
+        if (!res.ok) continue;
+
+        const { timezone, confidence } = await res.json();
+        if (confidence <= 0.8) continue;
+
+        const touched = userTouchedTimezones.has(event.id);
+
+        if (touched) {
+          setTzSuggestions(prev => ({ ...prev, [event.id]: { timezone, confidence } }));
+          // Still mark as resolved since we have an answer
+          const updateStatus = (e: CalendarEvent) =>
+            e.id === event.id ? { ...e, timezoneStatus: 'resolved' as TimezoneStatus } : e;
+          setUnsavedEvents(prev => prev.map(updateStatus));
+          setBatchProcessing(prev => prev ? { ...prev, events: prev.events.map(updateStatus) } : prev);
+        } else {
+          // Auto-apply
+          const applyTz = (e: CalendarEvent): CalendarEvent => {
+            if (e.id !== event.id) return e;
+            const newStart = e.rawStartDate ? convertRawToDate(e.rawStartDate, timezone) : e.startDate;
+            const newEnd = e.rawEndDate ? convertRawToDate(e.rawEndDate, timezone) : e.endDate;
+            return {
+              ...e,
+              timezone,
+              startDate: newStart,
+              endDate: newEnd,
+              timezoneStatus: 'resolved',
+              timezoneSource: 'llm',
+            };
+          };
+          setUnsavedEvents(prev => prev.map(applyTz));
+          setBatchProcessing(prev => prev ? { ...prev, events: prev.events.map(applyTz) } : prev);
+        }
+      } catch {
+        // Failed to resolve — keep as unknown with browser TZ
+        const markResolved = (e: CalendarEvent) =>
+          e.id === event.id ? { ...e, timezoneStatus: 'resolved' as TimezoneStatus } : e;
+        setUnsavedEvents(prev => prev.map(markResolved));
+        setBatchProcessing(prev => prev ? { ...prev, events: prev.events.map(markResolved) } : prev);
+      }
+    }
   };
 
   const handleBatchStream = async (
@@ -211,7 +321,12 @@ export default function Home() {
             const chunk = data as StreamedEventChunk;
 
             if (chunk.isComplete) {
-              setBatchProcessing(prev => prev ? { ...prev, isProcessing: false } : null);
+              setBatchProcessing(prev => {
+                if (!prev) return null;
+                // Fire async TZ resolution for all collected batch events
+                resolveTimezoneAsync(prev.events);
+                return { ...prev, isProcessing: false };
+              });
               break;
             }
 
@@ -394,6 +509,9 @@ export default function Home() {
 
         setBatchProcessing(prev => prev ? { ...prev, isProcessing: false } : null);
 
+        // Fire async timezone resolution for events with unknown TZ
+        resolveTimezoneAsync(allEvents);
+
         setTimeout(() => {
           setImageProcessingStatuses([]);
         }, 10000);
@@ -550,6 +668,9 @@ export default function Home() {
             phase: 'complete',
             message: 'Complete',
           });
+
+          // Fire async timezone resolution for events with unknown TZ
+          resolveTimezoneAsync(allEvents);
 
           setTimeout(() => {
             setUrlProcessingStatus(null);
@@ -842,6 +963,31 @@ export default function Home() {
             events.forEach(event => addEvent(event));
             setUnsavedEvents([]);
             setTotalEventsInStorage(prev => prev + events.length);
+          }}
+          tzSuggestions={tzSuggestions}
+          onTzSuggestionApply={(eventId, timezone) => {
+            setTzSuggestions(prev => {
+              const next = { ...prev };
+              delete next[eventId];
+              return next;
+            });
+            // Apply TZ to the event
+            setUnsavedEvents(prev => prev.map(e => {
+              if (e.id !== eventId) return e;
+              const newStart = e.rawStartDate ? convertRawToDate(e.rawStartDate, timezone) : e.startDate;
+              const newEnd = e.rawEndDate ? convertRawToDate(e.rawEndDate, timezone) : e.endDate;
+              return { ...e, timezone, startDate: newStart, endDate: newEnd, timezoneSource: 'llm', timezoneStatus: 'resolved' };
+            }));
+          }}
+          onTzSuggestionDismiss={(eventId) => {
+            setTzSuggestions(prev => {
+              const next = { ...prev };
+              delete next[eventId];
+              return next;
+            });
+          }}
+          onTimezoneUserChange={(eventId) => {
+            setUserTouchedTimezones(prev => new Set([...prev, eventId]));
           }}
         />
 

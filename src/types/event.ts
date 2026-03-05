@@ -7,6 +7,9 @@ export interface EventAttachment {
   size: number;
 }
 
+export type TimezoneStatus = 'resolved' | 'resolving' | 'unknown';
+export type TimezoneSource = 'extracted' | 'programmatic' | 'llm' | 'user';
+
 export interface CalendarEvent {
   id: string;
   title: string;
@@ -17,6 +20,11 @@ export interface CalendarEvent {
   url?: string;
   allDay: boolean;
   timezone?: string;
+  rawStartDate?: string;
+  rawEndDate?: string;
+  rawTimezone?: string;
+  timezoneStatus?: TimezoneStatus;
+  timezoneSource?: TimezoneSource;
   created: Date;
   source: 'image' | 'text' | 'url';
   originalInput?: string;

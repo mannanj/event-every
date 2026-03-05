@@ -1,6 +1,5 @@
 import { createEvent, createEvents, EventAttributes } from 'ics';
 import { CalendarEvent, EventAttachment } from '@/types/event';
-import { normalizeTimezone } from '@/utils/timezone';
 
 export interface ExportResult {
   success: boolean;
@@ -10,49 +9,6 @@ export interface ExportResult {
 export interface ValidationResult {
   isValid: boolean;
   errors: string[];
-}
-
-function addTimezoneToICS(icsContent: string, timezone: string): string {
-  const lines = icsContent.split('\n');
-  const modifiedLines: string[] = [];
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-
-    if (line.startsWith('DTSTART:') || line.startsWith('DTEND:')) {
-      const dateValue = line.split(':')[1];
-      const property = line.split(':')[0];
-      modifiedLines.push(`${property};TZID=${timezone}:${dateValue}`);
-    } else {
-      modifiedLines.push(line);
-    }
-  }
-
-  return modifiedLines.join('\n');
-}
-
-function addTimezoneToICSAtIndex(icsContent: string, timezone: string, eventIndex: number): string {
-  const lines = icsContent.split('\n');
-  const modifiedLines: string[] = [];
-  let currentEventIndex = -1;
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-
-    if (line.trim() === 'BEGIN:VEVENT') {
-      currentEventIndex++;
-    }
-
-    if (currentEventIndex === eventIndex && (line.startsWith('DTSTART:') || line.startsWith('DTEND:'))) {
-      const dateValue = line.split(':')[1];
-      const property = line.split(':')[0];
-      modifiedLines.push(`${property};TZID=${timezone}:${dateValue}`);
-    } else {
-      modifiedLines.push(line);
-    }
-  }
-
-  return modifiedLines.join('\n');
 }
 
 function normalizeUrl(url?: string): string | undefined {
@@ -114,8 +70,6 @@ function addAttachmentsToICSAtIndex(icsContent: string, attachments: EventAttach
 
 export function exportToICS(event: CalendarEvent): ExportResult {
   try {
-    const timezone = normalizeTimezone(event.timezone);
-
     const eventAttributes: EventAttributes = {
       start: dateToArray(event.startDate, event.allDay),
       end: dateToArray(event.endDate, event.allDay),
@@ -142,11 +96,7 @@ export function exportToICS(event: CalendarEvent): ExportResult {
       return { success: false, error: 'No calendar data generated' };
     }
 
-    let icsContent = value;
-    if (!event.allDay) {
-      icsContent = addTimezoneToICS(value, timezone);
-    }
-    icsContent = addAttachmentsToICS(icsContent, event.attachments);
+    const icsContent = addAttachmentsToICS(value, event.attachments);
     downloadICS(icsContent, event.title);
     return { success: true };
   } catch (err) {
@@ -165,12 +115,13 @@ function dateToArray(date: Date, allDay: boolean = false): [number, number, numb
       date.getDate(),
     ];
   }
+  // Use UTC components — Date objects now represent correct UTC moments
   return [
-    date.getFullYear(),
-    date.getMonth() + 1,
-    date.getDate(),
-    date.getHours(),
-    date.getMinutes(),
+    date.getUTCFullYear(),
+    date.getUTCMonth() + 1,
+    date.getUTCDate(),
+    date.getUTCHours(),
+    date.getUTCMinutes(),
   ];
 }
 
@@ -285,11 +236,6 @@ export function exportMultipleToICS(events: CalendarEvent[], filename?: string):
     let icsContent = value;
 
     events.forEach((event, index) => {
-      if (!event.allDay) {
-        const timezone = normalizeTimezone(event.timezone);
-        icsContent = addTimezoneToICSAtIndex(icsContent, timezone, index);
-      }
-
       if (event.attachments && event.attachments.length > 0) {
         icsContent = addAttachmentsToICSAtIndex(icsContent, event.attachments, index);
       }

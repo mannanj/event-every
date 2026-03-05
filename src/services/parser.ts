@@ -1,7 +1,7 @@
 import { ParsedEvent, BatchParsedEvents, ClientContext } from '@/types/event';
 
 const OPENROUTER_BASE_URL = process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1';
-const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || 'mistralai/pixtral-large-2411';
+const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || 'deepseek/deepseek-chat-v3-0324';
 
 type ToolDefinition = {
   type: 'function';
@@ -33,53 +33,37 @@ type OpenRouterResponse = {
 function formatClientContext(context?: ClientContext): string {
   if (!context) return '';
 
-  const offsetHours = Math.floor(Math.abs(context.timezoneOffset) / 60);
-  const offsetMinutes = Math.abs(context.timezoneOffset) % 60;
-  const offsetSign = context.timezoneOffset >= 0 ? '+' : '-';
-  const offsetString = `UTC${offsetSign}${offsetHours}${offsetMinutes > 0 ? `:${offsetMinutes.toString().padStart(2, '0')}` : ''}`;
-
-  const formattedContext = `\n\nCurrent context:
-- Date/Time: ${context.currentDateTime}
-- Timezone: ${context.timezone} (${offsetString})
+  return `\n\nCurrent context for relative date resolution:
+- Current date/time: ${context.currentDateTime}
 - Locale: ${context.locale}
 
-Use this context to interpret relative dates like "tomorrow", "next week", "yesterday", "3 days from now", etc. Convert all relative dates to absolute ISO 8601 dates in the user's timezone.`;
-
-  console.log('[DEBUG] Client Context:', JSON.stringify(context, null, 2));
-  console.log('[DEBUG] Formatted Context:', formattedContext);
-
-  return formattedContext;
+Use this ONLY to interpret relative dates like "tomorrow", "next week", etc. Convert relative dates to absolute ISO 8601.`;
 }
 
-const EVENT_PARSING_PROMPT = `You are an event extraction assistant. Extract event details from the provided text or image.
+const EVENT_PARSING_PROMPT = `You are an event extraction assistant. Extract event details EXACTLY as written — do NOT convert or interpret timezones.
 
 Extract the following fields:
 - title: The event name or summary
-- startDate: ISO 8601 format (YYYY-MM-DDTHH:mm:ss) for timed events, or YYYY-MM-DD for all-day events
-- endDate: ISO 8601 format (YYYY-MM-DDTHH:mm:ss) for timed events, or YYYY-MM-DD for all-day events
+- startDate: ISO 8601 format (YYYY-MM-DDTHH:mm:ss) WITHOUT timezone suffix — write the time exactly as it appears in the source
+- endDate: ISO 8601 format (YYYY-MM-DDTHH:mm:ss) WITHOUT timezone suffix — write the time exactly as it appears
 - location: Physical or virtual location
 - description: Additional details about the event
 - url: Source URL if present (look for "Original Event:", event links, or any URLs in the text)
-- timezone: IANA timezone identifier (e.g., "America/New_York") or abbreviation (e.g., "EST", "PST", "UTC+5")
+- timezone: The timezone EXACTLY as written in the source (e.g. "UTC", "EST", "Pacific Time", "PST", "Eastern"). If no timezone is mentioned, set to null.
 - allDay: BOOLEAN - Set to true if this is an all-day event, false if it has specific times
 
-CRITICAL - All-Day Event Detection:
-If the user's instruction contains ANY of these phrases, you MUST set allDay to TRUE for all events:
-- "single day" / "single-day"
-- "all day" / "all-day"
-- "full day" / "full-day"
-- "whole day"
-- "import as all-day"
-- "import as single-day"
+CRITICAL RULES:
+1. Do NOT convert times between timezones. If the source says "3:00 PM UTC", return startDate "...T15:00:00" and timezone "UTC".
+2. Return the timezone string exactly as it appears in the source material, not as an IANA identifier.
 
-When allDay is true:
+All-Day Event Detection:
+If the user's instruction contains "single day", "all day", "full day", "whole day", "all-day", etc., set allDay to TRUE:
 - Use YYYY-MM-DD format for startDate and endDate (no time component)
 - Ignore any times present in the source material
-- The event spans the entire day
 
 The confidence score should reflect how certain you are about the extracted information. Omit any fields that cannot be determined.`;
 
-const BATCH_EVENT_PARSING_PROMPT = `You are an event extraction assistant. Extract ALL event details from the provided text or image.
+const BATCH_EVENT_PARSING_PROMPT = `You are an event extraction assistant. Extract ALL event details EXACTLY as written — do NOT convert or interpret timezones.
 
 IMPORTANT:
 - Detect and extract MULTIPLE events if present (maximum 50 events)
@@ -89,29 +73,24 @@ IMPORTANT:
 
 Extract the following fields for EACH event:
 - title: The event name or summary
-- startDate: ISO 8601 format (YYYY-MM-DDTHH:mm:ss) for timed events, or YYYY-MM-DD for all-day events
-- endDate: ISO 8601 format (YYYY-MM-DDTHH:mm:ss) for timed events, or YYYY-MM-DD for all-day events
+- startDate: ISO 8601 format (YYYY-MM-DDTHH:mm:ss) WITHOUT timezone suffix — write the time exactly as it appears
+- endDate: ISO 8601 format (YYYY-MM-DDTHH:mm:ss) WITHOUT timezone suffix — write the time exactly as it appears
 - location: Physical or virtual location
 - description: Additional details about the event
 - url: Source URL if present (look for "Original Event:", event links, or any URLs in the text)
-- timezone: IANA timezone identifier (e.g., "America/New_York") or abbreviation (e.g., "EST", "PST", "UTC+5")
+- timezone: The timezone EXACTLY as written in the source (e.g. "UTC", "EST", "Pacific Time", "PST", "Eastern"). If no timezone is mentioned, set to null.
 - allDay: BOOLEAN - Set to true if this is an all-day event, false if it has specific times
 
-CRITICAL - All-Day Event Detection:
-If the user's instruction contains ANY of these phrases, you MUST set allDay to TRUE for ALL events:
-- "single day" / "single-day" / "single day events"
-- "all day" / "all-day" / "all day events"
-- "full day" / "full-day"
-- "whole day"
-- "import as all-day"
-- "import as single-day"
+CRITICAL RULES:
+1. Do NOT convert times between timezones. If the source says "3:00 PM UTC", return startDate "...T15:00:00" and timezone "UTC".
+2. Return the timezone string exactly as it appears in the source material, not as an IANA identifier.
 
-When allDay is true for an event:
+All-Day Event Detection:
+If the user's instruction contains "single day", "all day", "full day", "whole day", "all-day", etc., set allDay to TRUE for ALL events:
 - Use YYYY-MM-DD format for startDate and endDate (no time component)
-- Ignore any times present in the source material
-- The event spans the entire day
+- Ignore any times present
 
-The totalCount should be the number of events detected. The top-level confidence should reflect overall certainty about all extracted events. Omit any fields that cannot be determined for an event.`;
+The totalCount should be the number of events detected. The top-level confidence should reflect overall certainty. Omit any fields that cannot be determined.`;
 
 interface ParseEventInput {
   text?: string;
@@ -213,11 +192,11 @@ export async function parseEvent(input: ParseEventInput): Promise<ParsedEvent> {
               location: { type: 'string', description: 'Physical or virtual location' },
               description: { type: 'string', description: 'Additional details' },
               url: { type: 'string', description: 'Source URL if present' },
-              timezone: { type: 'string', description: 'IANA timezone identifier or abbreviation' },
+              timezone: { type: ['string', 'null'], description: 'Timezone exactly as written in source, or null if not mentioned' },
               allDay: { type: 'boolean', description: 'True if all-day event, false if timed' },
               confidence: { type: 'number', description: 'Confidence score (0-1)', minimum: 0, maximum: 1 },
             },
-            required: ['confidence'],
+            required: ['title', 'startDate', 'confidence'],
           },
         },
       },
@@ -297,11 +276,11 @@ export async function* parseEventsBatch(
                     location: { type: 'string', description: 'Physical or virtual location' },
                     description: { type: 'string', description: 'Additional details' },
                     url: { type: 'string', description: 'Source URL if present' },
-                    timezone: { type: 'string', description: 'IANA timezone identifier or abbreviation' },
+                    timezone: { type: ['string', 'null'], description: 'Timezone exactly as written in source, or null if not mentioned' },
                     allDay: { type: 'boolean', description: 'True if all-day event, false if timed' },
                     confidence: { type: 'number', description: 'Confidence score (0-1)', minimum: 0, maximum: 1 },
                   },
-                  required: ['confidence'],
+                  required: ['title', 'startDate', 'confidence'],
                 },
               },
               totalCount: { type: 'number', description: 'Total number of events' },
