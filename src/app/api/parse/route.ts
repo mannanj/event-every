@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { parseEvent, parseEventsBatch } from '@/services/parser';
+import { parseEventsBatch } from '@/services/parser';
 import { checkRateLimit, incrementRateLimit, DAILY_LIMIT } from '@/lib/ratelimit';
 
 function getClientIP(request: NextRequest): string {
@@ -122,22 +122,10 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const parsedEvent = await parseEvent({
-      text,
-      imageBase64,
-      imageMimeType,
-      clientContext,
-    });
-
-    const updatedRateLimit = await incrementRateLimit(clientIP);
-
-    return NextResponse.json(parsedEvent, {
-      headers: {
-        'X-RateLimit-Limit': DAILY_LIMIT.toString(),
-        'X-RateLimit-Remaining': updatedRateLimit.remaining.toString(),
-        'X-RateLimit-Reset': updatedRateLimit.reset.toString()
-      }
-    });
+    return NextResponse.json(
+      { error: 'Non-batch parsing is not supported. Use batch=true.' },
+      { status: 400 }
+    );
   } catch (error) {
     console.error('Parse API error:', error);
 

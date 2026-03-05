@@ -2,7 +2,9 @@
 const nextConfig = {
   devIndicators: false,
   reactStrictMode: true,
-  allowedDevOrigins: ['http://event-every.local'],
+  allowedDevOrigins: ['event-every.local'],
+  output: 'export',
+  images: { unoptimized: true },
 }
 
 module.exports = nextConfig
