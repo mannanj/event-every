@@ -1,10 +1,30 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { CalendarEvent } from '@/types/event';
 import { exportToICS, exportMultipleToICS } from '@/services/exporter';
-import { getTimezoneAbbreviation } from '@/utils/timeConversion';
+import { getTimezoneAbbreviation, convertRawToDate } from '@/utils/timeConversion';
 import { getBrowserTimezone } from '@/utils/timezone';
+
+const COMMON_TIMEZONES: { value: string; label: string }[] = [
+  { value: 'America/New_York', label: 'Eastern Time' },
+  { value: 'America/Chicago', label: 'Central Time' },
+  { value: 'America/Denver', label: 'Mountain Time' },
+  { value: 'America/Los_Angeles', label: 'Pacific Time' },
+  { value: 'America/Anchorage', label: 'Alaska Time' },
+  { value: 'Pacific/Honolulu', label: 'Hawaii Time' },
+  { value: 'UTC', label: 'UTC' },
+  { value: 'Europe/London', label: 'London' },
+  { value: 'Europe/Paris', label: 'Paris' },
+  { value: 'Europe/Berlin', label: 'Berlin' },
+  { value: 'Europe/Athens', label: 'Athens' },
+  { value: 'Asia/Kolkata', label: 'India' },
+  { value: 'Asia/Tokyo', label: 'Tokyo' },
+  { value: 'Asia/Seoul', label: 'Seoul' },
+  { value: 'Asia/Shanghai', label: 'China' },
+  { value: 'Australia/Sydney', label: 'Sydney' },
+  { value: 'Pacific/Auckland', label: 'Auckland' },
+];
 import InlineEventEditor from './InlineEventEditor';
 import EditableField from './EditableField';
 
@@ -63,6 +83,51 @@ export default function BatchEventList({
   const [expandedEventIds, setExpandedEventIds] = useState<Set<string>>(new Set());
   const [selectedEventIds, setSelectedEventIds] = useState<Set<string>>(new Set());
   const [editingField, setEditingField] = useState<{ eventId: string; field: string } | null>(null);
+  const [showTzInfo, setShowTzInfo] = useState<string | null>(null);
+  const [tzInfoHover, setTzInfoHover] = useState<string | null>(null);
+  const tzInfoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleTimezoneChange = (event: CalendarEvent, newTimezone: string) => {
+    if (event.rawStartDate && event.rawEndDate && !event.allDay) {
+      const newStart = convertRawToDate(event.rawStartDate, newTimezone);
+      const newEnd = convertRawToDate(event.rawEndDate, newTimezone);
+      onEdit({
+        ...event,
+        timezone: newTimezone,
+        startDate: newStart,
+        endDate: newEnd,
+        timezoneSource: 'user',
+        timezoneStatus: 'resolved',
+      });
+    } else {
+      onEdit({
+        ...event,
+        timezone: newTimezone,
+        timezoneSource: 'user',
+        timezoneStatus: 'resolved',
+      });
+    }
+  };
+
+  const getTzInfoLines = (event: CalendarEvent) => {
+    const sourceTz = event.timezone || getBrowserTimezone();
+    const friendlyTz = COMMON_TIMEZONES.find(tz => tz.value === sourceTz)?.label || sourceTz.replace('_', ' ');
+    const lines: string[] = [];
+    if (event.timezoneStatus === 'unknown') {
+      lines.push('Could not determine original timezone.');
+    } else if (event.timezoneSource === 'extracted') {
+      lines.push(`${friendlyTz} found in event text.`);
+    } else if (event.timezoneSource === 'llm') {
+      lines.push(`AI detected timezone as ${friendlyTz}.`);
+    } else {
+      lines.push(`Original timezone: ${friendlyTz}.`);
+    }
+    if (event.timezoneSource === 'user') {
+      lines.push(`Manually set to ${sourceTz.replace('_', ' ')}.`);
+    }
+    lines.push('Times shown in your local time.');
+    return lines;
+  };
 
   useEffect(() => {
     setSelectedEventIds(new Set(events.map((e) => e.id)));
@@ -312,12 +377,61 @@ export default function BatchEventList({
                           </span>
                         )}
                         {!event.allDay && (
-                          <span className="text-gray-400 ml-0.5">
-                            {getTimezoneAbbreviation(event.startDate, getBrowserTimezone())}
+                          <>
+                            <span className="group relative inline-block ml-0.5 border-0 border-b border-dotted border-gray-300 hover:border-gray-600 cursor-pointer">
+                              <span className="text-gray-400 text-xs pointer-events-none">
+                                {getTimezoneAbbreviation(event.startDate, getBrowserTimezone())}
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 6 4" className="inline-block w-1.5 h-1 ml-0.5 mb-0.5 opacity-0 group-hover:opacity-100 transition-opacity" fill="currentColor"><path d="M0 0l3 4 3-4z"/></svg>
+                              </span>
+                              <select
+                                value={event.timezone || getBrowserTimezone()}
+                                onChange={(e) => { e.stopPropagation(); handleTimezoneChange(event, e.target.value); }}
+                                onClick={(e) => e.stopPropagation()}
+                                className="absolute inset-0 w-full opacity-0 cursor-pointer"
+                              >
+                                {COMMON_TIMEZONES.map(tz => (
+                                  <option key={tz.value} value={tz.value}>
+                                    {(() => {
+                                      const abbr = getTimezoneAbbreviation(event.startDate, tz.value);
+                                      return abbr === tz.label ? tz.label : `${tz.label} (${abbr})`;
+                                    })()}
+                                  </option>
+                                ))}
+                              </select>
+                            </span>
                             {event.timezoneStatus === 'resolving' && (
                               <span className="inline-block ml-0.5 w-2.5 h-2.5 border border-gray-300 border-t-gray-600 rounded-full animate-spin align-middle" />
                             )}
-                          </span>
+                            {event.timezoneStatus !== 'resolving' && (
+                              <span
+                                className="relative inline-block ml-0.5 align-middle"
+                                onMouseEnter={() => setTzInfoHover(event.id)}
+                                onMouseLeave={() => setTzInfoHover(null)}
+                              >
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (tzInfoTimer.current) clearTimeout(tzInfoTimer.current);
+                                    setShowTzInfo(event.id);
+                                    tzInfoTimer.current = setTimeout(() => setShowTzInfo(null), 5000);
+                                  }}
+                                  className="text-gray-300 hover:text-gray-500 focus:outline-none"
+                                  aria-label="Timezone info"
+                                >
+                                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3 h-3">
+                                    <path fillRule="evenodd" d="M15 8A7 7 0 1 1 1 8a7 7 0 0 1 14 0ZM9 5a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM6.75 8a.75.75 0 0 0 0 1.5h.75v1.75a.75.75 0 0 0 1.5 0v-2.5A.75.75 0 0 0 8.25 8h-1.5Z" clipRule="evenodd" />
+                                  </svg>
+                                </button>
+                                {(showTzInfo === event.id || tzInfoHover === event.id) && (
+                                  <span className="absolute left-0 top-4 z-10 bg-black text-white text-xs rounded px-2 py-1.5 whitespace-nowrap shadow-lg flex flex-col gap-0.5">
+                                    {getTzInfoLines(event).map((line, i) => (
+                                      <span key={i}>{line}</span>
+                                    ))}
+                                  </span>
+                                )}
+                              </span>
+                            )}
+                          </>
                         )}
                         {event.location && (
                           <>

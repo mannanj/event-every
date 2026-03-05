@@ -8,24 +8,24 @@ import { convertRawToDate } from '@/utils/timeConversion';
 import { getBrowserTimezone } from '@/utils/timezone';
 import URLPill from './URLPill';
 
-const COMMON_TIMEZONES = [
-  'America/New_York',
-  'America/Chicago',
-  'America/Denver',
-  'America/Los_Angeles',
-  'America/Anchorage',
-  'Pacific/Honolulu',
-  'UTC',
-  'Europe/London',
-  'Europe/Paris',
-  'Europe/Berlin',
-  'Europe/Athens',
-  'Asia/Kolkata',
-  'Asia/Tokyo',
-  'Asia/Seoul',
-  'Asia/Shanghai',
-  'Australia/Sydney',
-  'Pacific/Auckland',
+const COMMON_TIMEZONES: { value: string; label: string }[] = [
+  { value: 'America/New_York', label: 'Eastern Time' },
+  { value: 'America/Chicago', label: 'Central Time' },
+  { value: 'America/Denver', label: 'Mountain Time' },
+  { value: 'America/Los_Angeles', label: 'Pacific Time' },
+  { value: 'America/Anchorage', label: 'Alaska Time' },
+  { value: 'Pacific/Honolulu', label: 'Hawaii Time' },
+  { value: 'UTC', label: 'UTC' },
+  { value: 'Europe/London', label: 'London' },
+  { value: 'Europe/Paris', label: 'Paris' },
+  { value: 'Europe/Berlin', label: 'Berlin' },
+  { value: 'Europe/Athens', label: 'Athens' },
+  { value: 'Asia/Kolkata', label: 'India' },
+  { value: 'Asia/Tokyo', label: 'Tokyo' },
+  { value: 'Asia/Seoul', label: 'Seoul' },
+  { value: 'Asia/Shanghai', label: 'China' },
+  { value: 'Australia/Sydney', label: 'Sydney' },
+  { value: 'Pacific/Auckland', label: 'Auckland' },
 ];
 
 interface InlineEventEditorProps {
@@ -73,6 +73,9 @@ export default function InlineEventEditor({
   onTimezoneUserChange,
 }: InlineEventEditorProps) {
   const [editingField, setEditingField] = useState<string | null>(null);
+  const [showTzInfo, setShowTzInfo] = useState(false);
+  const [tzInfoHover, setTzInfoHover] = useState(false);
+  const tzInfoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [formData, setFormData] = useState({
     title: event.title || '',
     startDate: formatDateForInput(event.startDate),
@@ -182,6 +185,26 @@ export default function InlineEventEditor({
 
   const isResolving = event.timezoneStatus === 'resolving';
 
+  const sourceTz = event.timezone || getBrowserTimezone();
+  const friendlyTz = COMMON_TIMEZONES.find(tz => tz.value === sourceTz)?.label || sourceTz.replace('_', ' ');
+  const tzInfoLines: string[] = (() => {
+    const lines: string[] = [];
+    if (event.timezoneStatus === 'unknown') {
+      lines.push('Could not determine original timezone.');
+    } else if (event.timezoneSource === 'extracted') {
+      lines.push(`${friendlyTz} found in event text.`);
+    } else if (event.timezoneSource === 'llm') {
+      lines.push(`AI detected timezone as ${friendlyTz}.`);
+    } else {
+      lines.push(`Original timezone: ${friendlyTz}.`);
+    }
+    if (event.timezoneSource === 'user') {
+      lines.push(`Manually set to ${sourceTz.replace('_', ' ')}.`);
+    }
+    lines.push(`Times shown in your local time.`);
+    return lines;
+  })();
+
   return (
     <div className="space-y-2 text-sm">
       {!hideTitle && (
@@ -246,10 +269,52 @@ export default function InlineEventEditor({
           </span>
         )}
         {!event.allDay && (
-          <span className="text-gray-500 ml-1">
-            {tzAbbr}
-            {isResolving && (
-              <span className="inline-block ml-1 w-3 h-3 border border-gray-400 border-t-black rounded-full animate-spin align-middle" />
+          <span className="group relative inline-block ml-0.5 border-0 border-b border-dotted border-gray-400 hover:border-black cursor-pointer">
+            <span className="text-gray-500 text-sm pointer-events-none">{tzAbbr}<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 6 4" className="inline-block w-1.5 h-1 ml-0.5 mb-0.5 opacity-0 group-hover:opacity-100 transition-opacity" fill="currentColor"><path d="M0 0l3 4 3-4z"/></svg></span>
+            <select
+              value={event.timezone || getBrowserTimezone()}
+              onChange={(e) => handleTimezoneChange(e.target.value)}
+              className="absolute inset-0 w-full opacity-0 cursor-pointer"
+            >
+              {COMMON_TIMEZONES.map(tz => (
+                <option key={tz.value} value={tz.value}>
+                  {(() => {
+                    const abbr = getTimezoneAbbreviation(event.startDate, tz.value);
+                    return abbr === tz.label ? tz.label : `${tz.label} (${abbr})`;
+                  })()}
+                </option>
+              ))}
+            </select>
+          </span>
+        )}
+        {!event.allDay && isResolving && (
+          <span className="inline-block ml-1 w-3 h-3 border border-gray-400 border-t-black rounded-full animate-spin align-middle" />
+        )}
+        {!event.allDay && !isResolving && (
+          <span
+            className="relative inline-block ml-1 align-middle"
+            onMouseEnter={() => setTzInfoHover(true)}
+            onMouseLeave={() => setTzInfoHover(false)}
+          >
+            <button
+              onClick={() => {
+                if (tzInfoTimer.current) clearTimeout(tzInfoTimer.current);
+                setShowTzInfo(true);
+                tzInfoTimer.current = setTimeout(() => setShowTzInfo(false), 5000);
+              }}
+              className="text-gray-400 hover:text-gray-600 focus:outline-none"
+              aria-label="Timezone info"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3.5 h-3.5">
+                <path fillRule="evenodd" d="M15 8A7 7 0 1 1 1 8a7 7 0 0 1 14 0ZM9 5a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM6.75 8a.75.75 0 0 0 0 1.5h.75v1.75a.75.75 0 0 0 1.5 0v-2.5A.75.75 0 0 0 8.25 8h-1.5Z" clipRule="evenodd" />
+              </svg>
+            </button>
+            {(showTzInfo || tzInfoHover) && (
+              <span className="absolute left-0 top-4 z-10 bg-black text-white text-xs rounded px-2 py-1.5 whitespace-nowrap shadow-lg flex flex-col gap-0.5">
+                {tzInfoLines.map((line, i) => (
+                  <span key={i}>{line}</span>
+                ))}
+              </span>
             )}
           </span>
         )}
@@ -316,27 +381,27 @@ export default function InlineEventEditor({
             {formatDateDisplay(event.endDate).split(' at ')[1]}
           </span>
         )}
-        {!event.allDay && <span className="text-gray-500 ml-1">{tzAbbr}</span>}
+        {!event.allDay && (
+          <span className="group relative inline-block ml-0.5 border-0 border-b border-dotted border-gray-400 hover:border-black cursor-pointer">
+            <span className="text-gray-500 text-sm pointer-events-none">{tzAbbr}<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 6 4" className="inline-block w-1.5 h-1 ml-0.5 mb-0.5 opacity-0 group-hover:opacity-100 transition-opacity" fill="currentColor"><path d="M0 0l3 4 3-4z"/></svg></span>
+            <select
+              value={event.timezone || getBrowserTimezone()}
+              onChange={(e) => handleTimezoneChange(e.target.value)}
+              className="absolute inset-0 w-full opacity-0 cursor-pointer"
+            >
+              {COMMON_TIMEZONES.map(tz => (
+                <option key={tz.value} value={tz.value}>
+                  {(() => {
+                    const abbr = getTimezoneAbbreviation(event.startDate, tz.value);
+                    return abbr === tz.label ? tz.label : `${tz.label} (${abbr})`;
+                  })()}
+                </option>
+              ))}
+            </select>
+          </span>
+        )}
       </div>
 
-      {/* Source timezone dropdown — changing this reinterprets raw times */}
-      {!event.allDay && (
-        <div className="text-gray-700 leading-relaxed">
-          <span className="font-semibold">Source TZ:</span>{' '}
-          <select
-            value={event.timezone || getBrowserTimezone()}
-            onChange={(e) => handleTimezoneChange(e.target.value)}
-            className="border border-black px-1 py-0 text-sm focus:outline-none focus:ring-1 focus:ring-black bg-white"
-          >
-            {COMMON_TIMEZONES.map(tz => (
-              <option key={tz} value={tz}>
-                {tz.replace('_', ' ')} ({getTimezoneAbbreviation(event.startDate, tz)})
-              </option>
-            ))}
-          </select>
-          <span className="text-xs text-gray-400 ml-1">original event timezone</span>
-        </div>
-      )}
 
       {(event.location || editingField === 'location') && (
         <div className="text-gray-700 leading-relaxed">
