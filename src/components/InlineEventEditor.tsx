@@ -97,16 +97,16 @@ export default function InlineEventEditor({
   const descriptionInputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
-    setFormData({
-      title: event.title || '',
-      startDate: formatDateForInput(event.startDate),
-      startTime: formatTimeForInput(event.startDate),
-      endDate: formatDateForInput(event.endDate),
-      endTime: formatTimeForInput(event.endDate),
-      location: event.location || '',
-      description: event.description || '',
-    });
-  }, [event]);
+    setFormData(prev => ({
+      title: editingField === 'title' ? prev.title : (event.title || ''),
+      startDate: editingField === 'startDate' ? prev.startDate : formatDateForInput(event.startDate),
+      startTime: editingField === 'startTime' ? prev.startTime : formatTimeForInput(event.startDate),
+      endDate: editingField === 'endDate' ? prev.endDate : formatDateForInput(event.endDate),
+      endTime: editingField === 'endTime' ? prev.endTime : formatTimeForInput(event.endDate),
+      location: editingField === 'location' ? prev.location : (event.location || ''),
+      description: editingField === 'description' ? prev.description : (event.description || ''),
+    }));
+  }, [event, editingField]);
 
   useEffect(() => {
     if (editingField === 'title' && titleInputRef.current) {
@@ -151,7 +151,7 @@ export default function InlineEventEditor({
         startDate: startDateTime,
         endDate: endDateTime,
         location: updatedFormData.location.trim() || undefined,
-        description: updatedFormData.description.trim() || undefined,
+        description: updatedFormData.description || undefined,
       };
       onChange(updatedEvent);
     }
