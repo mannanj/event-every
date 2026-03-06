@@ -19,6 +19,7 @@ export default function PatternLock({ onSubmit, error, attemptsLeft }: PatternLo
   const [currentPos, setCurrentPos] = useState<Point | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const patternRef = useRef<number[]>([]);
 
   const gridSize = 3;
   const dotRadius = 12;
@@ -118,6 +119,7 @@ export default function PatternLock({ onSubmit, error, attemptsLeft }: PatternLo
 
   const handleStart = (clientX: number, clientY: number) => {
     setIsDrawing(true);
+    patternRef.current = [];
     setPattern([]);
 
     const point = getCanvasCoordinates(clientX, clientY);
@@ -126,6 +128,7 @@ export default function PatternLock({ onSubmit, error, attemptsLeft }: PatternLo
 
     const dot = findClosestDot(point, canvas.width);
     if (dot !== null) {
+      patternRef.current = [dot];
       setPattern([dot]);
     }
   };
@@ -140,8 +143,10 @@ export default function PatternLock({ onSubmit, error, attemptsLeft }: PatternLo
     if (!canvas) return;
 
     const dot = findClosestDot(point, canvas.width);
-    if (dot !== null && !pattern.includes(dot)) {
-      setPattern([...pattern, dot]);
+    if (dot !== null && !patternRef.current.includes(dot)) {
+      const updated = [...patternRef.current, dot];
+      patternRef.current = updated;
+      setPattern(updated);
     }
   };
 
@@ -151,12 +156,15 @@ export default function PatternLock({ onSubmit, error, attemptsLeft }: PatternLo
     setIsDrawing(false);
     setCurrentPos(null);
 
-    if (pattern.length >= 2 && !isSubmitting) {
+    const finalPattern = patternRef.current;
+    if (finalPattern.length >= 2 && !isSubmitting) {
       setIsSubmitting(true);
-      await onSubmit(pattern);
+      await onSubmit(finalPattern);
       setIsSubmitting(false);
+      patternRef.current = [];
       setTimeout(() => setPattern([]), 500);
     } else {
+      patternRef.current = [];
       setTimeout(() => setPattern([]), 300);
     }
   };

@@ -21,7 +21,9 @@ export default function AuthWrapper({ children }: { children: React.ReactNode })
       setError('');
       setShowDevLock(false);
     } else if (typeof result === 'object') {
-      if (result.isLockedOut) {
+      if ('networkError' in result && result.networkError) {
+        setError('Connection error. Check your network and try again.');
+      } else if (result.isLockedOut) {
         setError('Whoa there! Too many tries. Take a breather.');
       } else if (result.attemptsLeft === 0) {
         setError('Not quite! No attempts remaining.');

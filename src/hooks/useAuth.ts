@@ -37,7 +37,7 @@ export function useAuth() {
     setIsLoading(false);
   }, []);
 
-  const verifyPattern = async (input: number[]): Promise<boolean | { success: false; attemptsLeft: number; isLockedOut: boolean; lockoutMinutes: number }> => {
+  const verifyPattern = async (input: number[]): Promise<boolean | { success: false; attemptsLeft: number; isLockedOut: boolean; lockoutMinutes: number; networkError?: boolean }> => {
     try {
       const response = await fetch('/api/auth/verify', {
         method: 'POST',
@@ -84,7 +84,8 @@ export function useAuth() {
         lockoutMinutes: data.lockoutMinutes || 0
       };
     } catch (error) {
-      return false;
+      console.error('[auth] Pattern verification failed:', error);
+      return { success: false as const, attemptsLeft: attempts, isLockedOut: false, lockoutMinutes: 0, networkError: true };
     }
   };
 
