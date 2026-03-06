@@ -122,17 +122,16 @@ This script handles everything: installs dependencies, pulls environment variabl
 ### Manual Setup
 
 ```bash
-pnpm i                 # Install dependencies
+bun install            # Install dependencies
 vercel link            # Link to Vercel project (first time only)
 vercel env pull        # Pull env variables to .env.local
-pnpm dev               # Start dev server
+bun dev                # Start dev server
 ```
 
 ### Requirements
 
-- Node.js 18+
-- [pnpm](https://pnpm.io/) (`npm install -g pnpm`)
-- [Vercel CLI](https://vercel.com/cli) (`npm install -g vercel`)
+- [Bun](https://bun.sh/) (v1.0+)
+- [Vercel CLI](https://vercel.com/cli) (`bun install -g vercel`)
 
 ## Contributing
 

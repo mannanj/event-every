@@ -68,22 +68,22 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 ### Frontend (Next.js + TypeScript)
 ```bash
 # Install dependencies
-npm install
+bun install
 
-# Run development server (port 3000)
-npm run dev
+# Run development server (port 3777)
+bun dev
 
 # Build for production
-npm run build
+bun run build
 
 # Run production server
-npm run start
+bun start
 
 # Type checking
-npm run type-check
+bun run type-check
 
 # Lint code
-npm run lint
+bun run lint
 ```
 
 ## Architecture
