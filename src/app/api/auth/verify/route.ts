@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { AUTH_COOKIE_NAME, AUTH_DURATION_S, generateAuthToken } from '../shared';
 
 const VALID_L_PATTERNS = [
   [0, 3, 6, 7, 8],
@@ -64,7 +65,13 @@ export async function POST(request: NextRequest) {
 
     const { pattern } = await request.json();
 
-    if (!pattern || !Array.isArray(pattern)) {
+    if (
+      !pattern ||
+      !Array.isArray(pattern) ||
+      pattern.length > 9 ||
+      pattern.length < 2 ||
+      !pattern.every((v: unknown) => typeof v === 'number' && Number.isInteger(v) && v >= 0 && v <= 8)
+    ) {
       return NextResponse.json(
         { success: false, error: 'Invalid request' },
         { status: 400 }
@@ -101,10 +108,19 @@ export async function POST(request: NextRequest) {
 
     if (isValid) {
       attemptStore.delete(clientIP);
-      return NextResponse.json({
+      const token = generateAuthToken();
+      const response = NextResponse.json({
         success: true,
         attemptsLeft: MAX_ATTEMPTS
       });
+      response.cookies.set(AUTH_COOKIE_NAME, token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: AUTH_DURATION_S,
+        path: '/',
+      });
+      return response;
     }
 
     record.attempts += 1;
@@ -130,7 +146,7 @@ export async function POST(request: NextRequest) {
       attemptsLeft,
       lockedOut: false
     });
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { success: false, error: 'Server error' },
       { status: 500 }

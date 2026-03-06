@@ -2,9 +2,6 @@
 
 import { useState, useEffect } from 'react';
 
-const AUTH_TIMESTAMP_KEY = 'event-every-auth-timestamp';
-const AUTH_DURATION_MS = 48 * 60 * 60 * 1000; // 48 hours
-
 export function useAuth() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -12,29 +9,18 @@ export function useAuth() {
   const [isLockedOut, setIsLockedOut] = useState(false);
   const [lockoutMinutes, setLockoutMinutes] = useState(0);
 
-  const checkAuthStatus = () => {
-    const authTimestamp = localStorage.getItem(AUTH_TIMESTAMP_KEY);
-
-    if (!authTimestamp) {
-      return false;
-    }
-
-    const timestamp = parseInt(authTimestamp, 10);
-    const now = Date.now();
-    const hasExpired = now - timestamp > AUTH_DURATION_MS;
-
-    if (hasExpired) {
-      localStorage.removeItem(AUTH_TIMESTAMP_KEY);
-      return false;
-    }
-
-    return true;
-  };
-
   useEffect(() => {
-    const isAuth = checkAuthStatus();
-    setIsAuthenticated(isAuth);
-    setIsLoading(false);
+    fetch('/api/auth/check')
+      .then(res => res.json())
+      .then(data => {
+        setIsAuthenticated(data.authenticated === true);
+      })
+      .catch(() => {
+        setIsAuthenticated(false);
+      })
+      .finally(() => {
+        setIsLoading(false);
+      });
   }, []);
 
   const verifyPattern = async (input: number[]): Promise<boolean | { success: false; attemptsLeft: number; isLockedOut: boolean; lockoutMinutes: number; networkError?: boolean }> => {
@@ -62,7 +48,6 @@ export function useAuth() {
       }
 
       if (data.success) {
-        localStorage.setItem(AUTH_TIMESTAMP_KEY, Date.now().toString());
         setIsAuthenticated(true);
         setAttempts(3);
         setIsLockedOut(false);
@@ -83,14 +68,13 @@ export function useAuth() {
         isLockedOut: data.lockedOut || false,
         lockoutMinutes: data.lockoutMinutes || 0
       };
-    } catch (error) {
-      console.error('[auth] Pattern verification failed:', error);
+    } catch {
       return { success: false as const, attemptsLeft: attempts, isLockedOut: false, lockoutMinutes: 0, networkError: true };
     }
   };
 
-  const logout = () => {
-    localStorage.removeItem(AUTH_TIMESTAMP_KEY);
+  const logout = async () => {
+    await fetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
     setIsAuthenticated(false);
     setAttempts(3);
     setIsLockedOut(false);
