@@ -1,4 +1,4 @@
-import { kv } from '@vercel/kv';
+import { Redis } from '@upstash/redis';
 
 export interface RateLimitResult {
   success: boolean;
@@ -10,12 +10,18 @@ export interface RateLimitResult {
 export const DAILY_LIMIT = 1000;
 const WINDOW_DURATION = 24 * 60 * 60; // 24 hours in seconds
 
-const isKVAvailable = () => {
-  return !!(process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN);
+const isRedisAvailable = () => {
+  return !!(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN);
 };
 
+const getRedis = () =>
+  new Redis({
+    url: process.env.UPSTASH_REDIS_REST_URL!,
+    token: process.env.UPSTASH_REDIS_REST_TOKEN!,
+  });
+
 export async function checkRateLimit(identifier: string): Promise<RateLimitResult> {
-  if (!isKVAvailable()) {
+  if (!isRedisAvailable()) {
     return {
       success: true,
       remaining: DAILY_LIMIT,
@@ -24,15 +30,15 @@ export async function checkRateLimit(identifier: string): Promise<RateLimitResul
   }
 
   try {
+    const redis = getRedis();
     const key = `ratelimit:events:${identifier}`;
     const now = Date.now();
-    const windowStart = now - (WINDOW_DURATION * 1000);
 
-    const count = await kv.get<number>(key);
+    const count = await redis.get<number>(key);
     const currentCount = count || 0;
 
     if (currentCount >= DAILY_LIMIT) {
-      const ttl = await kv.ttl(key);
+      const ttl = await redis.ttl(key);
       const resetTime = now + (ttl * 1000);
 
       return {
@@ -59,7 +65,7 @@ export async function checkRateLimit(identifier: string): Promise<RateLimitResul
 }
 
 export async function incrementRateLimit(identifier: string): Promise<RateLimitResult> {
-  if (!isKVAvailable()) {
+  if (!isRedisAvailable()) {
     return {
       success: true,
       remaining: DAILY_LIMIT - 1,
@@ -68,12 +74,13 @@ export async function incrementRateLimit(identifier: string): Promise<RateLimitR
   }
 
   try {
+    const redis = getRedis();
     const key = `ratelimit:events:${identifier}`;
 
-    const current = await kv.get<number>(key);
+    const current = await redis.get<number>(key);
     const newCount = (current || 0) + 1;
 
-    await kv.set(key, newCount, { ex: WINDOW_DURATION });
+    await redis.set(key, newCount, { ex: WINDOW_DURATION });
 
     const remaining = Math.max(0, DAILY_LIMIT - newCount);
     const reset = Date.now() + (WINDOW_DURATION * 1000);
