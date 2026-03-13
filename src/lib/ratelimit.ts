@@ -11,13 +11,13 @@ export const DAILY_LIMIT = 1000;
 const WINDOW_DURATION = 24 * 60 * 60; // 24 hours in seconds
 
 const isRedisAvailable = () => {
-  return !!(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN);
+  return !!(process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN);
 };
 
 const getRedis = () =>
   new Redis({
-    url: process.env.UPSTASH_REDIS_REST_URL!,
-    token: process.env.UPSTASH_REDIS_REST_TOKEN!,
+    url: process.env.KV_REST_API_URL!,
+    token: process.env.KV_REST_API_TOKEN!,
   });
 
 export async function checkRateLimit(identifier: string): Promise<RateLimitResult> {
