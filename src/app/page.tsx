@@ -20,6 +20,7 @@ import { exportAllEvents } from '@/services/exportAll';
 import { resolveTimezone } from '@/services/timezoneResolver';
 import { convertRawToDate } from '@/utils/timeConversion';
 import { getBrowserTimezone } from '@/utils/timezone';
+import { normalizeUrl } from '@/utils/url';
 
 interface ProcessingEvent {
   id: string;
@@ -172,7 +173,7 @@ export default function Home() {
       endDate,
       location: parsed.location,
       description: parsed.description,
-      url: parsed.url,
+      url: normalizeUrl(parsed.url),
       allDay: parsed.allDay ?? false,
       timezone: tzResolution.timezone,
       rawStartDate: rawStart,

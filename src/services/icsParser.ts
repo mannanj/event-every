@@ -1,4 +1,5 @@
 import { CalendarEvent } from '@/types/event';
+import { normalizeUrl } from '@/utils/url';
 
 interface ICSEvent {
   uid?: string;
@@ -130,7 +131,7 @@ function convertICSEventToCalendarEvent(icsEvent: ICSEvent): CalendarEvent | nul
     endDate,
     location: icsEvent.location,
     description: icsEvent.description,
-    url: icsEvent.url,
+    url: normalizeUrl(icsEvent.url),
     allDay: icsEvent.allDay,
     created: new Date(),
     source: 'text',

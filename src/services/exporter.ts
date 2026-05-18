@@ -1,5 +1,6 @@
 import { createEvent, createEvents, EventAttributes } from 'ics';
 import { CalendarEvent, EventAttachment } from '@/types/event';
+import { normalizeUrl } from '@/utils/url';
 
 export interface ExportResult {
   success: boolean;
@@ -11,10 +12,9 @@ export interface ValidationResult {
   errors: string[];
 }
 
-function normalizeUrl(url?: string): string | undefined {
-  if (!url) return undefined;
-  if (/^https?:\/\//i.test(url)) return url;
-  return `https://${url}`;
+function isUrlValidationError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /\burl\b/i.test(message) && /must match/i.test(message);
 }
 
 function formatAttachmentLine(attachment: EventAttachment): string {
@@ -86,7 +86,11 @@ export function exportToICS(event: CalendarEvent): ExportResult {
       endOutputType: event.allDay ? 'local' : 'utc',
     };
 
-    const { error, value } = createEvent(eventAttributes);
+    let { error, value } = createEvent(eventAttributes);
+
+    if (error && isUrlValidationError(error) && eventAttributes.url) {
+      ({ error, value } = createEvent({ ...eventAttributes, url: undefined }));
+    }
 
     if (error) {
       return { success: false, error: error.message || 'Failed to create event' };
@@ -223,7 +227,18 @@ export function exportMultipleToICS(events: CalendarEvent[], filename?: string):
       endOutputType: event.allDay ? 'local' : 'utc',
     }));
 
-    const { error, value } = createEvents(eventAttributesArray);
+    let { error, value } = createEvents(eventAttributesArray);
+
+    if (error && isUrlValidationError(error)) {
+      const sanitized = eventAttributesArray.map((attrs) => {
+        if (!attrs.url) return attrs;
+        const probe = createEvent(attrs);
+        return probe.error && isUrlValidationError(probe.error)
+          ? { ...attrs, url: undefined }
+          : attrs;
+      });
+      ({ error, value } = createEvents(sanitized));
+    }
 
     if (error) {
       return { success: false, error: error.message || 'Failed to create events' };

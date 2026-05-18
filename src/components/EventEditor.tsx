@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { CalendarEvent } from '@/types/event';
 import { downloadAttachment } from '@/utils/downloadAttachment';
+import { normalizeUrl } from '@/utils/url';
 
 interface EventEditorProps {
   event: CalendarEvent;
@@ -121,7 +122,7 @@ export default function EventEditor({ event, onSave, onCancel }: EventEditorProp
       endDate: endDateTime,
       location: formData.location.trim() || undefined,
       description: formData.description.trim() || undefined,
-      url: formData.url.trim() || undefined,
+      url: normalizeUrl(formData.url),
       allDay: formData.allDay,
       attachments: formData.attachments.length > 0 ? formData.attachments : undefined,
     };
