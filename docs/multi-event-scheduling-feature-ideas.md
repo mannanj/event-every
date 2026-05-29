@@ -7,7 +7,7 @@
 
 ## Original Problem Statement
 
-Currently, the Event Every app helps quickly convert images/text into calendar events, but users face challenges when:
+Currently, the Summon app helps quickly convert images/text into calendar events, but users face challenges when:
 - Dropping in several events at once
 - Choosing among multiple options at similar times
 - Needing to visualize and plan efficiently

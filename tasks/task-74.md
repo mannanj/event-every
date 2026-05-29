@@ -125,7 +125,7 @@ interface PlanningPermissions {
 ┌─────────────────────────────────────────┐
 │ Share Planning Event                   │
 ├─────────────────────────────────────────┤
-│ Link: event-every.app/plan/abc123     │
+│ Link: summon.app/plan/abc123          │
 │ [Copy Link]                            │
 │                                         │
 │ Invite by Email:                       │

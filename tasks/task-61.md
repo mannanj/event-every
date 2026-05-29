@@ -3,7 +3,7 @@
 **Goal:** Visual calendar interface for planning, organizing, and scheduling events with drag-and-drop, timeline views, filtering, and multi-calendar support
 
 **Vision:**
-Transform Event Every from a simple event creator into a powerful planning tool. Users can view their events on a timeline, drag them onto custom calendars, plan hypothetical scenarios, detect conflicts, and share their schedules. Filter events by search terms or time ranges, and visualize everything in day/week/month views.
+Transform Summon from a simple event creator into a powerful planning tool. Users can view their events on a timeline, drag them onto custom calendars, plan hypothetical scenarios, detect conflicts, and share their schedules. Filter events by search terms or time ranges, and visualize everything in day/week/month views.
 
 **Note:** This is a large feature that will be broken down into 3-7 subtasks during implementation. This task serves as the master planning document.
 
@@ -337,7 +337,7 @@ interface EventUpdate {
 **Sharing Flow:**
 ```
 1. User clicks "Share" on their calendar
-2. App generates public URL: event-every.app/cal/abc123
+2. App generates public URL: summon.app/cal/abc123
 3. Choose permissions: "Read-only" or "Editable"
 4. Copy link or generate QR code
 5. Recipients can:

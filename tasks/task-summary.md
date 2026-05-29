@@ -1,4 +1,4 @@
-# Event Every - Task Summary
+# Summon - Task Summary
 
 One-liner summary of all tasks organized by feature area.
 
@@ -154,7 +154,7 @@ All foundational features implemented:
 - 61-F: Conflict detection & scenarios
 - 61-G: Advanced search & filtering
 
-**Note**: This is a massive feature - essentially a full calendar app within Event Every
+**Note**: This is a massive feature - essentially a full calendar app within Summon
 
 ---
 

@@ -2,7 +2,7 @@
 
 set -e
 
-echo "Setting up Event Every..."
+echo "Setting up Summon..."
 
 # Check for pnpm
 if ! command -v pnpm &> /dev/null; then

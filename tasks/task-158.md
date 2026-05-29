@@ -28,6 +28,6 @@
 
 **Technical Notes**:
 - Use dynamic import: `const JSZip = (await import('jszip')).default;`
-- Filename format: `event-every-export-YYYY-MM-DDTHH-MM-SS.zip`
+- Filename format: `summon-export-YYYY-MM-DDTHH-MM-SS.zip`
 - Handle quota errors gracefully
 - Preserve all event metadata including timezone, source, etc.

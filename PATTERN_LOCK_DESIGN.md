@@ -19,7 +19,7 @@
 ## Overview
 
 ### Purpose
-The Pattern Lock Gate Mechanism is a gesture-based authentication system that restricts access to the Event Every application. Users must draw a specific pattern on a 3x3 grid to unlock the application.
+The Pattern Lock Gate Mechanism is a gesture-based authentication system that restricts access to the Summon application. Users must draw a specific pattern on a 3x3 grid to unlock the application.
 
 ### Key Features
 - **Gesture-Based Authentication**: Draw L-shaped patterns on a 3x3 dot grid
@@ -949,7 +949,7 @@ async function registerBiometric() {
   const credential = await navigator.credentials.create({
     publicKey: {
       challenge: new Uint8Array(32),
-      rp: { name: "Event Every" },
+      rp: { name: "Summon" },
       user: {
         id: new Uint8Array(16),
         name: "user@example.com",
@@ -1195,7 +1195,7 @@ const duration = lockoutDurations[lockoutLevel] * 60 * 1000;
 
 ## Conclusion
 
-The Pattern Lock Gate Mechanism provides a secure, user-friendly authentication layer for the Event Every application. It combines gesture-based interaction with robust rate limiting and session management to protect access while maintaining a minimal, black-and-white aesthetic.
+The Pattern Lock Gate Mechanism provides a secure, user-friendly authentication layer for the Summon application. It combines gesture-based interaction with robust rate limiting and session management to protect access while maintaining a minimal, black-and-white aesthetic.
 
 **Key Takeaways**:
 - **Simple UX**: Draw an L-pattern, no typing required

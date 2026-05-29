@@ -1,7 +1,7 @@
 # Event Enrichment Features Roadmap
 
 ## Overview
-This document outlines the AI-powered enrichment features for Event Every, focusing on intelligent address validation and LLM-based text improvements.
+This document outlines the AI-powered enrichment features for Summon, focusing on intelligent address validation and LLM-based text improvements.
 
 ## Task Breakdown
 

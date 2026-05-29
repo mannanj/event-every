@@ -16,8 +16,8 @@ const bubblegumSans = Bubblegum_Sans({
 })
 
 export const metadata: Metadata = {
-  title: 'Event Every',
-  description: 'Snap an image or paste text. Get a calendar event.',
+  title: 'Summon — from anything to your calendar',
+  description: 'Snap an image, paste text, or drop a link. Summon it into a calendar event.',
 }
 
 export default function RootLayout({

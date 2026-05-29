@@ -24,7 +24,7 @@
 - Any other app settings in LocalStorage
 
 **IndexedDB Schema**:
-- Database: `EventEveryDB`
+- Database: `SummonDB`
 - Object Stores:
   - `events` - calendar events (keyPath: `id`, indexes: `created`, `startDate`)
   - `tempEvents` - temporary unsaved events

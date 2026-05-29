@@ -1,7 +1,7 @@
 # Duplicate Detection Feature - Implementation Context
 
 ## Overview
-We're building an AI-powered duplicate detection and merging system for Event Every. When users create or import events, the system automatically detects duplicates using LLM similarity analysis, presents them in an intuitive UI, and offers intelligent merging.
+We're building an AI-powered duplicate detection and merging system for Summon. When users create or import events, the system automatically detects duplicates using LLM similarity analysis, presents them in an intuitive UI, and offers intelligent merging.
 
 ## User Flow
 1. User creates/imports a new calendar event

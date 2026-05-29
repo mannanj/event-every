@@ -272,7 +272,7 @@ interface Action {
 - [ ] Local processing where possible
 
 **Future Enhancements:**
-- [ ] Voice interface ("Hey Event Every, how long to get there?")
+- [ ] Voice interface ("Hey Summon, how long to get there?")
 - [ ] Integration with smart home (adjust thermostat before leaving)
 - [ ] Calendar sync with teammates (avoid scheduling over others)
 - [ ] Predictive event creation (AI suggests events based on patterns)

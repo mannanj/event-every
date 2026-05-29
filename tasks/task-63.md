@@ -3,7 +3,7 @@
 **Goal**: Add GPS icon to header (top right) that captures user location via browser geolocation API, stores lat/lon in localStorage and state, with visual dot indicators for state.
 
 **Subtasks**:
-- [ ] Add GPS icon component in header (top right next to "Event Every")
+- [ ] Add GPS icon component in header (top right next to "Summon it")
 - [ ] Implement dot indicator states (red=not set, green=set, blue pulsing=loading)
 - [ ] Create `useUserLocation` hook for location management
 - [ ] Implement browser geolocation API request on icon click

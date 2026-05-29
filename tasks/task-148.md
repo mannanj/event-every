@@ -1,7 +1,7 @@
 ### Task 148: LLM-Powered Calendar Search
 
 #### Overview
-Implement semantic search across all calendars (Event Every history + connected external calendars) using LLM capabilities. Allow natural language queries like "meetings with John last month" or "events in San Francisco" or "all birthdays this year".
+Implement semantic search across all calendars (Summon history + connected external calendars) using LLM capabilities. Allow natural language queries like "meetings with John last month" or "events in San Francisco" or "all birthdays this year".
 
 #### Subtasks
 - [ ] Design search architecture (embedding-based vs prompt-based)

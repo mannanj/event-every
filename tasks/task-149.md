@@ -1,7 +1,7 @@
 ### Task 149: Enhanced Event Editing Experience
 
 #### Overview
-Improve the event editing UX to make it faster and more intuitive to modify events from any source (Event Every history, Google Calendar, Apple Calendar). Support bulk editing, quick edits, and smart suggestions.
+Improve the event editing UX to make it faster and more intuitive to modify events from any source (Summon history, Google Calendar, Apple Calendar). Support bulk editing, quick edits, and smart suggestions.
 
 #### Subtasks
 

@@ -927,8 +927,8 @@ export default function Home() {
 
       <div className="w-full px-[14.28%] py-12">
         <header className="text-center mb-12">
-          <h1 className="text-5xl font-black retro-rainbow-text tracking-wider">Event Every</h1>
-          <p className="text-black text-sm">From anything to your calendar. Effortlessly.</p>
+          <h1 className="text-5xl font-black retro-rainbow-text tracking-wider">Summon it</h1>
+          <p className="text-black text-sm">Turn any flyer, screenshot, or text into a calendar event.</p>
         </header>
 
         {/* Smart input section */}

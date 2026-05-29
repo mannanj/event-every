@@ -1,7 +1,7 @@
 ### Task 147: Calendar Integration - Connect Apple/Google Calendars
 
 #### Overview
-Enable users to connect their existing Apple Calendar and Google Calendar accounts to Event Every. Display all calendars in a unified view with the ability to sync events bidirectionally.
+Enable users to connect their existing Apple Calendar and Google Calendar accounts to Summon. Display all calendars in a unified view with the ability to sync events bidirectionally.
 
 #### Subtasks
 - [ ] Research calendar integration APIs (Apple CalDAV, Google Calendar API)
@@ -14,7 +14,7 @@ Enable users to connect their existing Apple Calendar and Google Calendar accoun
 - [ ] Create unified calendar view component showing all calendars together
 - [ ] Add calendar filtering (show/hide specific calendars)
 - [ ] Add calendar color coding for visual distinction
-- [ ] Implement two-way sync: push Event Every events to external calendars
+- [ ] Implement two-way sync: push Summon events to external calendars
 - [ ] Implement two-way sync: pull updates from external calendars
 - [ ] Add sync status indicators and error handling
 - [ ] Store calendar credentials securely (encrypted local storage or backend)
@@ -22,7 +22,7 @@ Enable users to connect their existing Apple Calendar and Google Calendar accoun
 - [ ] Handle timezone conversions properly
 - [ ] Add conflict resolution for sync conflicts
 - [ ] Update storage service to track which events came from which calendar source
-- [ ] Add calendar selection when exporting Event Every events
+- [ ] Add calendar selection when exporting Summon events
 
 #### Technical Considerations
 - **Google Calendar API**: Requires OAuth 2.0, project setup in Google Cloud Console
@@ -53,7 +53,7 @@ Enable users to connect their existing Apple Calendar and Google Calendar accoun
 - [ ] Users can connect Apple Calendar (iCloud) accounts
 - [ ] All calendars display in a unified view
 - [ ] Events from external calendars are properly formatted
-- [ ] Users can push Event Every events to external calendars
+- [ ] Users can push Summon events to external calendars
 - [ ] Sync works bidirectionally without data loss
 - [ ] Calendar colors and names are preserved
 - [ ] Timezone handling is accurate
