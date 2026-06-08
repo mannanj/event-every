@@ -1,7 +1,7 @@
 import { ParsedEvent, BatchParsedEvents, ClientContext } from '@/types/event';
 
 const OPENROUTER_BASE_URL = process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1';
-const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || 'mistralai/pixtral-large-2411';
+const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || 'mistralai/mistral-large-2512';
 
 type ToolDefinition = {
   type: 'function';
