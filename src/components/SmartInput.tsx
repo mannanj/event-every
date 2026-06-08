@@ -5,14 +5,19 @@ import URLPill from './URLPill';
 import ImageModal from './ImageModal';
 import ParticleButton from './ParticleButton';
 import { parseICSFile } from '@/services/icsParser';
+import { inputStorage } from '@/services/inputStorage';
+import { StoredInputFile, InputDraft } from '@/types/input';
 
 interface SmartInputProps {
   onSubmit: (data: { text: string; images: File[]; calendarFiles: File[] }) => void;
   onError: (error: string) => void;
+  onOpenHistory: () => void;
 }
 
 export interface SmartInputHandle {
   clear: () => void;
+  getDraft: () => { text: string; images: File[]; calendarFiles: File[] };
+  loadInput: (text: string, files: StoredInputFile[]) => Promise<void>;
 }
 
 const MIN_TEXT_LENGTH = 3;
@@ -21,6 +26,10 @@ const MAX_FILES = 25;
 const ACCEPTED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/heic'];
 const ACCEPTED_CALENDAR_TYPES = ['text/calendar', 'application/ics'];
 const URL_REGEX = /(https?:\/\/(?:www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b(?:[-a-zA-Z0-9()@:%_\+.~#?&\/=]*))/gi;
+
+function makeFileId(): string {
+  return `f-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
 
 interface ImagePreview {
   file: File;
@@ -33,7 +42,7 @@ interface CalendarFilePreview {
 }
 
 const SmartInput = forwardRef<SmartInputHandle, SmartInputProps>(
-  function SmartInput({ onSubmit, onError }, ref) {
+  function SmartInput({ onSubmit, onError, onOpenHistory }, ref) {
     const [text, setText] = useState('');
     const [images, setImages] = useState<ImagePreview[]>([]);
     const [calendarFiles, setCalendarFiles] = useState<CalendarFilePreview[]>([]);
@@ -44,6 +53,25 @@ const SmartInput = forwardRef<SmartInputHandle, SmartInputProps>(
     const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
+    const restoredRef = useRef(false);
+
+    const applyStoredFiles = useCallback(async (files: StoredInputFile[]) => {
+      const cals = files.filter(f => f.kind === 'calendar');
+      setCalendarFiles(cals.map(c => ({ file: c.file, eventCount: c.eventCount ?? 0 })));
+      const imgs = files.filter(f => f.kind === 'image');
+      const previews = await Promise.all(
+        imgs.map(
+          f =>
+            new Promise<ImagePreview>(resolve => {
+              const reader = new FileReader();
+              reader.onloadend = () => resolve({ file: f.file, preview: reader.result as string });
+              reader.onerror = () => resolve({ file: f.file, preview: '' });
+              reader.readAsDataURL(f.file);
+            })
+        )
+      );
+      setImages(previews);
+    }, []);
 
     useImperativeHandle(ref, () => ({
       clear: () => {
@@ -52,6 +80,20 @@ const SmartInput = forwardRef<SmartInputHandle, SmartInputProps>(
         setCalendarFiles([]);
         setError(null);
         setDetectedUrls([]);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+        inputStorage.clearDraft();
+      },
+      getDraft: () => ({
+        text,
+        images: images.map(img => img.file),
+        calendarFiles: calendarFiles.map(cal => cal.file),
+      }),
+      loadInput: async (loadedText: string, files: StoredInputFile[]) => {
+        setError(null);
+        setText(loadedText);
+        await applyStoredFiles(files);
         if (fileInputRef.current) {
           fileInputRef.current.value = '';
         }
@@ -67,6 +109,59 @@ const SmartInput = forwardRef<SmartInputHandle, SmartInputProps>(
         setDetectedUrls([]);
       }
     }, [text]);
+
+    // Restore an in-progress draft (text + files) so a refresh/reload never loses work.
+    useEffect(() => {
+      let cancelled = false;
+      inputStorage.getDraft().then(async draft => {
+        if (cancelled) return;
+        if (draft && (draft.text || draft.files.length > 0)) {
+          setText(draft.text || '');
+          await applyStoredFiles(draft.files);
+        }
+        restoredRef.current = true;
+      });
+      return () => {
+        cancelled = true;
+      };
+    }, [applyStoredFiles]);
+
+    // Persist the current draft (debounced) once the initial restore has run.
+    useEffect(() => {
+      if (!restoredRef.current) return;
+      const handle = setTimeout(() => {
+        const isEmpty = text.trim().length === 0 && images.length === 0 && calendarFiles.length === 0;
+        if (isEmpty) {
+          inputStorage.clearDraft();
+          return;
+        }
+        const draft: InputDraft = {
+          text,
+          files: [
+            ...images.map(img => ({
+              id: makeFileId(),
+              file: img.file,
+              kind: 'image' as const,
+              name: img.file.name,
+              mimeType: img.file.type,
+              size: img.file.size,
+            })),
+            ...calendarFiles.map(cal => ({
+              id: makeFileId(),
+              file: cal.file,
+              kind: 'calendar' as const,
+              name: cal.file.name,
+              mimeType: cal.file.type || 'text/calendar',
+              size: cal.file.size,
+              eventCount: cal.eventCount,
+            })),
+          ],
+          updatedAt: Date.now(),
+        };
+        inputStorage.saveDraft(draft);
+      }, 400);
+      return () => clearTimeout(handle);
+    }, [text, images, calendarFiles]);
 
     const isImageFile = (file: File): boolean => {
       return ACCEPTED_IMAGE_TYPES.includes(file.type);
@@ -291,7 +386,7 @@ const SmartInput = forwardRef<SmartInputHandle, SmartInputProps>(
         >
           {/* Files row at top - scrollable horizontally up to attach icon */}
           {(images.length > 0 || calendarFiles.length > 0) && (
-            <div className="flex-shrink-0 pt-3 pl-2 pr-12 pb-2">
+            <div className="flex-shrink-0 pt-3 pl-2 pr-24 pb-2">
               <div className="flex gap-2 overflow-x-auto pb-1">
                 {/* Images first */}
                 {images.map((img, index) => (
@@ -386,6 +481,18 @@ const SmartInput = forwardRef<SmartInputHandle, SmartInputProps>(
             </div>
           )}
 
+          {/* Input history button — floating, left of the attach icon */}
+          <button
+            onClick={onOpenHistory}
+            className="absolute top-2 right-14 z-20 p-2 text-gray-600 hover:text-black transition-colors focus:outline-none focus:ring-2 focus:ring-black rounded"
+            aria-label="Open input history"
+            data-testid="input-history-button"
+          >
+            <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </button>
+
           {/* Attach icon button at top-right - floating */}
           <button
             onClick={handleUploadClick}
@@ -405,6 +512,7 @@ const SmartInput = forwardRef<SmartInputHandle, SmartInputProps>(
           {/* Text area - takes remaining space */}
           <textarea
             ref={textareaRef}
+            data-testid="smart-input-textarea"
             value={text}
             onChange={handleChange}
             onKeyDown={handleKeyDown}

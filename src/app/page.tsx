@@ -3,12 +3,15 @@
 import { useState, useRef, useEffect } from 'react';
 import SmartInput, { SmartInputHandle } from '@/components/SmartInput';
 import UnsavedEventsSection from '@/components/UnsavedEventsSection';
+import InputHistoryModal from '@/components/InputHistoryModal';
 import ErrorNotification from '@/components/ErrorNotification';
 import RateLimitBanner from '@/components/RateLimitBanner';
 import InlineEventEditor from '@/components/InlineEventEditor';
 import { CalendarEvent, ParsedEvent, StreamedEventChunk, EventAttachment, EventSortOption, TimezoneStatus } from '@/types/event';
+import { InputHistoryEntry, StoredInputFile, InputSource } from '@/types/input';
 import { exportToICS } from '@/services/exporter';
 import { useHistory } from '@/hooks/useHistory';
+import { useInputHistory } from '@/hooks/useInputHistory';
 import { useProcessingQueue } from '@/hooks/useProcessingQueue';
 import { detectURLs } from '@/services/urlDetector';
 import { scrapeURLsBatch } from '@/services/webScraper';
@@ -66,6 +69,8 @@ export default function Home() {
   const [totalEventsInStorage, setTotalEventsInStorage] = useState(0);
   const { addToQueue, updateProgress } = useProcessingQueue();
   const smartInputRef = useRef<SmartInputHandle>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const { entries: inputHistory, addEntry: addInputHistory } = useInputHistory();
   const [showDateRangePicker, setShowDateRangePicker] = useState(false);
   const [isCustomMode, setIsCustomMode] = useState(false);
   const [lastPresetDates, setLastPresetDates] = useState<{ start: Date; end: Date } | null>(null);
@@ -703,8 +708,38 @@ export default function Home() {
     );
   };
 
+  const buildHistoryFiles = (images: File[], calendarFiles: File[]): StoredInputFile[] => [
+    ...images.map(file => ({ id: `f-${Date.now()}-${Math.random().toString(36).slice(2)}`, file, kind: 'image' as const, name: file.name, mimeType: file.type, size: file.size })),
+    ...calendarFiles.map(file => ({ id: `f-${Date.now()}-${Math.random().toString(36).slice(2)}`, file, kind: 'calendar' as const, name: file.name, mimeType: file.type || 'text/calendar', size: file.size })),
+  ];
+
+  const saveInputToHistory = (text: string, images: File[], calendarFiles: File[]) => {
+    const trimmed = text.trim();
+    if (!trimmed && images.length === 0 && calendarFiles.length === 0) return;
+    const hasFiles = images.length + calendarFiles.length > 0;
+    const source: InputSource = trimmed && hasFiles ? 'mixed' : hasFiles ? 'image' : 'text';
+    addInputHistory({
+      id: `ih-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      createdAt: Date.now(),
+      text: trimmed,
+      files: buildHistoryFiles(images, calendarFiles),
+      source,
+    });
+  };
+
+  const handleApplyInput = async (entry: InputHistoryEntry) => {
+    const current = smartInputRef.current?.getDraft();
+    if (current && (current.text.trim() || current.images.length > 0 || current.calendarFiles.length > 0)) {
+      saveInputToHistory(current.text, current.images, current.calendarFiles);
+    }
+    await smartInputRef.current?.loadInput(entry.text, entry.files);
+    setHistoryOpen(false);
+  };
+
   const handleSmartInputSubmit = async (data: { text: string; images: File[]; calendarFiles: File[] }) => {
     const { text, images, calendarFiles } = data;
+
+    saveInputToHistory(text, images, calendarFiles);
 
     if (images.length > 0) {
       handleImageSelect(images, text.trim().length > 0 ? text.trim() : undefined);
@@ -937,6 +972,7 @@ export default function Home() {
             ref={smartInputRef}
             onSubmit={handleSmartInputSubmit}
             onError={handleError}
+            onOpenHistory={() => setHistoryOpen(true)}
           />
         </div>
 
@@ -1431,6 +1467,12 @@ export default function Home() {
           </div>
         </div>
       )}
+      <InputHistoryModal
+        open={historyOpen}
+        entries={inputHistory}
+        onClose={() => setHistoryOpen(false)}
+        onApply={handleApplyInput}
+      />
     </main>
   );
 }
