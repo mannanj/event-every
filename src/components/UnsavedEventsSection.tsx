@@ -166,7 +166,17 @@ export default function UnsavedEventsSection({
       <div className="border-2 border-black bg-white">
         {/* Processing status label and skeleton loaders */}
         {hasActiveProcessing && (
-          <div className="p-4 bg-gray-50 border-b-2 border-black">
+          <div className="relative p-4 bg-gray-50 border-b-2 border-black">
+            <button
+              onClick={onCancelAll}
+              className="absolute top-2 right-2 z-20 p-1 text-black hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-black"
+              aria-label="Cancel processing"
+              data-testid="cancel-job-button"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
             <h2 className="text-lg font-bold text-black mb-4">
               <RainbowText>{currentMessage}</RainbowText>
               <AnimatedEllipsis textLength={currentMessage.length} />

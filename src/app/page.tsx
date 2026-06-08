@@ -71,6 +71,7 @@ export default function Home() {
   const smartInputRef = useRef<SmartInputHandle>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const { entries: inputHistory, addEntry: addInputHistory } = useInputHistory();
+  const abortRef = useRef<AbortController | null>(null);
   const [showDateRangePicker, setShowDateRangePicker] = useState(false);
   const [isCustomMode, setIsCustomMode] = useState(false);
   const [lastPresetDates, setLastPresetDates] = useState<{ start: Date; end: Date } | null>(null);
@@ -384,6 +385,9 @@ export default function Home() {
         const imageFiles = queueItem.payload as File[];
         const allEvents: CalendarEvent[] = [];
 
+        const controller = new AbortController();
+        abortRef.current = controller;
+
         const batchId = `batch-${Date.now()}`;
         setBatchProcessing({
           id: batchId,
@@ -401,6 +405,7 @@ export default function Home() {
         setImageProcessingStatuses(initialStatuses);
 
         for (let i = 0; i < imageFiles.length; i++) {
+          if (controller.signal.aborted) break;
           const file = imageFiles[i];
           const statusId = initialStatuses[i].id;
 
@@ -445,6 +450,7 @@ export default function Home() {
                 batch: true,
                 clientContext,
               }),
+              signal: controller.signal,
             });
 
             if (!response.ok) {
@@ -503,6 +509,9 @@ export default function Home() {
               prev.map(s => s.id === statusId ? { ...s, status: 'complete' as const, eventCount: eventsFromThisImage } : s)
             );
           } catch (err) {
+            if (controller.signal.aborted || (err instanceof Error && err.name === 'AbortError')) {
+              break;
+            }
             const errorMessage = err instanceof Error
               ? err.message
               : 'Unable to extract event details from this image.';
@@ -535,6 +544,9 @@ export default function Home() {
       undefined,
       async (queueItem: QueueItem) => {
         const inputText = queueItem.payload as string;
+
+        const controller = new AbortController();
+        abortRef.current = controller;
 
         try {
           setUrlProcessingStatus({
@@ -614,6 +626,7 @@ export default function Home() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ text: combinedText, batch: true, clientContext }),
+            signal: controller.signal,
           });
 
           if (!response.ok) {
@@ -684,6 +697,10 @@ export default function Home() {
 
           return allEvents;
         } catch (err) {
+          if (controller.signal.aborted || (err instanceof Error && err.name === 'AbortError')) {
+            setUrlProcessingStatus(null);
+            return [];
+          }
           const errorMessage = err instanceof Error
             ? err.message
             : 'Unable to extract event details from this text.';
@@ -841,8 +858,12 @@ export default function Home() {
   };
 
   const handleCancelBatch = () => {
+    abortRef.current?.abort();
+    abortRef.current = null;
     setUnsavedEvents([]);
     setBatchProcessing(null);
+    setImageProcessingStatuses([]);
+    setUrlProcessingStatus(null);
   };
 
   const formatDate = (date: Date) => {
