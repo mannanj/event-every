@@ -197,7 +197,7 @@ const ImageModal = ({ images, initialIndex, onClose }: ImageModalProps) => {
       >
         <img
           ref={imageRef}
-          src={currentImage.preview}
+          src={currentImage.preview || undefined}
           alt={currentImage.file.name}
           className={`max-w-full max-h-full object-contain transition-transform ${
             zoom > 1 ? 'cursor-move' : 'cursor-zoom-in'

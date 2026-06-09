@@ -36,6 +36,17 @@ export default function InputHistoryModal({ open, entries, onClose, onApply }: I
     return () => window.removeEventListener('keydown', onKey);
   }, [open, onClose]);
 
+  // Lock background page scroll while open so wheel/touch scroll stays scoped to
+  // the modal and never chains to the page below.
+  useEffect(() => {
+    if (!open) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [open]);
+
   // Object URLs for image thumbnails — created only while open, revoked on close/change.
   const thumbUrls = useMemo(() => {
     const map = new Map<string, string>();
@@ -43,7 +54,11 @@ export default function InputHistoryModal({ open, entries, onClose, onApply }: I
       for (const entry of entries) {
         for (const f of entry.files) {
           if (f.kind === 'image') {
-            map.set(f.id, URL.createObjectURL(f.file));
+            try {
+              map.set(f.id, URL.createObjectURL(f.file));
+            } catch {
+              // Unreadable stored blob — skip; the card shows no thumbnail rather than erroring.
+            }
           }
         }
       }
@@ -72,7 +87,7 @@ export default function InputHistoryModal({ open, entries, onClose, onApply }: I
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-black bg-opacity-60 flex items-start justify-center p-4 overflow-y-auto"
+      className="fixed inset-0 z-50 bg-black bg-opacity-60 flex items-start justify-center p-4 overflow-y-auto overscroll-contain"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}

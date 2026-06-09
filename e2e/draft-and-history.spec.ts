@@ -43,7 +43,28 @@ test.describe('Input draft persistence', () => {
     await page.waitForTimeout(800);
     await page.reload();
     await page.waitForSelector('[data-testid="smart-input-textarea"]', { state: 'visible' });
+    const restored = page.locator('img[alt="Uploaded 1"]');
+    await expect(restored).toBeVisible({ timeout: 8000 });
+    await expect(restored).toHaveAttribute('src', /^(blob:|data:)/); // not an empty src
+  });
+
+  test('a stored image renders (valid src, not empty) when loaded back from history', async ({ page }) => {
+    await setupLocal(page);
+    await mockParseAPI(page, SINGLE_EVENT);
+    await page.locator('input[type="file"]').setInputFiles({
+      name: 'flyer.png',
+      mimeType: 'image/png',
+      buffer: Buffer.from(TINY_PNG_BASE64, 'base64'),
+    });
     await expect(page.locator('img[alt="Uploaded 1"]')).toBeVisible({ timeout: 8000 });
+    await page.locator('button[aria-label="Transform content to events"]').click();
+    await waitForEvents(page, 1);
+
+    await page.locator('[data-testid="input-history-button"]').click();
+    await page.locator('[data-testid="input-history-card"]').first().click();
+    const loaded = page.locator('img[alt="Uploaded 1"]');
+    await expect(loaded).toBeVisible({ timeout: 8000 });
+    await expect(loaded).toHaveAttribute('src', /^(blob:|data:)/);
   });
 });
 
@@ -138,6 +159,21 @@ test.describe('Input history', () => {
     await page.locator('[data-testid="input-history-button"]').click();
     await expect(page.locator('[data-testid="input-history-card"]')).toHaveCount(2);
     await expect(page.locator('[data-testid="input-history-modal"]')).toContainText('Unsaved scratch note');
+  });
+
+  test('the history modal locks background page scroll while open', async ({ page }) => {
+    await setupLocal(page);
+    await mockParseAPI(page, SINGLE_EVENT);
+    await submitText(page, 'scroll lock test');
+    await waitForEvents(page, 1);
+
+    await page.locator('[data-testid="input-history-button"]').click();
+    await expect(page.locator('[data-testid="input-history-modal"]')).toBeVisible();
+    await expect.poll(() => page.evaluate(() => document.body.style.overflow)).toBe('hidden');
+
+    await page.keyboard.press('Escape');
+    await expect(page.locator('[data-testid="input-history-modal"]')).toBeHidden();
+    await expect.poll(() => page.evaluate(() => document.body.style.overflow)).not.toBe('hidden');
   });
 
   test('history groups entries into day sections', async ({ page }) => {

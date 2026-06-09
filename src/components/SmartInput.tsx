@@ -56,23 +56,38 @@ const SmartInput = forwardRef<SmartInputHandle, SmartInputProps>(
     const editorRef = useRef<HTMLDivElement>(null);
     const restoredRef = useRef(false);
 
+    const objectUrlsRef = useRef<string[]>([]);
+
     const applyStoredFiles = useCallback(async (files: StoredInputFile[]) => {
+      // Revoke object URLs from a previous load before creating new ones.
+      objectUrlsRef.current.forEach(u => URL.revokeObjectURL(u));
+      objectUrlsRef.current = [];
+
       const cals = files.filter(f => f.kind === 'calendar');
       setCalendarFiles(cals.map(c => ({ file: c.file, eventCount: c.eventCount ?? 0 })));
+
+      // Render stored blobs via object URLs (synchronous + robust) instead of FileReader,
+      // which can fail on an IndexedDB-restored File and leave an empty <img src="">.
       const imgs = files.filter(f => f.kind === 'image');
-      const previews = await Promise.all(
-        imgs.map(
-          f =>
-            new Promise<ImagePreview>(resolve => {
-              const reader = new FileReader();
-              reader.onloadend = () => resolve({ file: f.file, preview: reader.result as string });
-              reader.onerror = () => resolve({ file: f.file, preview: '' });
-              reader.readAsDataURL(f.file);
-            })
-        )
-      );
+      const previews: ImagePreview[] = [];
+      for (const f of imgs) {
+        try {
+          const url = URL.createObjectURL(f.file);
+          objectUrlsRef.current.push(url);
+          previews.push({ file: f.file, preview: url });
+        } catch {
+          // Unreadable stored blob — skip rather than render a broken image.
+        }
+      }
       setImages(previews);
     }, []);
+
+    useEffect(
+      () => () => {
+        objectUrlsRef.current.forEach(u => URL.revokeObjectURL(u));
+      },
+      []
+    );
 
     // Imperatively set the editor's content for programmatic changes (clear / load / restore /
     // URL-pill removal). The contenteditable is otherwise uncontrolled — user typing flows
@@ -86,6 +101,8 @@ const SmartInput = forwardRef<SmartInputHandle, SmartInputProps>(
 
     useImperativeHandle(ref, () => ({
       clear: () => {
+        objectUrlsRef.current.forEach(u => URL.revokeObjectURL(u));
+        objectUrlsRef.current = [];
         setEditorContent('');
         setImages([]);
         setCalendarFiles([]);
@@ -420,7 +437,7 @@ const SmartInput = forwardRef<SmartInputHandle, SmartInputProps>(
                       className="w-[128px] h-[128px] border-2 border-black bg-white cursor-pointer overflow-hidden hover:border-gray-600 transition-colors relative"
                     >
                       <img
-                        src={img.preview}
+                        src={img.preview || undefined}
                         alt={`Uploaded ${index + 1}`}
                         className="w-full h-full object-cover"
                       />
@@ -449,7 +466,7 @@ const SmartInput = forwardRef<SmartInputHandle, SmartInputProps>(
                       <div className="absolute top-full left-0 mt-2 z-50 pointer-events-none">
                         <div className="bg-white border-2 border-black p-3 shadow-xl">
                           <img
-                            src={img.preview}
+                            src={img.preview || undefined}
                             alt={`Preview ${index + 1}`}
                             className="max-w-lg max-h-96 object-contain"
                           />
