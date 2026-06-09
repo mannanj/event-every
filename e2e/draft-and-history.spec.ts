@@ -1,0 +1,148 @@
+import { test, expect } from '@playwright/test';
+import {
+  setupLocal,
+  mockParseAPI,
+  mockParseAPIDelayed,
+  submitText,
+  waitForEvents,
+  TINY_PNG_BASE64,
+} from './helpers';
+
+const SINGLE_EVENT = [
+  {
+    title: 'Coffee with Dana',
+    startDate: '2026-07-01T10:00:00',
+    endDate: '2026-07-01T11:00:00',
+    confidence: 0.9,
+    allDay: false,
+    timezone: null,
+  },
+];
+
+test.describe('Input draft persistence', () => {
+  test('text draft survives a page reload', async ({ page }) => {
+    await setupLocal(page);
+    const ta = page.locator('[data-testid="smart-input-textarea"]');
+    await ta.fill('My unsaved draft text');
+    await page.waitForTimeout(800); // debounce + IndexedDB write
+    await page.reload();
+    await page.waitForSelector('[data-testid="smart-input-textarea"]', { state: 'visible' });
+    await expect(page.locator('[data-testid="smart-input-textarea"]')).toHaveValue('My unsaved draft text', {
+      timeout: 8000,
+    });
+  });
+
+  test('an attached image survives a page reload', async ({ page }) => {
+    await setupLocal(page);
+    await page.locator('input[type="file"]').setInputFiles({
+      name: 'flyer.png',
+      mimeType: 'image/png',
+      buffer: Buffer.from(TINY_PNG_BASE64, 'base64'),
+    });
+    await expect(page.locator('img[alt="Uploaded 1"]')).toBeVisible({ timeout: 8000 });
+    await page.waitForTimeout(800);
+    await page.reload();
+    await page.waitForSelector('[data-testid="smart-input-textarea"]', { state: 'visible' });
+    await expect(page.locator('img[alt="Uploaded 1"]')).toBeVisible({ timeout: 8000 });
+  });
+});
+
+test.describe('Input history', () => {
+  test('transforming saves the input to history', async ({ page }) => {
+    await setupLocal(page);
+    await mockParseAPI(page, SINGLE_EVENT);
+    await submitText(page, 'Coffee with Dana');
+    await waitForEvents(page, 1);
+
+    await page.locator('[data-testid="input-history-button"]').click();
+    await expect(page.locator('[data-testid="input-history-modal"]')).toBeVisible();
+    const cards = page.locator('[data-testid="input-history-card"]');
+    await expect(cards).toHaveCount(1);
+    await expect(cards.first()).toContainText('Coffee with Dana');
+  });
+
+  test('clicking a history entry loads it back into the input', async ({ page }) => {
+    await setupLocal(page);
+    await mockParseAPI(page, SINGLE_EVENT);
+    await submitText(page, 'Lunch with Priya');
+    await waitForEvents(page, 1);
+    await expect(page.locator('[data-testid="smart-input-textarea"]')).toHaveValue('');
+
+    await page.locator('[data-testid="input-history-button"]').click();
+    await page.locator('[data-testid="input-history-card"]').first().click();
+    await expect(page.locator('[data-testid="input-history-modal"]')).toBeHidden();
+    await expect(page.locator('[data-testid="smart-input-textarea"]')).toHaveValue('Lunch with Priya');
+  });
+
+  test('applying history with an unsaved draft auto-saves the draft first', async ({ page }) => {
+    await setupLocal(page);
+    await mockParseAPI(page, SINGLE_EVENT);
+    await submitText(page, 'First input');
+    await waitForEvents(page, 1);
+
+    // Type an un-transformed draft, then apply an older history entry.
+    await page.locator('[data-testid="smart-input-textarea"]').fill('Unsaved scratch note');
+    await page.waitForTimeout(800);
+
+    await page.locator('[data-testid="input-history-button"]').click();
+    await expect(page.locator('[data-testid="input-history-card"]')).toHaveCount(1);
+    await page.locator('[data-testid="input-history-card"]').first().click();
+    await expect(page.locator('[data-testid="smart-input-textarea"]')).toHaveValue('First input');
+
+    // The unsaved draft should have been auto-saved → now two history entries.
+    await page.locator('[data-testid="input-history-button"]').click();
+    await expect(page.locator('[data-testid="input-history-card"]')).toHaveCount(2);
+    await expect(page.locator('[data-testid="input-history-modal"]')).toContainText('Unsaved scratch note');
+  });
+
+  test('history groups entries into day sections', async ({ page }) => {
+    await setupLocal(page);
+    await mockParseAPI(page, SINGLE_EVENT);
+    await submitText(page, 'Today input');
+    await waitForEvents(page, 1);
+
+    // Seed an older entry directly into IndexedDB (the DB exists after the first save).
+    await page.evaluate(
+      (createdAt) =>
+        new Promise<void>((resolve, reject) => {
+          const req = indexedDB.open('summon-input', 1);
+          req.onsuccess = () => {
+            const db = req.result;
+            const tx = db.transaction('history', 'readwrite');
+            tx.objectStore('history').put({
+              id: 'seed-old',
+              createdAt,
+              text: 'Older input',
+              files: [],
+              source: 'text',
+            });
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error);
+          };
+          req.onerror = () => reject(req.error);
+        }),
+      Date.now() - 3 * 86400000
+    );
+
+    await page.reload();
+    await page.waitForSelector('[data-testid="smart-input-textarea"]', { state: 'visible' });
+    await page.locator('[data-testid="input-history-button"]').click();
+    await expect(page.locator('[data-testid="input-history-day"]')).toHaveCount(2);
+    await expect(page.locator('[data-testid="input-history-card"]')).toHaveCount(2);
+  });
+});
+
+test.describe('Job cancellation', () => {
+  test('cancel aborts an in-flight parse and clears the processing card', async ({ page }) => {
+    await setupLocal(page);
+    await mockParseAPIDelayed(page, SINGLE_EVENT, 6000);
+    await submitText(page, 'Some event happening sometime soon');
+
+    const cancelBtn = page.locator('[data-testid="cancel-job-button"]');
+    await expect(cancelBtn).toBeVisible({ timeout: 8000 });
+    await cancelBtn.click();
+
+    await expect(cancelBtn).toBeHidden({ timeout: 8000 });
+    await expect(page.locator('h3.font-bold')).toHaveCount(0);
+  });
+});
