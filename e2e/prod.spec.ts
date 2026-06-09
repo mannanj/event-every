@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
-// The unlock pattern lives only in .env.local (gitignored) as TEST_AUTH_PATTERN,
-// e.g. TEST_AUTH_PATTERN=0,3,6,7,8 — never committed. Without it, prod tests skip.
+// The unlock pattern lives only in .env.local (gitignored) as TEST_AUTH_PATTERN
+// (comma-separated grid indices) — never committed. Without it, prod tests skip.
 const RAW = process.env.TEST_AUTH_PATTERN;
 const PATTERN = RAW ? RAW.split(',').map(n => parseInt(n.trim(), 10)) : null;
 
