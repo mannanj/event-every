@@ -35,7 +35,7 @@ test.describe('Production (summonit.app) — real stack', () => {
     await page.waitForTimeout(1000);
     await page.reload();
     await page.waitForSelector('[data-testid="smart-input-textarea"]', { state: 'visible' });
-    await expect(page.locator('[data-testid="smart-input-textarea"]')).toHaveValue('Prod draft persistence check', {
+    await expect(page.locator('[data-testid="smart-input-textarea"]')).toHaveText('Prod draft persistence check', {
       timeout: 10000,
     });
   });

@@ -53,7 +53,7 @@ const SmartInput = forwardRef<SmartInputHandle, SmartInputProps>(
     const [hoveredImageIndex, setHoveredImageIndex] = useState<number | null>(null);
     const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
-    const textareaRef = useRef<HTMLTextAreaElement>(null);
+    const editorRef = useRef<HTMLDivElement>(null);
     const restoredRef = useRef(false);
 
     const applyStoredFiles = useCallback(async (files: StoredInputFile[]) => {
@@ -74,9 +74,19 @@ const SmartInput = forwardRef<SmartInputHandle, SmartInputProps>(
       setImages(previews);
     }, []);
 
+    // Imperatively set the editor's content for programmatic changes (clear / load / restore /
+    // URL-pill removal). The contenteditable is otherwise uncontrolled — user typing flows
+    // DOM -> state via onInput, so React never re-renders (and never clobbers) its children.
+    const setEditorContent = useCallback((value: string) => {
+      if (editorRef.current && editorRef.current.innerText !== value) {
+        editorRef.current.innerText = value;
+      }
+      setText(value);
+    }, []);
+
     useImperativeHandle(ref, () => ({
       clear: () => {
-        setText('');
+        setEditorContent('');
         setImages([]);
         setCalendarFiles([]);
         setError(null);
@@ -93,7 +103,7 @@ const SmartInput = forwardRef<SmartInputHandle, SmartInputProps>(
       }),
       loadInput: async (loadedText: string, files: StoredInputFile[]) => {
         setError(null);
-        setText(loadedText);
+        setEditorContent(loadedText);
         await applyStoredFiles(files);
         if (fileInputRef.current) {
           fileInputRef.current.value = '';
@@ -117,6 +127,7 @@ const SmartInput = forwardRef<SmartInputHandle, SmartInputProps>(
       inputStorage.getDraft().then(async draft => {
         if (cancelled) return;
         if (draft && (draft.text || draft.files.length > 0)) {
+          if (editorRef.current) editorRef.current.innerText = draft.text || '';
           setText(draft.text || '');
           await applyStoredFiles(draft.files);
         }
@@ -323,22 +334,29 @@ const SmartInput = forwardRef<SmartInputHandle, SmartInputProps>(
       });
     }, [text, images, calendarFiles, onSubmit]);
 
-    const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
       if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
         handleSubmit();
       }
     };
 
-    const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-      setText(e.target.value);
+    const handleEditorInput = () => {
+      setText(editorRef.current?.innerText ?? '');
       if (error) {
         setError(null);
       }
     };
 
+    // Paste as plain text so rich flyer/email content doesn't inject markup.
+    const handlePaste = (e: React.ClipboardEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      const plain = e.clipboardData.getData('text/plain');
+      document.execCommand('insertText', false, plain);
+    };
+
     const handleRemoveUrl = (urlToRemove: string) => {
-      setText(prevText => prevText.replace(urlToRemove, '').trim());
+      setEditorContent((editorRef.current?.innerText ?? text).replace(urlToRemove, '').trim());
     };
 
     const handleUploadClick = () => {
@@ -512,19 +530,31 @@ const SmartInput = forwardRef<SmartInputHandle, SmartInputProps>(
             )}
           </button>
 
-          {/* Text area - takes remaining space */}
-          <textarea
-            ref={textareaRef}
-            data-testid="smart-input-textarea"
-            value={text}
-            onChange={handleChange}
-            onKeyDown={handleKeyDown}
-            placeholder="Drop your screenshot, image, or text here. We'll turn it into events ✨"
-            aria-label="Enter event details as text or drop images"
-            aria-describedby={error ? 'smart-input-error' : undefined}
-            aria-invalid={error ? 'true' : 'false'}
-            className={`flex-1 w-full p-2 ${hasHistory ? 'pr-24' : 'pr-12'} text-black placeholder-gray-400 bg-transparent resize-none focus:outline-none centered-placeholder ${images.length > 0 ? 'has-images' : ''}`}
-          />
+          {/* Text area — contentEditable so text wraps around the corner controls.
+              A transparent float (.smart-wrap-spacer) carves the top-right (icons) and
+              bottom-right (Transform button) corners; middle lines stay full width. */}
+          <div className="relative flex-1 w-full overflow-y-auto [container-type:size]">
+            <div aria-hidden="true" className={`smart-wrap-spacer${hasHistory ? ' with-history' : ''}`} />
+            <div
+              ref={editorRef}
+              data-testid="smart-input-textarea"
+              role="textbox"
+              aria-multiline="true"
+              aria-label="Enter event details as text or drop images"
+              aria-describedby={error ? 'smart-input-error' : undefined}
+              aria-invalid={error ? 'true' : 'false'}
+              contentEditable
+              suppressContentEditableWarning
+              spellCheck
+              data-placeholder="Drop your screenshot, image, or text here. We'll turn it into events ✨"
+              data-empty={text.trim().length === 0 ? 'true' : 'false'}
+              data-has-images={images.length > 0 ? 'true' : 'false'}
+              onInput={handleEditorInput}
+              onKeyDown={handleKeyDown}
+              onPaste={handlePaste}
+              className="smart-editor"
+            />
+          </div>
 
           {/* URL pills row at bottom - flex item like images */}
           {detectedUrls.length > 0 && (

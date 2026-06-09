@@ -31,20 +31,42 @@ body {
   pointer-events: none !important;
 }
 
-.centered-placeholder {
-  padding-left: 15px;
+.smart-editor {
+  min-height: 100%;
+  padding: 0.75rem 0.5rem 0.5rem 15px;
+  color: #000;
+  outline: none;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  cursor: text;
 }
 
-.centered-placeholder:placeholder-shown {
+.smart-editor[data-empty="true"]::before {
+  content: attr(data-placeholder);
+  color: #9ca3af;
+  pointer-events: none;
+}
+
+/* Vertically center the placeholder when empty, mirroring the old textarea. */
+.smart-editor[data-empty="true"] {
   padding-top: 170px;
 }
 
-.centered-placeholder.has-images:placeholder-shown {
+.smart-editor[data-empty="true"][data-has-images="true"] {
   padding-top: 14px;
 }
 
-.centered-placeholder:not(:placeholder-shown) {
-  padding-top: 0.75rem;
+/* Transparent float that carves the top-right (icons) and bottom-right (Transform
+   button) corners so the first/last lines wrap shorter while the middle stays full width. */
+.smart-wrap-spacer {
+  float: right;
+  width: 160px;
+  height: 100cqh;
+  shape-outside: polygon(104px 0, 160px 0, 160px 100%, 0 100%, 0 calc(100% - 64px), 160px calc(100% - 64px), 160px 64px, 104px 64px);
+}
+
+.smart-wrap-spacer.with-history {
+  shape-outside: polygon(50px 0, 160px 0, 160px 100%, 0 100%, 0 calc(100% - 64px), 160px calc(100% - 64px), 160px 64px, 50px 64px);
 }
 
 @keyframes rainbow {

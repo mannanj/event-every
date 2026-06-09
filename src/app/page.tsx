@@ -1001,7 +1001,7 @@ export default function Home() {
         </header>
 
         {/* Smart input section */}
-        <div className="border-2 border-black bg-white p-[5px] mb-12 h-[400px]">
+        <div className="border-2 border-black bg-white p-[5px] mb-12 h-[400px]" data-testid="input-box">
           <SmartInput
             ref={smartInputRef}
             onSubmit={handleSmartInputSubmit}

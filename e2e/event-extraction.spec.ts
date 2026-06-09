@@ -87,12 +87,12 @@ async function setupPage(page: Page) {
 
   await page.goto('/');
   // Wait for the textarea to be present and interactive
-  await page.waitForSelector('textarea', { state: 'visible', timeout: 15000 });
+  await page.waitForSelector('[data-testid="smart-input-textarea"]', { state: 'visible', timeout: 15000 });
 }
 
 // Helper: type text and submit
 async function submitText(page: Page, text: string) {
-  const textarea = page.locator('textarea');
+  const textarea = page.locator('[data-testid="smart-input-textarea"]');
   await textarea.fill(text);
   await textarea.press('Meta+Enter');
 }
@@ -293,7 +293,7 @@ test.describe('UI Interaction Tests', () => {
   test('Submit button enables with 3+ chars', async ({ page }) => {
     await setupPage(page);
 
-    const textarea = page.locator('textarea');
+    const textarea = page.locator('[data-testid="smart-input-textarea"]');
     await textarea.fill('abc');
 
     const submitButton = page.locator('button[aria-label="Transform content to events"]');
@@ -357,7 +357,7 @@ test.describe('UI Interaction Tests', () => {
       },
     ]);
 
-    const textarea = page.locator('textarea');
+    const textarea = page.locator('[data-testid="smart-input-textarea"]');
     await textarea.fill('Quick Event May 1 at 10am');
     await textarea.press('Meta+Enter');
 

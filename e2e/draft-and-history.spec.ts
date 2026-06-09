@@ -27,7 +27,7 @@ test.describe('Input draft persistence', () => {
     await page.waitForTimeout(800); // debounce + IndexedDB write
     await page.reload();
     await page.waitForSelector('[data-testid="smart-input-textarea"]', { state: 'visible' });
-    await expect(page.locator('[data-testid="smart-input-textarea"]')).toHaveValue('My unsaved draft text', {
+    await expect(page.locator('[data-testid="smart-input-textarea"]')).toHaveText('My unsaved draft text', {
       timeout: 8000,
     });
   });
@@ -111,12 +111,12 @@ test.describe('Input history', () => {
     await mockParseAPI(page, SINGLE_EVENT);
     await submitText(page, 'Lunch with Priya');
     await waitForEvents(page, 1);
-    await expect(page.locator('[data-testid="smart-input-textarea"]')).toHaveValue('');
+    await expect(page.locator('[data-testid="smart-input-textarea"]')).toHaveText('');
 
     await page.locator('[data-testid="input-history-button"]').click();
     await page.locator('[data-testid="input-history-card"]').first().click();
     await expect(page.locator('[data-testid="input-history-modal"]')).toBeHidden();
-    await expect(page.locator('[data-testid="smart-input-textarea"]')).toHaveValue('Lunch with Priya');
+    await expect(page.locator('[data-testid="smart-input-textarea"]')).toHaveText('Lunch with Priya');
   });
 
   test('applying history with an unsaved draft auto-saves the draft first', async ({ page }) => {
@@ -132,7 +132,7 @@ test.describe('Input history', () => {
     await page.locator('[data-testid="input-history-button"]').click();
     await expect(page.locator('[data-testid="input-history-card"]')).toHaveCount(1);
     await page.locator('[data-testid="input-history-card"]').first().click();
-    await expect(page.locator('[data-testid="smart-input-textarea"]')).toHaveValue('First input');
+    await expect(page.locator('[data-testid="smart-input-textarea"]')).toHaveText('First input');
 
     // The unsaved draft should have been auto-saved → now two history entries.
     await page.locator('[data-testid="input-history-button"]').click();
