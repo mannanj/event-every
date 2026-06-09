@@ -767,10 +767,8 @@ export default function Home() {
   const handleSmartInputSubmit = async (data: { text: string; images: File[]; calendarFiles: File[] }) => {
     const { text, images, calendarFiles } = data;
 
-    // Only record in Recent summons if this isn't an unmodified entry loaded from history.
-    if (inputSignature(text, images, calendarFiles) !== loadedSigRef.current) {
-      saveInputToHistory(text, images, calendarFiles);
-    }
+    // Transform always records to Recent summons — re-saving a loaded entry is fine.
+    saveInputToHistory(text, images, calendarFiles);
     loadedSigRef.current = null;
 
     if (images.length > 0) {

@@ -70,7 +70,7 @@ test.describe('Input history', () => {
     await expect(cards.first()).toContainText('Coffee with Dana');
   });
 
-  test('loading an entry and transforming it unmodified does not duplicate it', async ({ page }) => {
+  test('loading an entry (without changing it) never duplicates it in history', async ({ page }) => {
     await setupLocal(page);
     await mockParseAPI(page, SINGLE_EVENT);
     await submitText(page, 'Reusable summon text');
@@ -78,10 +78,14 @@ test.describe('Input history', () => {
 
     await page.locator('[data-testid="input-history-button"]').click();
     await expect(page.locator('[data-testid="input-history-card"]')).toHaveCount(1);
-    await page.locator('[data-testid="input-history-card"]').first().click();
 
-    // Transform the loaded entry unchanged -> must NOT create a second history entry.
-    await page.locator('[data-testid="smart-input-textarea"]').press('Meta+Enter');
+    // Simply loading it back must NOT add a duplicate.
+    await page.locator('[data-testid="input-history-card"]').first().click();
+    await page.locator('[data-testid="input-history-button"]').click();
+    await expect(page.locator('[data-testid="input-history-card"]')).toHaveCount(1);
+
+    // Loading it again, still unchanged, also must not duplicate.
+    await page.locator('[data-testid="input-history-card"]').first().click();
     await page.locator('[data-testid="input-history-button"]').click();
     await expect(page.locator('[data-testid="input-history-card"]')).toHaveCount(1);
   });
