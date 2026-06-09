@@ -72,6 +72,7 @@ export default function Home() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const { entries: inputHistory, addEntry: addInputHistory } = useInputHistory();
   const abortRef = useRef<AbortController | null>(null);
+  const loadedSigRef = useRef<string | null>(null);
   const [showDateRangePicker, setShowDateRangePicker] = useState(false);
   const [isCustomMode, setIsCustomMode] = useState(false);
   const [lastPresetDates, setLastPresetDates] = useState<{ start: Date; end: Date } | null>(null);
@@ -725,6 +726,9 @@ export default function Home() {
     );
   };
 
+  const inputSignature = (text: string, images: File[], calendarFiles: File[]): string =>
+    `${text.trim()}|${[...images, ...calendarFiles].map(f => `${f.name}:${f.size}`).join(',')}`;
+
   const buildHistoryFiles = (images: File[], calendarFiles: File[]): StoredInputFile[] => [
     ...images.map(file => ({ id: `f-${Date.now()}-${Math.random().toString(36).slice(2)}`, file, kind: 'image' as const, name: file.name, mimeType: file.type, size: file.size })),
     ...calendarFiles.map(file => ({ id: `f-${Date.now()}-${Math.random().toString(36).slice(2)}`, file, kind: 'calendar' as const, name: file.name, mimeType: file.type || 'text/calendar', size: file.size })),
@@ -746,17 +750,28 @@ export default function Home() {
 
   const handleApplyInput = async (entry: InputHistoryEntry) => {
     const current = smartInputRef.current?.getDraft();
-    if (current && (current.text.trim() || current.images.length > 0 || current.calendarFiles.length > 0)) {
+    if (
+      current &&
+      (current.text.trim() || current.images.length > 0 || current.calendarFiles.length > 0) &&
+      inputSignature(current.text, current.images, current.calendarFiles) !== loadedSigRef.current
+    ) {
       saveInputToHistory(current.text, current.images, current.calendarFiles);
     }
+    const entryImages = entry.files.filter(f => f.kind === 'image').map(f => f.file);
+    const entryCalendars = entry.files.filter(f => f.kind === 'calendar').map(f => f.file);
     await smartInputRef.current?.loadInput(entry.text, entry.files);
+    loadedSigRef.current = inputSignature(entry.text, entryImages, entryCalendars);
     setHistoryOpen(false);
   };
 
   const handleSmartInputSubmit = async (data: { text: string; images: File[]; calendarFiles: File[] }) => {
     const { text, images, calendarFiles } = data;
 
-    saveInputToHistory(text, images, calendarFiles);
+    // Only record in Recent summons if this isn't an unmodified entry loaded from history.
+    if (inputSignature(text, images, calendarFiles) !== loadedSigRef.current) {
+      saveInputToHistory(text, images, calendarFiles);
+    }
+    loadedSigRef.current = null;
 
     if (images.length > 0) {
       handleImageSelect(images, text.trim().length > 0 ? text.trim() : undefined);
