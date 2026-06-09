@@ -82,6 +82,9 @@ export default function BatchEventList({
 }: BatchEventListProps) {
   const [expandedEventIds, setExpandedEventIds] = useState<Set<string>>(new Set());
   const [selectedEventIds, setSelectedEventIds] = useState<Set<string>>(new Set());
+  // Event ids we've already auto-selected. Lets events that stream in default to
+  // selected WITHOUT resetting the user's manual select/deselect on existing ones.
+  const seenIdsRef = useRef<Set<string>>(new Set());
   const [editingField, setEditingField] = useState<{ eventId: string; field: string } | null>(null);
   const [showTzInfo, setShowTzInfo] = useState<string | null>(null);
   const [tzInfoHover, setTzInfoHover] = useState<string | null>(null);
@@ -130,7 +133,21 @@ export default function BatchEventList({
   };
 
   useEffect(() => {
-    setSelectedEventIds(new Set(events.map((e) => e.id)));
+    const currentIds = events.map((e) => e.id);
+    const currentIdSet = new Set(currentIds);
+    const newlyArrived = currentIds.filter((id) => !seenIdsRef.current.has(id));
+    newlyArrived.forEach((id) => seenIdsRef.current.add(id));
+
+    setSelectedEventIds((prev) => {
+      // Preserve the user's existing choices; only default newly-arrived events to selected.
+      const next = new Set(prev);
+      newlyArrived.forEach((id) => next.add(id));
+      // Drop selections for events that no longer exist (e.g. deleted).
+      for (const id of next) {
+        if (!currentIdSet.has(id)) next.delete(id);
+      }
+      return next;
+    });
   }, [events]);
 
   const toggleExpand = (eventId: string) => {

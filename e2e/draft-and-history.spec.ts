@@ -5,6 +5,7 @@ import {
   mockParseAPIDelayed,
   submitText,
   waitForEvents,
+  buildSSE,
   TINY_PNG_BASE64,
 } from './helpers';
 
@@ -225,5 +226,48 @@ test.describe('Job cancellation', () => {
 
     await expect(cancelBtn).toBeHidden({ timeout: 8000 });
     await expect(page.locator('h3.font-bold')).toHaveCount(0);
+  });
+});
+
+test.describe('Streaming selection', () => {
+  test('events that stream in do not reset the user\'s manual selection', async ({ page }) => {
+    await setupLocal(page);
+
+    let nextBatch: Record<string, unknown>[] = [
+      { title: 'Alpha event', startDate: '2026-07-01T10:00:00', endDate: '2026-07-01T11:00:00', confidence: 0.9, allDay: false, timezone: null },
+      { title: 'Beta event', startDate: '2026-07-02T10:00:00', endDate: '2026-07-02T11:00:00', confidence: 0.9, allDay: false, timezone: null },
+    ];
+    await page.route('**/api/parse', async (route) => {
+      await route.fulfill({
+        status: 200,
+        headers: {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          'X-RateLimit-Limit': '50',
+          'X-RateLimit-Remaining': '49',
+          'X-RateLimit-Reset': String(Date.now() + 86400000),
+        },
+        body: buildSSE(nextBatch),
+      });
+    });
+
+    await submitText(page, 'first batch of events');
+    await waitForEvents(page, 2);
+
+    // Deselect one event mid-session.
+    const alpha = page.locator('input[aria-label="Select Alpha event"]');
+    await alpha.uncheck();
+    await expect(alpha).not.toBeChecked();
+
+    // A new event streams in (appends to the batch).
+    nextBatch = [
+      { title: 'Gamma event', startDate: '2026-07-03T10:00:00', endDate: '2026-07-03T11:00:00', confidence: 0.9, allDay: false, timezone: null },
+    ];
+    await submitText(page, 'second batch streams in');
+    await waitForEvents(page, 3);
+
+    // Manual deselection must persist; the newly-arrived event defaults to selected.
+    await expect(page.locator('input[aria-label="Select Alpha event"]')).not.toBeChecked();
+    await expect(page.locator('input[aria-label="Select Gamma event"]')).toBeChecked();
   });
 });
