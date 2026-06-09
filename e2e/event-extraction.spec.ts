@@ -64,6 +64,17 @@ async function mockURLDetection(page: Page) {
   });
 }
 
+// Helper: mock /api/summarize so these tests never hit the real (paid) summary endpoint
+async function mockSummarize(page: Page) {
+  await page.route('**/api/summarize', async (route: Route) => {
+    await route.fulfill({
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ summary: 'Test Summary' }),
+    });
+  });
+}
+
 // Auth is a server cookie checked via /api/auth/check; mock it true so the
 // pattern lock never blocks the app. (The old localStorage key was a no-op.)
 async function mockAuth(page: Page) {
@@ -80,6 +91,7 @@ async function setupPage(page: Page) {
   // Set up route mocks BEFORE navigating
   await mockAuth(page);
   await mockURLDetection(page);
+  await mockSummarize(page);
 
   await page.addInitScript(() => {
     localStorage.clear();

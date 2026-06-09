@@ -22,4 +22,7 @@ export interface InputHistoryEntry {
   text: string;
   files: StoredInputFile[];
   source: InputSource;
+  // 2-3 word LLM gist, generated in parallel while events are processed.
+  // undefined = not generated (legacy/in-flight); '' = generation produced nothing.
+  summary?: string;
 }

@@ -3,6 +3,8 @@ import {
   setupLocal,
   mockParseAPI,
   mockParseAPIDelayed,
+  mockSummarize,
+  mockSummarizeDelayed,
   submitText,
   waitForEvents,
   buildSSE,
@@ -269,5 +271,88 @@ test.describe('Streaming selection', () => {
     // Manual deselection must persist; the newly-arrived event defaults to selected.
     await expect(page.locator('input[aria-label="Select Alpha event"]')).not.toBeChecked();
     await expect(page.locator('input[aria-label="Select Gamma event"]')).toBeChecked();
+  });
+});
+
+test.describe('Recent summons — summaries', () => {
+  test('a 2-3 word summary appears on the card after transform', async ({ page }) => {
+    await setupLocal(page);
+    await mockSummarize(page, 'Coffee Catchup');
+    await mockParseAPI(page, SINGLE_EVENT);
+    await submitText(page, 'Grab coffee with Dana tomorrow');
+    await waitForEvents(page, 1);
+
+    await page.locator('[data-testid="input-history-button"]').click();
+    await expect(
+      page
+        .locator('[data-testid="input-history-card"]')
+        .first()
+        .locator('[data-testid="input-history-summary"]')
+    ).toHaveText('Coffee Catchup', { timeout: 10000 });
+  });
+
+  test('a shimmer shows while the summary is generating, then it resolves to the label', async ({ page }) => {
+    await setupLocal(page);
+    await mockSummarizeDelayed(page, 'Slow Label', 2500);
+    await mockParseAPI(page, SINGLE_EVENT);
+    await submitText(page, 'Something to summon');
+    await waitForEvents(page, 1);
+
+    await page.locator('[data-testid="input-history-button"]').click();
+    const card = page.locator('[data-testid="input-history-card"]').first();
+    // In-flight: shimmer placeholder, no label yet.
+    await expect(card.locator('[data-testid="input-history-summary-pending"]')).toBeVisible({ timeout: 4000 });
+    // Resolved: real label, shimmer gone.
+    await expect(card.locator('[data-testid="input-history-summary"]')).toHaveText('Slow Label', { timeout: 8000 });
+    await expect(card.locator('[data-testid="input-history-summary-pending"]')).toHaveCount(0);
+  });
+});
+
+test.describe('Recent summons — search', () => {
+  test('search filters entries and clearing restores all', async ({ page }) => {
+    await setupLocal(page);
+    await mockParseAPI(page, SINGLE_EVENT);
+    await submitText(page, 'Alpha planning meeting');
+    await waitForEvents(page, 1);
+    await submitText(page, 'Beta workshop offsite');
+    await waitForEvents(page, 2);
+
+    await page.locator('[data-testid="input-history-button"]').click();
+    await expect(page.locator('[data-testid="input-history-card"]')).toHaveCount(2);
+
+    const search = page.locator('[data-testid="input-history-search"]');
+    await search.fill('alpha');
+    const cards = page.locator('[data-testid="input-history-card"]');
+    await expect(cards).toHaveCount(1);
+    await expect(cards.first()).toContainText('Alpha planning meeting');
+
+    await search.fill('');
+    await expect(page.locator('[data-testid="input-history-card"]')).toHaveCount(2);
+  });
+
+  test('search matches on the generated summary, not just the input text', async ({ page }) => {
+    await setupLocal(page);
+    await mockSummarize(page, 'Birthday Party');
+    await mockParseAPI(page, SINGLE_EVENT);
+    await submitText(page, 'zzz unrelated input text');
+    await waitForEvents(page, 1);
+
+    await page.locator('[data-testid="input-history-button"]').click();
+    // Wait for the summary to attach to the card before searching by it.
+    await expect(
+      page
+        .locator('[data-testid="input-history-card"]')
+        .first()
+        .locator('[data-testid="input-history-summary"]')
+    ).toHaveText('Birthday Party', { timeout: 10000 });
+
+    // 'birthday' is absent from the input text — a match proves the summary is searchable.
+    await page.locator('[data-testid="input-history-search"]').fill('birthday');
+    await expect(page.locator('[data-testid="input-history-card"]')).toHaveCount(1);
+
+    // A query matching neither text nor summary shows the no-results state.
+    await page.locator('[data-testid="input-history-search"]').fill('qqqqzz');
+    await expect(page.locator('[data-testid="input-history-no-results"]')).toBeVisible();
+    await expect(page.locator('[data-testid="input-history-card"]')).toHaveCount(0);
   });
 });

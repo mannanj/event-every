@@ -45,6 +45,34 @@ export async function mockURLDetection(page: Page) {
   });
 }
 
+// The 2-3 word Recent-summons label. Re-registering later (per-test) overrides the
+// default wired into setupLocal — Playwright matches the most recently added route first.
+export async function mockSummarize(page: Page, summary = 'Test Summary') {
+  await page.route('**/api/summarize', async (route: Route) => {
+    await route.fulfill({
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ summary }),
+    });
+  });
+}
+
+// Delays the summary response so the in-flight shimmer is observable before it resolves.
+export async function mockSummarizeDelayed(page: Page, summary: string, delayMs: number) {
+  await page.route('**/api/summarize', async (route: Route) => {
+    await new Promise(resolve => setTimeout(resolve, delayMs));
+    try {
+      await route.fulfill({
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ summary }),
+      });
+    } catch {
+      // page navigated/closed mid-delay — fine for this test
+    }
+  });
+}
+
 export async function mockParseAPI(page: Page, events: Record<string, unknown>[]) {
   await page.route('**/api/parse', async (route: Route) => {
     await route.fulfill({ status: 200, headers: SSE_HEADERS, body: buildSSE(events) });
@@ -66,6 +94,7 @@ export async function mockParseAPIDelayed(page: Page, events: Record<string, unk
 export async function setupLocal(page: Page) {
   await mockAuth(page);
   await mockURLDetection(page);
+  await mockSummarize(page);
   await page.addInitScript(() => localStorage.clear());
   await page.goto('/');
   await page.waitForSelector('[data-testid="smart-input-textarea"]', { state: 'visible', timeout: 20000 });

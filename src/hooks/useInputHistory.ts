@@ -24,5 +24,13 @@ export function useInputHistory() {
     [refresh]
   );
 
-  return { entries, addEntry, refresh };
+  const setSummary = useCallback(
+    async (id: string, summary: string) => {
+      await inputStorage.updateHistoryEntry(id, { summary });
+      await refresh();
+    },
+    [refresh]
+  );
+
+  return { entries, addEntry, setSummary, refresh };
 }

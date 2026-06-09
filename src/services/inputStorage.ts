@@ -84,6 +84,12 @@ export const inputStorage = {
     }
   },
 
+  async updateHistoryEntry(id: string, patch: Partial<InputHistoryEntry>): Promise<void> {
+    const existing = await run<InputHistoryEntry>(HISTORY_STORE, 'readonly', (s) => s.get(id));
+    if (!existing) return; // evicted or never stored — nothing to patch
+    await run(HISTORY_STORE, 'readwrite', (s) => s.put({ ...existing, ...patch }));
+  },
+
   deleteHistoryEntry(id: string): Promise<unknown> {
     return run(HISTORY_STORE, 'readwrite', (s) => s.delete(id));
   },

@@ -14,6 +14,7 @@ import { useHistory } from '@/hooks/useHistory';
 import { useInputHistory } from '@/hooks/useInputHistory';
 import { useProcessingQueue } from '@/hooks/useProcessingQueue';
 import { detectURLs } from '@/services/urlDetector';
+import { summarizeInput } from '@/services/summarizer';
 import { scrapeURLsBatch } from '@/services/webScraper';
 import { QueueItem } from '@/services/processingQueue';
 import { eventStorage } from '@/services/storage';
@@ -70,7 +71,28 @@ export default function Home() {
   const { addToQueue, updateProgress } = useProcessingQueue();
   const smartInputRef = useRef<SmartInputHandle>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
-  const { entries: inputHistory, addEntry: addInputHistory } = useInputHistory();
+  const { entries: inputHistory, addEntry: addInputHistory, setSummary: setInputSummary } = useInputHistory();
+  const [pendingSummaryIds, setPendingSummaryIds] = useState<Set<string>>(new Set());
+
+  const markSummaryPending = (id: string, pending: boolean) =>
+    setPendingSummaryIds(prev => {
+      const next = new Set(prev);
+      if (pending) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+
+  // Fire a lightweight 2-3 word summary for a saved Recent-summons entry, in parallel
+  // with (and never blocking) event extraction. Patches the entry once the label lands.
+  const summarizeAndStore = (entryId: string | undefined, text: string, events: CalendarEvent[]) => {
+    if (!entryId) return;
+    const eventTitles = events.map(e => e.title).filter(t => !!t && t.trim().length > 0);
+    if (!text.trim() && eventTitles.length === 0) return;
+    markSummaryPending(entryId, true);
+    summarizeInput({ text: text.trim(), eventTitles })
+      .then(summary => { if (summary) setInputSummary(entryId, summary); })
+      .finally(() => markSummaryPending(entryId, false));
+  };
   const abortRef = useRef<AbortController | null>(null);
   const loadedSigRef = useRef<string | null>(null);
   const [showDateRangePicker, setShowDateRangePicker] = useState(false);
@@ -375,7 +397,7 @@ export default function Home() {
     }
   };
 
-  const handleImageSelect = async (files: File[], additionalText?: string) => {
+  const handleImageSelect = async (files: File[], additionalText?: string, summaryEntryId?: string) => {
     if (files.length === 0) return;
 
     addToQueue(
@@ -527,6 +549,7 @@ export default function Home() {
 
         // Fire async timezone resolution for events with unknown TZ
         resolveTimezoneAsync(allEvents);
+        summarizeAndStore(summaryEntryId, additionalText ?? '', allEvents);
 
         setTimeout(() => {
           setImageProcessingStatuses([]);
@@ -538,7 +561,7 @@ export default function Home() {
     );
   };
 
-  const handleTextSubmit = async (text: string) => {
+  const handleTextSubmit = async (text: string, summaryEntryId?: string) => {
     addToQueue(
       'text',
       text,
@@ -691,6 +714,7 @@ export default function Home() {
 
           // Fire async timezone resolution for events with unknown TZ
           resolveTimezoneAsync(allEvents);
+          summarizeAndStore(summaryEntryId, text, allEvents);
 
           setTimeout(() => {
             setUrlProcessingStatus(null);
@@ -734,18 +758,20 @@ export default function Home() {
     ...calendarFiles.map(file => ({ id: `f-${Date.now()}-${Math.random().toString(36).slice(2)}`, file, kind: 'calendar' as const, name: file.name, mimeType: file.type || 'text/calendar', size: file.size })),
   ];
 
-  const saveInputToHistory = (text: string, images: File[], calendarFiles: File[]) => {
+  const saveInputToHistory = (text: string, images: File[], calendarFiles: File[]): string | undefined => {
     const trimmed = text.trim();
-    if (!trimmed && images.length === 0 && calendarFiles.length === 0) return;
+    if (!trimmed && images.length === 0 && calendarFiles.length === 0) return undefined;
     const hasFiles = images.length + calendarFiles.length > 0;
     const source: InputSource = trimmed && hasFiles ? 'mixed' : hasFiles ? 'image' : 'text';
+    const id = `ih-${Date.now()}-${Math.random().toString(36).slice(2)}`;
     addInputHistory({
-      id: `ih-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      id,
       createdAt: Date.now(),
       text: trimmed,
       files: buildHistoryFiles(images, calendarFiles),
       source,
     });
+    return id;
   };
 
   const handleApplyInput = async (entry: InputHistoryEntry) => {
@@ -768,30 +794,39 @@ export default function Home() {
     const { text, images, calendarFiles } = data;
 
     // Transform always records to Recent summons — re-saving a loaded entry is fine.
-    saveInputToHistory(text, images, calendarFiles);
+    const entryId = saveInputToHistory(text, images, calendarFiles);
     loadedSigRef.current = null;
 
+    // Exactly one handler "owns" the 2-3 word summary for this submit, so a mixed
+    // input (e.g. images + a calendar file) never fires two competing summaries.
+    const imageEntryId = images.length > 0 ? entryId : undefined;
+    const calendarEntryId = images.length === 0 && calendarFiles.length > 0 ? entryId : undefined;
+    const textEntryId =
+      images.length === 0 && calendarFiles.length === 0 && text.trim().length > 0 ? entryId : undefined;
+
     if (images.length > 0) {
-      handleImageSelect(images, text.trim().length > 0 ? text.trim() : undefined);
+      handleImageSelect(images, text.trim().length > 0 ? text.trim() : undefined, imageEntryId);
     }
 
     if (calendarFiles.length > 0) {
-      handleCalendarFilesSubmit(calendarFiles);
+      handleCalendarFilesSubmit(calendarFiles, calendarEntryId);
     }
 
     if (text.trim().length > 0 && images.length === 0) {
-      handleTextSubmit(text);
+      handleTextSubmit(text, textEntryId);
     }
 
     smartInputRef.current?.clear();
   };
 
-  const handleCalendarFilesSubmit = async (files: File[]) => {
+  const handleCalendarFilesSubmit = async (files: File[], summaryEntryId?: string) => {
+    const collected: CalendarEvent[] = [];
     for (const file of files) {
       try {
         const events = await parseICSFile(file);
 
         if (events.length > 0) {
+          collected.push(...events);
           setUnsavedEvents(prev => [...prev, ...events]);
         }
       } catch (error) {
@@ -812,6 +847,7 @@ export default function Home() {
         }, 5000);
       }
     }
+    summarizeAndStore(summaryEntryId, '', collected);
   };
 
   const handleError = (errorMessage: string) => {
@@ -1507,6 +1543,7 @@ export default function Home() {
         entries={inputHistory}
         onClose={() => setHistoryOpen(false)}
         onApply={handleApplyInput}
+        pendingSummaryIds={pendingSummaryIds}
       />
     </main>
   );

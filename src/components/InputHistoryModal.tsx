@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { InputHistoryEntry } from '@/types/input';
 
 interface InputHistoryModalProps {
@@ -8,6 +8,7 @@ interface InputHistoryModalProps {
   entries: InputHistoryEntry[];
   onClose: () => void;
   onApply: (entry: InputHistoryEntry) => void;
+  pendingSummaryIds?: Set<string>;
 }
 
 function sameDay(a: Date, b: Date): boolean {
@@ -26,7 +27,36 @@ function timeLabel(ts: number): string {
   return new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit' }).format(new Date(ts));
 }
 
-export default function InputHistoryModal({ open, entries, onClose, onApply }: InputHistoryModalProps) {
+// Fuzzy match: each whitespace-separated query term must appear as an ordered
+// (gappy) subsequence of the haystack. Case-insensitive; no dependency.
+function isSubsequence(needle: string, hay: string): boolean {
+  let i = 0;
+  for (let j = 0; j < hay.length && i < needle.length; j++) {
+    if (hay[j] === needle[i]) i++;
+  }
+  return i === needle.length;
+}
+
+function matchesQuery(query: string, entry: InputHistoryEntry): boolean {
+  const hay = `${entry.text} ${entry.summary ?? ''} ${entry.files
+    .map((f) => f.name)
+    .join(' ')}`.toLowerCase();
+  return query
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean)
+    .every((term) => isSubsequence(term, hay));
+}
+
+export default function InputHistoryModal({
+  open,
+  entries,
+  onClose,
+  onApply,
+  pendingSummaryIds,
+}: InputHistoryModalProps) {
+  const [query, setQuery] = useState('');
+
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -35,6 +65,11 @@ export default function InputHistoryModal({ open, entries, onClose, onApply }: I
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [open, onClose]);
+
+  // Reset the search when the modal closes so reopening starts fresh.
+  useEffect(() => {
+    if (!open) setQuery('');
+  }, [open]);
 
   // Lock background page scroll while open so wheel/touch scroll stays scoped to
   // the modal and never chains to the page below.
@@ -48,6 +83,8 @@ export default function InputHistoryModal({ open, entries, onClose, onApply }: I
   }, [open]);
 
   // Object URLs for image thumbnails — created only while open, revoked on close/change.
+  // Keyed off the full entry list (stable per open) rather than the filtered list, so
+  // typing in the search box doesn't thrash URL creation/revocation.
   const thumbUrls = useMemo(() => {
     const map = new Map<string, string>();
     if (open) {
@@ -72,16 +109,22 @@ export default function InputHistoryModal({ open, entries, onClose, onApply }: I
     };
   }, [thumbUrls]);
 
+  const filtered = useMemo(() => {
+    const q = query.trim();
+    if (!q) return entries;
+    return entries.filter((e) => matchesQuery(q, e));
+  }, [entries, query]);
+
   const groups = useMemo(() => {
     const byDay = new Map<string, InputHistoryEntry[]>();
-    for (const entry of entries) {
+    for (const entry of filtered) {
       const key = new Date(entry.createdAt).toDateString();
       const list = byDay.get(key);
       if (list) list.push(entry);
       else byDay.set(key, [entry]);
     }
     return Array.from(byDay.values());
-  }, [entries]);
+  }, [filtered]);
 
   if (!open) return null;
 
@@ -94,24 +137,43 @@ export default function InputHistoryModal({ open, entries, onClose, onApply }: I
       data-testid="input-history-modal"
     >
       <div className="bg-white border-2 border-black w-full max-w-5xl my-8">
-        <div className="sticky top-0 bg-white border-b-2 border-black flex items-center justify-between px-6 py-4 z-10">
-          <h2 className="text-xl font-bold">Recent summons</h2>
-          <button
-            onClick={onClose}
-            className="p-1 text-black hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-black"
-            aria-label="Close recent summons"
-            data-testid="input-history-close"
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+        <div className="sticky top-0 bg-white border-b-2 border-black z-10">
+          <div className="flex items-center justify-between px-6 py-4">
+            <h2 className="text-xl font-bold">Recent summons</h2>
+            <button
+              onClick={onClose}
+              className="p-1 text-black hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-black"
+              aria-label="Close recent summons"
+              data-testid="input-history-close"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+          {entries.length > 0 && (
+            <div className="px-6 pb-4">
+              <input
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search summons…"
+                aria-label="Search recent summons"
+                data-testid="input-history-search"
+                className="w-full border-2 border-black px-3 py-2 text-sm text-black placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-black"
+              />
+            </div>
+          )}
         </div>
 
         <div className="p-6">
           {entries.length === 0 ? (
             <div className="py-16 text-center text-gray-500" data-testid="input-history-empty">
               Nothing summoned yet — your inputs will show up here.
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="py-16 text-center text-gray-500" data-testid="input-history-no-results">
+              No summons match “{query.trim()}”.
             </div>
           ) : (
             groups.map((dayEntries) => (
@@ -126,14 +188,36 @@ export default function InputHistoryModal({ open, entries, onClose, onApply }: I
                   {dayEntries.map((entry) => {
                     const images = entry.files.filter((f) => f.kind === 'image');
                     const calendars = entry.files.filter((f) => f.kind === 'calendar');
+                    const hasSummary = !!entry.summary;
+                    const isPending = !hasSummary && (pendingSummaryIds?.has(entry.id) ?? false);
                     return (
                       <button
                         key={entry.id}
                         onClick={() => onApply(entry)}
-                        className="text-left border-2 border-black bg-white p-3 h-44 flex flex-col gap-2 hover:bg-gray-50 transition-colors focus:outline-none focus:ring-2 focus:ring-black overflow-hidden"
+                        className="relative text-left border-2 border-black bg-white p-3 h-44 flex flex-col gap-2 hover:bg-gray-50 transition-colors focus:outline-none focus:ring-2 focus:ring-black overflow-hidden"
                         data-testid="input-history-card"
                         title="Load this input"
                       >
+                        {(hasSummary || isPending) && (
+                          <>
+                            {/* Reserve a top row so the absolutely-positioned label never overlaps the thumbnails. */}
+                            <div className="h-5 shrink-0" aria-hidden="true" />
+                            {hasSummary ? (
+                              <span
+                                className="absolute top-2 left-3 right-3 text-xs font-bold uppercase tracking-wide text-black truncate"
+                                data-testid="input-history-summary"
+                              >
+                                {entry.summary}
+                              </span>
+                            ) : (
+                              <span
+                                className="absolute top-2 left-3 h-3 w-20 bg-gray-200 animate-pulse"
+                                data-testid="input-history-summary-pending"
+                                aria-label="Summarizing…"
+                              />
+                            )}
+                          </>
+                        )}
                         {(images.length > 0 || calendars.length > 0) && (
                           <div className="flex gap-1.5 flex-wrap">
                             {images.slice(0, 3).map((f) => (

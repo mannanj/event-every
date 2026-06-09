@@ -53,6 +53,7 @@ test.describe('Production (summonit.app) — real stack', () => {
     await page.locator('[data-testid="input-history-button"]').click();
     await expect(page.locator('[data-testid="input-history-modal"]')).toBeVisible();
     await expect(page.locator('[data-testid="input-history-card"]').first()).toContainText('Prod history check');
+    await expect(page.locator('[data-testid="input-history-search"]')).toBeVisible();
     await page.keyboard.press('Escape');
     await expect(page.locator('[data-testid="input-history-modal"]')).toBeHidden();
   });
