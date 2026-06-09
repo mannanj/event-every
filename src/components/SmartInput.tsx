@@ -12,6 +12,7 @@ interface SmartInputProps {
   onSubmit: (data: { text: string; images: File[]; calendarFiles: File[] }) => void;
   onError: (error: string) => void;
   onOpenHistory: () => void;
+  hasHistory: boolean;
 }
 
 export interface SmartInputHandle {
@@ -42,7 +43,7 @@ interface CalendarFilePreview {
 }
 
 const SmartInput = forwardRef<SmartInputHandle, SmartInputProps>(
-  function SmartInput({ onSubmit, onError, onOpenHistory }, ref) {
+  function SmartInput({ onSubmit, onError, onOpenHistory, hasHistory }, ref) {
     const [text, setText] = useState('');
     const [images, setImages] = useState<ImagePreview[]>([]);
     const [calendarFiles, setCalendarFiles] = useState<CalendarFilePreview[]>([]);
@@ -481,17 +482,19 @@ const SmartInput = forwardRef<SmartInputHandle, SmartInputProps>(
             </div>
           )}
 
-          {/* Input history button — floating, left of the attach icon */}
-          <button
-            onClick={onOpenHistory}
-            className="absolute top-2 right-14 z-20 p-2 text-gray-600 hover:text-black transition-colors focus:outline-none focus:ring-2 focus:ring-black rounded"
-            aria-label="Open input history"
-            data-testid="input-history-button"
-          >
-            <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          </button>
+          {/* Recent summons button — floating, left of the attach icon; only when history exists */}
+          {hasHistory && (
+            <button
+              onClick={onOpenHistory}
+              className="absolute top-2 right-14 z-20 p-2 text-gray-600 hover:text-black transition-colors focus:outline-none focus:ring-2 focus:ring-black rounded"
+              aria-label="Open recent summons"
+              data-testid="input-history-button"
+            >
+              <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </button>
+          )}
 
           {/* Attach icon button at top-right - floating */}
           <button
@@ -520,7 +523,7 @@ const SmartInput = forwardRef<SmartInputHandle, SmartInputProps>(
             aria-label="Enter event details as text or drop images"
             aria-describedby={error ? 'smart-input-error' : undefined}
             aria-invalid={error ? 'true' : 'false'}
-            className={`flex-1 w-full p-2 pr-12 text-black placeholder-gray-400 bg-transparent resize-none focus:outline-none centered-placeholder ${images.length > 0 ? 'has-images' : ''}`}
+            className={`flex-1 w-full p-2 ${hasHistory ? 'pr-24' : 'pr-12'} text-black placeholder-gray-400 bg-transparent resize-none focus:outline-none centered-placeholder ${images.length > 0 ? 'has-images' : ''}`}
           />
 
           {/* URL pills row at bottom - flex item like images */}

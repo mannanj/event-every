@@ -994,6 +994,7 @@ export default function Home() {
             onSubmit={handleSmartInputSubmit}
             onError={handleError}
             onOpenHistory={() => setHistoryOpen(true)}
+            hasHistory={inputHistory.length > 0}
           />
         </div>
 

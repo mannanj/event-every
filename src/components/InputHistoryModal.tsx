@@ -80,11 +80,11 @@ export default function InputHistoryModal({ open, entries, onClose, onApply }: I
     >
       <div className="bg-white border-2 border-black w-full max-w-5xl my-8">
         <div className="sticky top-0 bg-white border-b-2 border-black flex items-center justify-between px-6 py-4 z-10">
-          <h2 className="text-xl font-bold">Input history</h2>
+          <h2 className="text-xl font-bold">Recent summons</h2>
           <button
             onClick={onClose}
             className="p-1 text-black hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-black"
-            aria-label="Close input history"
+            aria-label="Close recent summons"
             data-testid="input-history-close"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -96,7 +96,7 @@ export default function InputHistoryModal({ open, entries, onClose, onApply }: I
         <div className="p-6">
           {entries.length === 0 ? (
             <div className="py-16 text-center text-gray-500" data-testid="input-history-empty">
-              No history yet — your transformed inputs will show up here.
+              Nothing summoned yet — your inputs will show up here.
             </div>
           ) : (
             groups.map((dayEntries) => (

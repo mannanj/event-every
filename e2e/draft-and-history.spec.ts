@@ -48,6 +48,15 @@ test.describe('Input draft persistence', () => {
 });
 
 test.describe('Input history', () => {
+  test('the history button is hidden until there is history', async ({ page }) => {
+    await setupLocal(page);
+    await expect(page.locator('[data-testid="input-history-button"]')).toHaveCount(0);
+    await mockParseAPI(page, SINGLE_EVENT);
+    await submitText(page, 'First summon');
+    await waitForEvents(page, 1);
+    await expect(page.locator('[data-testid="input-history-button"]')).toBeVisible();
+  });
+
   test('transforming saves the input to history', async ({ page }) => {
     await setupLocal(page);
     await mockParseAPI(page, SINGLE_EVENT);
