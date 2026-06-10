@@ -147,6 +147,11 @@ const SmartInput = forwardRef<SmartInputHandle, SmartInputProps>(
           if (editorRef.current) editorRef.current.innerText = draft.text || '';
           setText(draft.text || '');
           await applyStoredFiles(draft.files);
+        } else if (editorRef.current?.innerText) {
+          // The browser can restore contentEditable text (bfcache / form restore)
+          // before React hydrates. Capture it into state so data-empty, the
+          // placeholder, and the Transform button reflect the real DOM content.
+          setText(editorRef.current.innerText);
         }
         restoredRef.current = true;
       });
@@ -562,6 +567,7 @@ const SmartInput = forwardRef<SmartInputHandle, SmartInputProps>(
               aria-invalid={error ? 'true' : 'false'}
               contentEditable
               suppressContentEditableWarning
+              suppressHydrationWarning
               spellCheck
               data-placeholder="Drop your screenshot, image, or text here. We'll turn it into events ✨"
               data-empty={text.trim().length === 0 ? 'true' : 'false'}
