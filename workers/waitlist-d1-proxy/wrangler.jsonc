@@ -1,0 +1,13 @@
+{
+  "name": "spirit-hammer-waitlist-proxy",
+  "main": "src/index.js",
+  "compatibility_date": "2026-06-01",
+  "account_id": "547c30420926d619338cfd0049a6a73e",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "spirit-hammer-waitlist",
+      "database_id": "aee71288-dc04-41f4-8230-8dbbea640a33"
+    }
+  ]
+}
