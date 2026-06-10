@@ -1,15 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server';
+import {
+  CommunityLimitError,
+  communityLimitResponse,
+  ensureCommunityBudget,
+  getLlmKey,
+  getLlmMode,
+  recordLlmUsage,
+  upstreamCommunityLimit,
+} from '@/lib/llm';
 
 const OPENROUTER_BASE_URL = process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1';
 const TZ_RESOLVE_MODEL = process.env.OPENROUTER_TZ_MODEL || 'deepseek/deepseek-chat-v3-0324';
 
 export async function POST(request: NextRequest) {
   try {
-    if (!process.env.OPENROUTER_API_KEY) {
+    const mode = getLlmMode(request);
+    const apiKey = getLlmKey(mode);
+    if (!apiKey) {
       return NextResponse.json(
         { error: 'OPENROUTER_API_KEY not configured' },
         { status: 500 }
       );
+    }
+
+    try {
+      await ensureCommunityBudget(mode);
+    } catch (error) {
+      if (error instanceof CommunityLimitError) return communityLimitResponse(error);
+      throw error;
     }
 
     const { rawTimezone, rawStartDate, rawEndDate, eventTitle, eventLocation } = await request.json();
@@ -32,7 +50,7 @@ export async function POST(request: NextRequest) {
     const response = await fetch(`${OPENROUTER_BASE_URL}/chat/completions`, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
         'X-Title': 'summon',
       },
@@ -68,11 +86,15 @@ export async function POST(request: NextRequest) {
     const data = await response.json();
 
     if (!response.ok) {
+      const limitError = upstreamCommunityLimit(mode, response.status);
+      if (limitError) return communityLimitResponse(limitError);
       return NextResponse.json(
         { error: data.error?.message || 'LLM API error' },
         { status: 502 }
       );
     }
+
+    await recordLlmUsage(mode, data.usage);
 
     const toolCalls = data.choices?.[0]?.message?.tool_calls;
     if (!toolCalls || toolCalls.length === 0) {

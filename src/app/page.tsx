@@ -25,6 +25,7 @@ import { resolveTimezone } from '@/services/timezoneResolver';
 import { convertRawToDate } from '@/utils/timeConversion';
 import { getBrowserTimezone } from '@/utils/timezone';
 import { normalizeUrl } from '@/utils/url';
+import { COMMUNITY_LIMIT_CODE, emitCommunityLimit, emitIfCommunityLimited } from '@/utils/communityLimit';
 
 interface ProcessingEvent {
   id: string;
@@ -253,7 +254,10 @@ export default function Home() {
           }),
         });
 
-        if (!res.ok) continue;
+        if (!res.ok) {
+          await emitIfCommunityLimited(res);
+          continue;
+        }
 
         const { timezone, confidence } = await res.json();
         if (confidence <= 0.8) continue;
@@ -318,6 +322,7 @@ export default function Home() {
       });
 
       if (!response.ok) {
+        await emitIfCommunityLimited(response);
         const errorData = await response.json().catch(() => ({ error: 'Failed to process batch' }));
         throw new Error(errorData.error || 'Failed to process batch');
       }
@@ -345,6 +350,9 @@ export default function Home() {
             const data = JSON.parse(line.slice(6));
 
             if (data.error) {
+              if (data.code === COMMUNITY_LIMIT_CODE) {
+                emitCommunityLimit(typeof data.resetAt === 'string' ? data.resetAt : undefined);
+              }
               throw new Error(data.error);
             }
 
@@ -654,6 +662,7 @@ export default function Home() {
           });
 
           if (!response.ok) {
+            await emitIfCommunityLimited(response);
             const errorData = await response.json().catch(() => ({ error: 'Failed to process batch' }));
             throw new Error(errorData.error || 'Failed to process batch');
           }
@@ -684,6 +693,9 @@ export default function Home() {
                 const data = JSON.parse(line.slice(6));
 
                 if (data.error) {
+                  if (data.code === COMMUNITY_LIMIT_CODE) {
+                    emitCommunityLimit(typeof data.resetAt === 'string' ? data.resetAt : undefined);
+                  }
                   throw new Error(data.error);
                 }
 

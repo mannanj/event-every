@@ -1,3 +1,5 @@
+import { emitIfCommunityLimited } from '@/utils/communityLimit';
+
 export interface URLDetectionResult {
   urls: string[];
   remainingText: string;
@@ -13,6 +15,7 @@ export async function detectURLs(text: string): Promise<URLDetectionResult> {
     });
 
     if (!response.ok) {
+      await emitIfCommunityLimited(response);
       const errorData = await response.json().catch(() => ({ error: 'Failed to detect URLs' }));
       throw new Error(errorData.error || 'Failed to detect URLs');
     }

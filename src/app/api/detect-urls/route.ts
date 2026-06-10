@@ -1,4 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
+import {
+  CommunityLimitError,
+  communityLimitResponse,
+  ensureCommunityBudget,
+  getLlmKey,
+  getLlmMode,
+  recordLlmUsage,
+  upstreamCommunityLimit,
+} from '@/lib/llm';
 
 const OPENROUTER_BASE_URL = process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1';
 const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || 'mistralai/mistral-large-2512';
@@ -41,6 +50,9 @@ interface OpenRouterResponse {
       tool_calls?: OpenRouterToolCall[];
     };
   }>;
+  usage?: {
+    cost?: number;
+  };
   error?: {
     message?: string;
   };
@@ -48,8 +60,17 @@ interface OpenRouterResponse {
 
 export async function POST(request: NextRequest) {
   try {
-    if (!process.env.OPENROUTER_API_KEY) {
+    const mode = getLlmMode(request);
+    const apiKey = getLlmKey(mode);
+    if (!apiKey) {
       throw new Error('OPENROUTER_API_KEY environment variable is not set');
+    }
+
+    try {
+      await ensureCommunityBudget(mode);
+    } catch (error) {
+      if (error instanceof CommunityLimitError) return communityLimitResponse(error);
+      throw error;
     }
 
     const body = await request.json();
@@ -94,7 +115,7 @@ export async function POST(request: NextRequest) {
     const response = await fetch(`${OPENROUTER_BASE_URL}/chat/completions`, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
         'X-Title': 'summon',
       },
@@ -117,9 +138,13 @@ export async function POST(request: NextRequest) {
     const data = (await response.json()) as OpenRouterResponse;
 
     if (!response.ok) {
+      const limitError = upstreamCommunityLimit(mode, response.status);
+      if (limitError) return communityLimitResponse(limitError);
       const errorMessage = data.error?.message || 'OpenRouter API error';
       throw new Error(errorMessage);
     }
+
+    await recordLlmUsage(mode, data.usage);
 
     const toolCalls = data.choices?.[0]?.message?.tool_calls;
     if (!toolCalls || toolCalls.length === 0) {

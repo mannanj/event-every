@@ -1,4 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
+import {
+  CommunityLimitError,
+  communityLimitResponse,
+  ensureCommunityBudget,
+  getLlmKey,
+  getLlmMode,
+  recordLlmUsage,
+  upstreamCommunityLimit,
+} from '@/lib/llm';
 
 const OPENROUTER_BASE_URL = process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1';
 // Lightweight model for fast 2-3 word labels — kept separate from the heavyweight
@@ -13,6 +22,7 @@ Example reply: Team Lunch`;
 
 interface OpenRouterResponse {
   choices?: Array<{ message?: { content?: string } }>;
+  usage?: { cost?: number };
   error?: { message?: string };
 }
 
@@ -32,8 +42,17 @@ function cleanLabel(raw: string): string {
 
 export async function POST(request: NextRequest) {
   try {
-    if (!process.env.OPENROUTER_API_KEY) {
+    const mode = getLlmMode(request);
+    const apiKey = getLlmKey(mode);
+    if (!apiKey) {
       throw new Error('OPENROUTER_API_KEY environment variable is not set');
+    }
+
+    try {
+      await ensureCommunityBudget(mode);
+    } catch (error) {
+      if (error instanceof CommunityLimitError) return communityLimitResponse(error);
+      throw error;
     }
 
     let body: { text?: unknown; eventTitles?: unknown };
@@ -64,7 +83,7 @@ export async function POST(request: NextRequest) {
     const response = await fetch(`${OPENROUTER_BASE_URL}/chat/completions`, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
         'X-Title': 'summon',
       },
@@ -82,8 +101,12 @@ export async function POST(request: NextRequest) {
     const data = (await response.json()) as OpenRouterResponse;
 
     if (!response.ok) {
+      const limitError = upstreamCommunityLimit(mode, response.status);
+      if (limitError) return communityLimitResponse(limitError);
       throw new Error(data.error?.message || 'OpenRouter API error');
     }
+
+    await recordLlmUsage(mode, data.usage);
 
     const summary = cleanLabel(data.choices?.[0]?.message?.content || '');
     return NextResponse.json({ summary });

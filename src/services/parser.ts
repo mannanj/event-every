@@ -1,7 +1,13 @@
 import { ParsedEvent, BatchParsedEvents, ClientContext } from '@/types/event';
+import { LlmMode, recordLlmUsage, upstreamCommunityLimit } from '@/lib/llm';
 
 const OPENROUTER_BASE_URL = process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1';
 const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || 'mistralai/mistral-large-2512';
+
+export interface LlmCallAuth {
+  key: string;
+  mode: LlmMode;
+}
 
 type ToolDefinition = {
   type: 'function';
@@ -25,6 +31,9 @@ type OpenRouterResponse = {
       tool_calls?: OpenRouterToolCall[];
     };
   }>;
+  usage?: {
+    cost?: number;
+  };
   error?: {
     message?: string;
   };
@@ -115,16 +124,17 @@ interface ParseEventInput {
 async function callOpenRouter(
   content: Array<{ type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } }>,
   tools: ToolDefinition[],
-  toolName: string
+  toolName: string,
+  auth: LlmCallAuth
 ): Promise<OpenRouterToolCall> {
-  if (!process.env.OPENROUTER_API_KEY) {
+  if (!auth.key) {
     throw new Error('OPENROUTER_API_KEY environment variable is not set');
   }
 
   const response = await fetch(`${OPENROUTER_BASE_URL}/chat/completions`, {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+      Authorization: `Bearer ${auth.key}`,
       'Content-Type': 'application/json',
       'X-Title': 'summon',
     },
@@ -147,9 +157,13 @@ async function callOpenRouter(
   const data = (await response.json()) as OpenRouterResponse;
 
   if (!response.ok) {
+    const limitError = upstreamCommunityLimit(auth.mode, response.status);
+    if (limitError) throw limitError;
     const errorMessage = data.error?.message || 'OpenRouter API error';
     throw new Error(errorMessage);
   }
+
+  await recordLlmUsage(auth.mode, data.usage);
 
   const toolCalls = data.choices?.[0]?.message?.tool_calls;
   if (!toolCalls || toolCalls.length === 0) {
@@ -163,7 +177,8 @@ const MAX_BATCH_EVENTS = 50;
 const CHUNK_SIZE = 3;
 
 export async function* parseEventsBatch(
-  input: ParseEventInput
+  input: ParseEventInput,
+  auth: LlmCallAuth
 ): AsyncGenerator<ParsedEvent[], void, unknown> {
   try {
     const content: Array<{ type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } }> = [];
@@ -240,7 +255,7 @@ export async function* parseEventsBatch(
       },
     ];
 
-    const toolCall = await callOpenRouter(content, tools, 'extract_events');
+    const toolCall = await callOpenRouter(content, tools, 'extract_events', auth);
     const parsed = JSON.parse(toolCall.function.arguments) as BatchParsedEvents;
 
     if (!parsed.events || parsed.events.length === 0) {

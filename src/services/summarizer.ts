@@ -1,3 +1,5 @@
+import { emitIfCommunityLimited } from '@/utils/communityLimit';
+
 interface SummarizeResult {
   summary: string;
 }
@@ -18,7 +20,10 @@ export async function summarizeInput(params: {
         eventTitles: params.eventTitles ?? [],
       }),
     });
-    if (!response.ok) return '';
+    if (!response.ok) {
+      await emitIfCommunityLimited(response);
+      return '';
+    }
     const data = (await response.json()) as SummarizeResult;
     return typeof data.summary === 'string' ? data.summary : '';
   } catch {

@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { parseEventsBatch } from '@/services/parser';
 import { checkRateLimit, incrementRateLimit, DAILY_LIMIT } from '@/lib/ratelimit';
+import {
+  CommunityLimitError,
+  communityLimitResponse,
+  ensureCommunityBudget,
+  getLlmKey,
+  getLlmMode,
+} from '@/lib/llm';
 
 function getClientIP(request: NextRequest): string {
   const forwarded = request.headers.get('x-forwarded-for');
@@ -45,6 +52,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const mode = getLlmMode(request);
+    try {
+      await ensureCommunityBudget(mode);
+    } catch (error) {
+      if (error instanceof CommunityLimitError) return communityLimitResponse(error);
+      throw error;
+    }
+
     const body = await request.json();
     const { text, imageBase64, imageMimeType, batch = false, clientContext } = body;
 
@@ -70,12 +85,15 @@ export async function POST(request: NextRequest) {
         async start(controller) {
           try {
             let chunkIndex = 0;
-            for await (const eventChunk of parseEventsBatch({
-              text,
-              imageBase64,
-              imageMimeType,
-              clientContext,
-            })) {
+            for await (const eventChunk of parseEventsBatch(
+              {
+                text,
+                imageBase64,
+                imageMimeType,
+                clientContext,
+              },
+              { key: getLlmKey(mode), mode }
+            )) {
               const chunk = {
                 events: eventChunk,
                 chunkIndex,
@@ -101,7 +119,14 @@ export async function POST(request: NextRequest) {
                 ? error.message
                 : 'An unexpected error occurred while parsing events';
 
-            const errorData = `data: ${JSON.stringify({ error: errorMessage })}\n\n`;
+            // The community key can hit its upstream credit limit mid-stream;
+            // tag the SSE error so the client can flip to the limit screen.
+            const payload =
+              error instanceof CommunityLimitError
+                ? { error: error.message, code: error.code, resetAt: error.resetAt }
+                : { error: errorMessage };
+
+            const errorData = `data: ${JSON.stringify(payload)}\n\n`;
             controller.enqueue(encoder.encode(errorData));
             controller.close();
           }
