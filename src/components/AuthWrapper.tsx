@@ -1,25 +1,76 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import PatternLock from './PatternLock';
 import EmailRequestModal from './EmailRequestModal';
 import SideDrawerLockButton from './SideDrawerLockButton';
+import CommunityLimitScreen from './CommunityLimitScreen';
+import { COMMUNITY_LIMIT_EVENT, CommunityLimitDetail } from '@/utils/communityLimit';
+
+// The app is open by default (community mode, budget-gated server-side).
+// 'limit' replaces it when the daily community budget is spent; 'pattern' is
+// the admin entry point — reached from the limit screen or /?unlock.
+type Screen = 'app' | 'limit' | 'pattern';
 
 export default function AuthWrapper({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isLoading, attempts, isLockedOut, lockoutMinutes, verifyPattern, logout } = useAuth();
+  const { isAuthenticated, isLoading, attempts, isLockedOut, verifyPattern } = useAuth();
+  const [screen, setScreen] = useState<Screen>('app');
+  const [resetAt, setResetAt] = useState<string | null>(null);
   const [error, setError] = useState('');
-  const [showDevLock, setShowDevLock] = useState(false);
   const [showEmailModal, setShowEmailModal] = useState(false);
 
   const isDevMode = process.env.NEXT_PUBLIC_DISABLE_AUTH === 'true';
+
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).has('unlock')) {
+      setScreen('pattern');
+    }
+  }, []);
+
+  // If today's community budget is already spent, anonymous visitors land on
+  // the limit screen. Admins (valid pattern cookie) never see it.
+  useEffect(() => {
+    if (isLoading || isAuthenticated) return;
+    let cancelled = false;
+    fetch('/api/usage')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (cancelled || !data || !data.exhausted || data.isAdmin) return;
+        setResetAt(typeof data.resetAt === 'string' ? data.resetAt : null);
+        setScreen((prev) => (prev === 'pattern' ? prev : 'limit'));
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoading, isAuthenticated]);
+
+  // Mid-session limit hits (any API call returning the community-limit 402).
+  useEffect(() => {
+    const onLimit = (event: Event) => {
+      if (isAuthenticated) return;
+      const detail = (event as CustomEvent<CommunityLimitDetail>).detail;
+      setResetAt(detail?.resetAt ?? null);
+      setScreen('limit');
+    };
+    window.addEventListener(COMMUNITY_LIMIT_EVENT, onLimit);
+    return () => window.removeEventListener(COMMUNITY_LIMIT_EVENT, onLimit);
+  }, [isAuthenticated]);
+
+  // Pattern success → straight back into the app, now in admin mode.
+  useEffect(() => {
+    if (isAuthenticated) {
+      setScreen('app');
+      setError('');
+    }
+  }, [isAuthenticated]);
 
   const handleVerify = async (input: number[]) => {
     const result = await verifyPattern(input);
 
     if (result === true) {
       setError('');
-      setShowDevLock(false);
     } else if (typeof result === 'object') {
       if ('networkError' in result && result.networkError) {
         setError('Connection error. Check your network and try again.');
@@ -37,63 +88,7 @@ export default function AuthWrapper({ children }: { children: React.ReactNode })
     }
   };
 
-  const handleDevLock = () => {
-    setShowDevLock(true);
-    setError('');
-  };
-
-  const handleRequestAccess = () => {
-    setShowEmailModal(true);
-  };
-
-  const handleCloseModal = () => {
-    setShowEmailModal(false);
-  };
-
-  if (isDevMode) {
-    if (showDevLock) {
-      return (
-        <>
-          <PatternLock
-            onSubmit={handleVerify}
-            error={error}
-            attemptsLeft={attempts}
-          />
-          {isLockedOut && (
-            <div className="fixed bottom-32 left-1/2 transform -translate-x-1/2">
-              <button
-                onClick={handleRequestAccess}
-                className="px-6 py-3 bg-black text-white hover:bg-white hover:text-black border-2 border-black transition-colors font-medium"
-              >
-                Request Access
-              </button>
-            </div>
-          )}
-          {showEmailModal && <EmailRequestModal onClose={handleCloseModal} />}
-        </>
-      );
-    }
-
-    return (
-      <>
-        {children}
-        <SideDrawerLockButton onLock={handleDevLock} />
-      </>
-    );
-  }
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-white">
-        <div className="text-center">
-          <div className="w-8 h-8 border-2 border-black border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-sm text-gray-600">Loading...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!isAuthenticated) {
+  if (screen === 'pattern' && !isAuthenticated) {
     return (
       <>
         <PatternLock
@@ -101,20 +96,44 @@ export default function AuthWrapper({ children }: { children: React.ReactNode })
           error={error}
           attemptsLeft={attempts}
         />
-        {isLockedOut && (
+        {isLockedOut ? (
           <div className="fixed bottom-32 left-1/2 transform -translate-x-1/2">
             <button
-              onClick={handleRequestAccess}
+              onClick={() => setShowEmailModal(true)}
               className="px-6 py-3 bg-black text-white hover:bg-white hover:text-black border-2 border-black transition-colors font-medium"
             >
               Request Access
             </button>
           </div>
-        )}
-        {showEmailModal && <EmailRequestModal onClose={handleCloseModal} />}
+        ) : null}
+        {showEmailModal ? <EmailRequestModal onClose={() => setShowEmailModal(false)} /> : null}
       </>
     );
   }
 
-  return <>{children}</>;
+  if (screen === 'limit' && !isAuthenticated) {
+    return (
+      <CommunityLimitScreen
+        resetAt={resetAt}
+        onEnterPattern={() => {
+          setError('');
+          setScreen('pattern');
+        }}
+      />
+    );
+  }
+
+  return (
+    <>
+      {children}
+      {isDevMode ? (
+        <SideDrawerLockButton
+          onLock={() => {
+            setError('');
+            setScreen('pattern');
+          }}
+        />
+      ) : null}
+    </>
+  );
 }
