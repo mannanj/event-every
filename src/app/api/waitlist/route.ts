@@ -98,6 +98,8 @@ async function sendConfirmationEmail(email: string): Promise<boolean> {
       headers: {
         Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
+        // Same signup retried within 24h returns the original send, no dupe.
+        'Idempotency-Key': `waitlist-confirmation/${email}`,
       },
       body: JSON.stringify({
         from,
