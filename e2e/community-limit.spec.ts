@@ -113,6 +113,42 @@ test.describe('community limit screen', () => {
     await expect(page.getByTestId('input-box')).toBeVisible();
   });
 
+  test('/spent previews the limit screen without the budget being exhausted', async ({ page }) => {
+    await mockAnonymous(page, {
+      exhausted: false,
+      isAdmin: false,
+      resetAt: RESET_AT,
+      limitUsd: 5,
+      spentUsd: 0,
+      remainingUsd: 5,
+    });
+    await page.goto('/spent');
+
+    const message = page.getByTestId('community-limit-message');
+    await expect(message).toContainText(
+      'This app is community sponsored. The usage limits have been hit today and reset'
+    );
+    await expect(message).toContainText(expectedResetText());
+    await expect(page.getByTestId('waitlist-email')).toBeVisible();
+  });
+
+  test('"Enter pattern lock" on /spent opens the pattern screen via /?unlock', async ({ page }) => {
+    await mockAnonymous(page, {
+      exhausted: false,
+      isAdmin: false,
+      resetAt: RESET_AT,
+      limitUsd: 5,
+      spentUsd: 0,
+      remainingUsd: 5,
+    });
+    await page.goto('/spent');
+
+    await page.getByTestId('enter-pattern-link').click();
+
+    await expect(page).toHaveURL(/\?unlock/);
+    await expect(page.locator('canvas')).toBeVisible();
+  });
+
   test('a mid-session community 402 flips the app to the limit screen', async ({ page }) => {
     await mockAnonymous(page, {
       exhausted: false,

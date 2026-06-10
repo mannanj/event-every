@@ -121,6 +121,8 @@ link. A valid pattern unlock switches the session to the unrestricted admin
 key (`/?unlock` opens the pattern screen directly).
 
 Endpoints: `GET /api/usage` (budget status), `POST /api/waitlist` (signup).
+Preview the limit screen anytime at [`/spent`](https://www.summonit.app/spent)
+(fully functional, doesn't touch the real budget).
 Full numbers and levers: [docs/cost-analysis.md](docs/cost-analysis.md).
 
 | Env var | Purpose |
