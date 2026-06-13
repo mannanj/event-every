@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Redis } from '@upstash/redis';
 import { d1Query, isD1Configured } from '@/lib/d1';
+import { getClientIP } from '@/lib/clientIp';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const MAX_SIGNUPS_PER_IP_PER_DAY = 5;
@@ -12,12 +13,6 @@ const getRedis = () =>
     url: process.env.KV_REST_API_URL!,
     token: process.env.KV_REST_API_TOKEN!,
   });
-
-function getClientIP(request: NextRequest): string {
-  const forwarded = request.headers.get('x-forwarded-for');
-  if (forwarded) return forwarded.split(',')[0].trim();
-  return request.headers.get('x-real-ip') || 'unknown';
-}
 
 async function overSignupLimit(ip: string): Promise<boolean> {
   if (!isRedisAvailable()) return false;

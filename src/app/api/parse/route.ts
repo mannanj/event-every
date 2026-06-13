@@ -8,21 +8,7 @@ import {
   getLlmKey,
   getLlmMode,
 } from '@/lib/llm';
-
-function getClientIP(request: NextRequest): string {
-  const forwarded = request.headers.get('x-forwarded-for');
-  const realIP = request.headers.get('x-real-ip');
-
-  if (forwarded) {
-    return forwarded.split(',')[0].trim();
-  }
-
-  if (realIP) {
-    return realIP;
-  }
-
-  return 'unknown';
-}
+import { getClientIP } from '@/lib/clientIp';
 
 export async function POST(request: NextRequest) {
   try {

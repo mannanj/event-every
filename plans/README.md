@@ -19,7 +19,7 @@ Each executor: read your plan fully before starting, honor its STOP conditions, 
 | 002  | Close the SSRF/open-proxy hole in /api/scrape-url | P1 | S–M | — | TODO |
 | 003  | `bun test` baseline: unit tests on ICS, timezone, budget, ratelimit | P1 | M | — | DONE (58 tests/125 assertions; +@types/bun dev) |
 | 004  | Fix lint (ESLint 9 flat config) + GitHub Actions CI | P1 | M | 003 (soft) | TODO |
-| 005  | Rate limiter: atomic, fixed UTC-day window, shared getClientIP | P2 | S–M | 003 | TODO |
+| 005  | Rate limiter: atomic, fixed UTC-day window, shared getClientIP | P2 | S–M | 003 | DONE (atomic incr + UTC-day key + nextResetMs; `clientIp.ts` extracted; 2 quirk tests flipped) |
 | 006  | Delete dead components, drop unused deps, fix run.sh to bun | P2 | S | — (see 010/014) | TODO |
 | 007  | Docs truth pass: README / CLAUDE.md / .env.example | P2 | S | — | TODO |
 | 008  | ICS date correctness: all-day UTC round-trip, TZID, no silent fallback | P3 | M | 003 | TODO |
