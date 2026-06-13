@@ -4,5 +4,37 @@
       "path": "/api/keep-alive",
       "schedule": "0 0 * * *"
     }
+  ],
+  "redirects": [
+    {
+      "source": "/:path*",
+      "has": [{ "type": "host", "value": "www.eventevery.com" }],
+      "destination": "https://eventevery.com/:path*",
+      "permanent": false
+    },
+    {
+      "source": "/:path*",
+      "has": [{ "type": "host", "value": "eventevery.app" }],
+      "destination": "https://eventevery.com/:path*",
+      "permanent": false
+    },
+    {
+      "source": "/:path*",
+      "has": [{ "type": "host", "value": "www.eventevery.app" }],
+      "destination": "https://eventevery.com/:path*",
+      "permanent": false
+    },
+    {
+      "source": "/:path*",
+      "has": [{ "type": "host", "value": "summonit.app" }],
+      "destination": "https://eventevery.com/:path*",
+      "permanent": false
+    },
+    {
+      "source": "/:path*",
+      "has": [{ "type": "host", "value": "www.summonit.app" }],
+      "destination": "https://eventevery.com/:path*",
+      "permanent": false
+    }
   ]
 }
