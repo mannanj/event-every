@@ -45,6 +45,29 @@ export async function mockURLDetection(page: Page) {
   });
 }
 
+// Forces the URL-paste→scrape branch ON: detect-urls reports a URL, scrape-url
+// returns canned page content. Register AFTER setupLocal so it overrides the
+// hasUrls:false default.
+export async function mockURLDetectionWithUrls(page: Page, url: string, remainingText = '') {
+  await page.route('**/api/detect-urls', async (route: Route) => {
+    await route.fulfill({
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ hasUrls: true, urls: [url], remainingText }),
+    });
+  });
+}
+
+export async function mockScrape(page: Page, url: string, title: string, text: string) {
+  await page.route('**/api/scrape-url', async (route: Route) => {
+    await route.fulfill({
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url, text, title, status: 'success' }),
+    });
+  });
+}
+
 // The 2-3 word Recent label. Re-registering later (per-test) overrides the
 // default wired into setupLocal — Playwright matches the most recently added route first.
 export async function mockSummarize(page: Page, summary = 'Test Summary') {
@@ -107,7 +130,7 @@ export async function submitText(page: Page, text: string) {
 }
 
 export async function waitForEvents(page: Page, count = 1) {
-  await expect(page.locator('h3.font-bold')).toHaveCount(count, { timeout: 20000 });
+  await expect(page.getByTestId('event-card-title')).toHaveCount(count, { timeout: 20000 });
 }
 
 // A tiny valid 1x1 PNG for file-upload tests.

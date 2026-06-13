@@ -111,7 +111,7 @@ async function submitText(page: Page, text: string) {
 
 // Helper: wait for events to appear after submission
 async function waitForEvents(page: Page, count = 1) {
-  await expect(page.locator('h3.font-bold')).toHaveCount(count, { timeout: 15000 });
+  await expect(page.getByTestId('event-card-title')).toHaveCount(count, { timeout: 15000 });
 }
 
 test.describe('Event Extraction Scenarios', () => {
@@ -132,7 +132,16 @@ test.describe('Event Extraction Scenarios', () => {
     await submitText(page, "Dinner at Luigi's, Friday March 13 at 7pm");
     await waitForEvents(page, 1);
 
-    await expect(page.locator('h3.font-bold').first()).toContainText("Dinner at Luigi's");
+    const card = page.getByTestId('event-card').first();
+    await expect(page.getByTestId('event-card-title').first()).toContainText("Dinner at Luigi's");
+    // Rendered date + time on the card's one-line summary. The date token is
+    // robust; the exact wall-clock hour depends on the runner's browser tz
+    // (timezone:null → display in browser tz), so assert a time token shape,
+    // not a fixed hour.
+    await expect(card).toContainText('Mar 13');
+    await expect(card).toContainText(/\d{1,2}:\d{2}\s?[AP]M/);
+    // Location renders inline even while collapsed (BatchEventList.tsx:453).
+    await expect(card).toContainText("Luigi's Restaurant");
   });
 
   test('Scenario 2: All-day event (no times mentioned)', async ({ page }) => {
@@ -151,7 +160,11 @@ test.describe('Event Extraction Scenarios', () => {
     await submitText(page, 'Company offsite March 20, Napa Valley');
     await waitForEvents(page, 1);
 
-    await expect(page.locator('h3.font-bold').first()).toContainText('Company offsite');
+    const card = page.getByTestId('event-card').first();
+    await expect(page.getByTestId('event-card-title').first()).toContainText('Company offsite');
+    // All-day cards still render a date and the location inline.
+    await expect(card).toContainText('Mar 20');
+    await expect(card).toContainText('Napa Valley');
   });
 
   test('Scenario 3: Conference poster extracts as 1 event', async ({ page }) => {
@@ -177,8 +190,8 @@ test.describe('Event Extraction Scenarios', () => {
     await waitForEvents(page, 1);
 
     // Should be exactly 1 event (conference as a whole)
-    await expect(page.locator('h3.font-bold')).toHaveCount(1);
-    await expect(page.locator('h3.font-bold').first()).toContainText('AI Summit 2026');
+    await expect(page.getByTestId('event-card-title')).toHaveCount(1);
+    await expect(page.getByTestId('event-card-title').first()).toContainText('AI Summit 2026');
   });
 
   test('Scenario 4: Schedule with multiple distinct events', async ({ page }) => {
@@ -213,7 +226,7 @@ test.describe('Event Extraction Scenarios', () => {
     await submitText(page, 'Monday 9am standup, Tuesday 2pm design review, Wednesday 11am retro');
     await waitForEvents(page, 3);
 
-    const titles = page.locator('h3.font-bold');
+    const titles = page.getByTestId('event-card-title');
     await expect(titles).toHaveCount(3);
     await expect(titles.nth(0)).toContainText('Standup');
     await expect(titles.nth(1)).toContainText('Design Review');
@@ -251,8 +264,8 @@ test.describe('Event Extraction Scenarios', () => {
     await submitText(page, 'Lunch with Alice, Bob, and Carol Thursday at noon');
     await waitForEvents(page, 1);
 
-    await expect(page.locator('h3.font-bold')).toHaveCount(1);
-    await expect(page.locator('h3.font-bold').first()).toContainText('Lunch with Alice, Bob, and Carol');
+    await expect(page.getByTestId('event-card-title')).toHaveCount(1);
+    await expect(page.getByTestId('event-card-title').first()).toContainText('Lunch with Alice, Bob, and Carol');
   });
 
   test('Scenario 7: Event with timezone preserved', async ({ page }) => {
@@ -271,7 +284,12 @@ test.describe('Event Extraction Scenarios', () => {
     await submitText(page, 'Team Sync at 3:00 PM UTC on March 15');
     await waitForEvents(page, 1);
 
-    await expect(page.locator('h3.font-bold').first()).toContainText('Team Sync');
+    const card = page.getByTestId('event-card').first();
+    await expect(page.getByTestId('event-card-title').first()).toContainText('Team Sync');
+    // Timed events render a timezone abbreviation chip (BatchEventList.tsx:400).
+    // The exact abbreviation depends on the runner's browser tz, so assert the
+    // chip exists via a loose token shape rather than a fixed value.
+    await expect(card).toContainText(/[A-Z]{2,5}T|UTC|GMT/);
   });
 
   test('Scenario 8: Low-confidence events are filtered out', async ({ page }) => {
@@ -289,8 +307,8 @@ test.describe('Event Extraction Scenarios', () => {
     await submitText(page, 'Real Meeting at 10am March 16. Also the sky is blue.');
     await waitForEvents(page, 1);
 
-    await expect(page.locator('h3.font-bold')).toHaveCount(1);
-    await expect(page.locator('h3.font-bold').first()).toContainText('Real Meeting');
+    await expect(page.getByTestId('event-card-title')).toHaveCount(1);
+    await expect(page.getByTestId('event-card-title').first()).toContainText('Real Meeting');
   });
 });
 
@@ -331,7 +349,7 @@ test.describe('UI Interaction Tests', () => {
     await waitForEvents(page, 1);
 
     // Click the event card to expand
-    const eventCard = page.locator('h3.font-bold').first();
+    const eventCard = page.getByTestId('event-card-title').first();
     await eventCard.click();
 
     // After expanding, location should be visible
@@ -349,7 +367,7 @@ test.describe('UI Interaction Tests', () => {
     await expect(dismissButton.first()).toBeVisible({ timeout: 15000 });
 
     // The error alert with border styling (not the textarea's aria-invalid alert)
-    const errorNotification = page.locator('div.border-2.border-black[role="alert"]');
+    const errorNotification = page.getByTestId('error-notification');
     await expect(errorNotification.first()).toBeVisible();
 
     await dismissButton.first().click();
@@ -374,7 +392,7 @@ test.describe('UI Interaction Tests', () => {
     await textarea.press('Meta+Enter');
 
     await waitForEvents(page, 1);
-    await expect(page.locator('h3.font-bold').first()).toContainText('Quick Event');
+    await expect(page.getByTestId('event-card-title').first()).toContainText('Quick Event');
   });
 });
 

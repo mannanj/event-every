@@ -33,7 +33,7 @@ export default defineConfig({
     : {
         command: 'bun run dev',
         url: 'http://localhost:3777',
-        reuseExistingServer: true,
+        reuseExistingServer: !process.env.CI,
         timeout: 120000,
       },
 });

@@ -227,7 +227,7 @@ test.describe('Job cancellation', () => {
     await cancelBtn.click();
 
     await expect(cancelBtn).toBeHidden({ timeout: 8000 });
-    await expect(page.locator('h3.font-bold')).toHaveCount(0);
+    await expect(page.getByTestId('event-card-title')).toHaveCount(0);
   });
 });
 

@@ -20,6 +20,7 @@ export default function ErrorNotification({ errors, onDismiss }: ErrorNotificati
         {errors.map((error) => (
           <div
             key={error.id}
+            data-testid="error-notification"
             className="border-2 border-black bg-white p-4 flex items-start gap-3"
             role="alert"
           >

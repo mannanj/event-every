@@ -89,7 +89,7 @@ const URLPill = ({ url, onRemove, large = false }: URLPillProps) => {
 
   return (
     <>
-      <div className="relative inline-block">
+      <div data-testid="url-pill" className="relative inline-block">
         <div
           onClick={handlePillClick}
           onMouseEnter={() => setIsHovered(true)}

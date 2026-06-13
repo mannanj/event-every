@@ -269,6 +269,7 @@ export default function BatchEventList({
           return (
             <div
               key={event.id}
+              data-testid="event-card"
               className={`transition-all duration-500 border-t-2 border-black ${
                 isNew ? 'bg-green-50' : 'bg-white'
               }`}
@@ -300,6 +301,7 @@ export default function BatchEventList({
                         {editingField?.eventId === event.id && editingField.field === 'title' ? (
                           <input
                             type="text"
+                            data-testid="event-card-title-input"
                             value={event.title}
                             onChange={(e) => handleFieldEdit(event, 'title', e.target.value)}
                             onBlur={() => setEditingField(null)}
@@ -314,6 +316,7 @@ export default function BatchEventList({
                           />
                         ) : (
                           <h3
+                            data-testid="event-card-title"
                             className="font-bold text-base truncate cursor-pointer hover:bg-gray-200 px-1 rounded"
                             onClick={(e) => {
                               e.stopPropagation();
@@ -335,6 +338,7 @@ export default function BatchEventList({
                         {editingField?.eventId === event.id && editingField.field === 'startDate' ? (
                           <input
                             type="date"
+                            data-testid="event-card-date-input"
                             value={formatDateForInput(event.startDate)}
                             onChange={(e) => handleFieldEdit(event, 'startDate', e.target.value)}
                             onBlur={() => setEditingField(null)}
@@ -366,6 +370,7 @@ export default function BatchEventList({
                         {editingField?.eventId === event.id && editingField.field === 'startTime' ? (
                           <input
                             type="time"
+                            data-testid="event-card-time-input"
                             value={formatTimeForInput(event.startDate)}
                             onChange={(e) => handleFieldEdit(event, 'startTime', e.target.value)}
                             onBlur={() => setEditingField(null)}
@@ -542,6 +547,7 @@ export default function BatchEventList({
         <div className="px-4 pt-4 pb-1 border-t-2 border-black">
           <button
             onClick={handleExport}
+            data-testid="save-events-button"
             className={`w-full py-3 px-6 border-2 transition-colors focus:outline-none focus:ring-2 ${
               selectedCount === 0
                 ? 'bg-red-500 text-white border-red-500 hover:bg-red-600 hover:border-red-600 focus:ring-red-500'
