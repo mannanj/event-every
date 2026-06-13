@@ -40,3 +40,4 @@ package-lock.json
 pnpm-lock.yaml
 yarn.lock
 .claude/session-memory/
+.claude/handoff/
