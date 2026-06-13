@@ -5,11 +5,9 @@ import {
   ensureCommunityBudget,
   getLlmKey,
   getLlmMode,
-  recordLlmUsage,
-  upstreamCommunityLimit,
+  openRouterChat,
 } from '@/lib/llm';
 
-const OPENROUTER_BASE_URL = process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1';
 const TZ_RESOLVE_MODEL = process.env.OPENROUTER_TZ_MODEL || 'deepseek/deepseek-chat-v3-0324';
 
 export async function POST(request: NextRequest) {
@@ -47,54 +45,46 @@ export async function POST(request: NextRequest) {
       eventLocation && `Event location: ${eventLocation}`,
     ].filter(Boolean).join('\n');
 
-    const response = await fetch(`${OPENROUTER_BASE_URL}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-        'X-Title': 'event-every',
-      },
-      body: JSON.stringify({
-        model: TZ_RESOLVE_MODEL,
-        messages: [
-          {
-            role: 'user',
-            content: `Given the following event context, determine the IANA timezone identifier.\n\n${contextParts}\n\nReturn the most likely IANA timezone (e.g. "America/New_York", "UTC", "Europe/London").`,
-          },
-        ],
-        tools: [
-          {
-            type: 'function',
-            function: {
-              name: 'resolve_timezone',
-              description: 'Return the resolved IANA timezone',
-              parameters: {
-                type: 'object',
-                properties: {
-                  timezone: { type: 'string', description: 'IANA timezone identifier' },
-                  confidence: { type: 'number', description: 'Confidence 0-1', minimum: 0, maximum: 1 },
+    let data;
+    try {
+      data = await openRouterChat(
+        {
+          model: TZ_RESOLVE_MODEL,
+          messages: [
+            {
+              role: 'user',
+              content: `Given the following event context, determine the IANA timezone identifier.\n\n${contextParts}\n\nReturn the most likely IANA timezone (e.g. "America/New_York", "UTC", "Europe/London").`,
+            },
+          ],
+          tools: [
+            {
+              type: 'function',
+              function: {
+                name: 'resolve_timezone',
+                description: 'Return the resolved IANA timezone',
+                parameters: {
+                  type: 'object',
+                  properties: {
+                    timezone: { type: 'string', description: 'IANA timezone identifier' },
+                    confidence: { type: 'number', description: 'Confidence 0-1', minimum: 0, maximum: 1 },
+                  },
+                  required: ['timezone', 'confidence'],
                 },
-                required: ['timezone', 'confidence'],
               },
             },
-          },
-        ],
-        tool_choice: { type: 'function', function: { name: 'resolve_timezone' } },
-      }),
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      const limitError = upstreamCommunityLimit(mode, response.status);
-      if (limitError) return communityLimitResponse(limitError);
+          ],
+          tool_choice: { type: 'function', function: { name: 'resolve_timezone' } },
+        },
+        { key: apiKey, mode }
+      );
+    } catch (error) {
+      if (error instanceof CommunityLimitError) return communityLimitResponse(error);
+      // Preserve this route's contract: a non-limit upstream failure is a 502, not a 500.
       return NextResponse.json(
-        { error: data.error?.message || 'LLM API error' },
+        { error: error instanceof Error ? error.message : 'LLM API error' },
         { status: 502 }
       );
     }
-
-    await recordLlmUsage(mode, data.usage);
 
     const toolCalls = data.choices?.[0]?.message?.tool_calls;
     if (!toolCalls || toolCalls.length === 0) {

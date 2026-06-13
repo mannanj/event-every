@@ -5,11 +5,9 @@ import {
   ensureCommunityBudget,
   getLlmKey,
   getLlmMode,
-  recordLlmUsage,
-  upstreamCommunityLimit,
+  openRouterChat,
 } from '@/lib/llm';
 
-const OPENROUTER_BASE_URL = process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1';
 // Lightweight model for fast 2-3 word labels — kept separate from the heavyweight
 // parse model (OPENROUTER_MODEL) so it can be swapped without touching extraction.
 // NOTE: use the dated id; the bare `mistralai/ministral-8b` alias 404s ("No endpoints found").
@@ -19,12 +17,6 @@ const SUMMARY_PROMPT = `You write ultra-short labels for saved calendar inputs.
 Reply with ONLY a 2-3 word label in Title Case, words separated by single spaces.
 No punctuation, no quotes, no preamble, no explanation.
 Example reply: Team Lunch`;
-
-interface OpenRouterResponse {
-  choices?: Array<{ message?: { content?: string } }>;
-  usage?: { cost?: number };
-  error?: { message?: string };
-}
 
 // Force the model's reply into a clean 2-3 word Title Case label. Handles the
 // observed failure modes: run-on PascalCase ("DinnerWithSam"), stray quotes/markdown,
@@ -80,33 +72,24 @@ export async function POST(request: NextRequest) {
       .filter(Boolean)
       .join('\n');
 
-    const response = await fetch(`${OPENROUTER_BASE_URL}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-        'X-Title': 'event-every',
-      },
-      body: JSON.stringify({
-        model: OPENROUTER_SUMMARY_MODEL,
-        messages: [
-          { role: 'system', content: SUMMARY_PROMPT },
-          { role: 'user', content: context },
-        ],
-        max_tokens: 16,
-        temperature: 0.2,
-      }),
-    });
-
-    const data = (await response.json()) as OpenRouterResponse;
-
-    if (!response.ok) {
-      const limitError = upstreamCommunityLimit(mode, response.status);
-      if (limitError) return communityLimitResponse(limitError);
-      throw new Error(data.error?.message || 'OpenRouter API error');
+    let data;
+    try {
+      data = await openRouterChat(
+        {
+          model: OPENROUTER_SUMMARY_MODEL,
+          messages: [
+            { role: 'system', content: SUMMARY_PROMPT },
+            { role: 'user', content: context },
+          ],
+          max_tokens: 16,
+          temperature: 0.2,
+        },
+        { key: apiKey, mode }
+      );
+    } catch (error) {
+      if (error instanceof CommunityLimitError) return communityLimitResponse(error);
+      throw error;
     }
-
-    await recordLlmUsage(mode, data.usage);
 
     const summary = cleanLabel(data.choices?.[0]?.message?.content || '');
     return NextResponse.json({ summary });

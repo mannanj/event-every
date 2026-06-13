@@ -5,11 +5,10 @@ import {
   ensureCommunityBudget,
   getLlmKey,
   getLlmMode,
-  recordLlmUsage,
-  upstreamCommunityLimit,
+  openRouterChat,
+  ToolDefinition,
 } from '@/lib/llm';
 
-const OPENROUTER_BASE_URL = process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1';
 const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || 'mistralai/mistral-large-2512';
 
 const URL_DETECTION_PROMPT = `You are a URL detection assistant. Analyze the provided text and extract ALL URLs.
@@ -26,36 +25,6 @@ interface URLDetectionResult {
   urls: string[];
   remainingText: string;
   hasUrls: boolean;
-}
-
-type ToolDefinition = {
-  type: 'function';
-  function: {
-    name: string;
-    description: string;
-    parameters: Record<string, unknown>;
-  };
-};
-
-type OpenRouterToolCall = {
-  function: {
-    name: string;
-    arguments: string;
-  };
-};
-
-interface OpenRouterResponse {
-  choices: Array<{
-    message: {
-      tool_calls?: OpenRouterToolCall[];
-    };
-  }>;
-  usage?: {
-    cost?: number;
-  };
-  error?: {
-    message?: string;
-  };
 }
 
 export async function POST(request: NextRequest) {
@@ -112,39 +81,26 @@ export async function POST(request: NextRequest) {
       },
     ];
 
-    const response = await fetch(`${OPENROUTER_BASE_URL}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-        'X-Title': 'event-every',
-      },
-      body: JSON.stringify({
-        model: OPENROUTER_MODEL,
-        messages: [
-          {
-            role: 'user',
-            content: `${URL_DETECTION_PROMPT}\n\nExtract URLs from this text:\n${text}`,
-          },
-        ],
-        tools,
-        tool_choice: {
-          type: 'function',
-          function: { name: 'extract_urls' },
+    let data;
+    try {
+      data = await openRouterChat(
+        {
+          model: OPENROUTER_MODEL,
+          messages: [
+            {
+              role: 'user',
+              content: `${URL_DETECTION_PROMPT}\n\nExtract URLs from this text:\n${text}`,
+            },
+          ],
+          tools,
+          tool_choice: { type: 'function', function: { name: 'extract_urls' } },
         },
-      }),
-    });
-
-    const data = (await response.json()) as OpenRouterResponse;
-
-    if (!response.ok) {
-      const limitError = upstreamCommunityLimit(mode, response.status);
-      if (limitError) return communityLimitResponse(limitError);
-      const errorMessage = data.error?.message || 'OpenRouter API error';
-      throw new Error(errorMessage);
+        { key: apiKey, mode }
+      );
+    } catch (error) {
+      if (error instanceof CommunityLimitError) return communityLimitResponse(error);
+      throw error;
     }
-
-    await recordLlmUsage(mode, data.usage);
 
     const toolCalls = data.choices?.[0]?.message?.tool_calls;
     if (!toolCalls || toolCalls.length === 0) {
@@ -152,7 +108,6 @@ export async function POST(request: NextRequest) {
     }
 
     const result = JSON.parse(toolCalls[0].function.arguments) as URLDetectionResult;
-
     return NextResponse.json(result);
   } catch (error) {
     console.error('URL detection API error:', error);

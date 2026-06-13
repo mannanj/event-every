@@ -1,43 +1,12 @@
 import { ParsedEvent, BatchParsedEvents, ClientContext } from '@/types/event';
-import { LlmMode, recordLlmUsage, upstreamCommunityLimit } from '@/lib/llm';
+import { LlmMode, openRouterChat, OpenRouterToolCall, ToolDefinition } from '@/lib/llm';
 
-const OPENROUTER_BASE_URL = process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1';
 const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || 'mistralai/mistral-large-2512';
 
 export interface LlmCallAuth {
   key: string;
   mode: LlmMode;
 }
-
-type ToolDefinition = {
-  type: 'function';
-  function: {
-    name: string;
-    description: string;
-    parameters: Record<string, unknown>;
-  };
-};
-
-type OpenRouterToolCall = {
-  function: {
-    name: string;
-    arguments: string;
-  };
-};
-
-type OpenRouterResponse = {
-  choices: Array<{
-    message: {
-      tool_calls?: OpenRouterToolCall[];
-    };
-  }>;
-  usage?: {
-    cost?: number;
-  };
-  error?: {
-    message?: string;
-  };
-};
 
 function formatClientContext(context?: ClientContext): string {
   if (!context) return '';
@@ -127,49 +96,20 @@ async function callOpenRouter(
   toolName: string,
   auth: LlmCallAuth
 ): Promise<OpenRouterToolCall> {
-  if (!auth.key) {
-    throw new Error('OPENROUTER_API_KEY environment variable is not set');
-  }
-
-  const response = await fetch(`${OPENROUTER_BASE_URL}/chat/completions`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${auth.key}`,
-      'Content-Type': 'application/json',
-      'X-Title': 'event-every',
-    },
-    body: JSON.stringify({
+  const data = await openRouterChat(
+    {
       model: OPENROUTER_MODEL,
-      messages: [
-        {
-          role: 'user',
-          content,
-        },
-      ],
+      messages: [{ role: 'user', content }],
       tools,
-      tool_choice: {
-        type: 'function',
-        function: { name: toolName },
-      },
-    }),
-  });
-
-  const data = (await response.json()) as OpenRouterResponse;
-
-  if (!response.ok) {
-    const limitError = upstreamCommunityLimit(auth.mode, response.status);
-    if (limitError) throw limitError;
-    const errorMessage = data.error?.message || 'OpenRouter API error';
-    throw new Error(errorMessage);
-  }
-
-  await recordLlmUsage(auth.mode, data.usage);
+      tool_choice: { type: 'function', function: { name: toolName } },
+    },
+    auth
+  );
 
   const toolCalls = data.choices?.[0]?.message?.tool_calls;
   if (!toolCalls || toolCalls.length === 0) {
     throw new Error('No tool calls found in OpenRouter response');
   }
-
   return toolCalls[0];
 }
 
