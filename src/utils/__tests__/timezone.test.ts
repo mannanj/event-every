@@ -1,12 +1,16 @@
-// Characterization tests for the timezone authority. These pin CURRENT behavior so the
-// timezone consolidation (plans/012) can change it deliberately and visibly.
+// Tests for the timezone-resolution authority. Plan 003 stood these up as characterization
+// tests; plan 012 reconciles them to the consolidated API: the old no-op IANA alias was deleted
+// (it just forwarded to normalizeTimezone), parseTimezoneFromText is now internal, and the
+// resolveTimezone mislabel is fixed (a zone that resolves but equals the browser zone is now
+// reported 'resolved', not 'unknown'). The normalizeTimezone assertions below are unchanged —
+// its observable output was verified byte-for-byte identical to the pre-012 implementation.
 import { describe, expect, test } from 'bun:test';
 import {
-  convertToIANATimezone,
   getBrowserTimezone,
   isValidIANATimezone,
   normalizeTimezone,
-  parseTimezoneFromText,
+  resolveTimezone,
+  resolveTimezoneZone,
 } from '@/utils/timezone';
 
 describe('isValidIANATimezone', () => {
@@ -35,6 +39,7 @@ describe('normalizeTimezone', () => {
     expect(typeof tz).toBe('string');
     expect(tz.length).toBeGreaterThan(0);
     expect(isValidIANATimezone(tz)).toBe(true);
+    expect(tz).toBe(getBrowserTimezone());
   });
 
   test('maps US abbreviations to their IANA zone', () => {
@@ -50,25 +55,76 @@ describe('normalizeTimezone', () => {
   test('UTC stays UTC', () => {
     expect(normalizeTimezone('UTC')).toBe('UTC');
   });
+
+  // Free-text resolution (previously asserted via the now-internal parseTimezoneFromText;
+  // rewritten against normalizeTimezone, which routes free text through the same parser).
+  test('resolves a US abbreviation embedded in a sentence', () => {
+    expect(normalizeTimezone('Meeting at 3pm EST')).toBe('America/New_York');
+  });
+
+  test('resolves an explicit IANA zone in free text', () => {
+    expect(normalizeTimezone('Call scheduled for America/Chicago')).toBe('America/Chicago');
+  });
+
+  test('falls back to the browser zone when no timezone is present in free text', () => {
+    expect(normalizeTimezone('lunch tomorrow at noon')).toBe(getBrowserTimezone());
+  });
 });
 
-describe('parseTimezoneFromText', () => {
-  test('finds a US abbreviation embedded in a sentence', () => {
-    expect(parseTimezoneFromText('Meeting at 3pm EST')).toBe('America/New_York');
+describe('resolveTimezoneZone', () => {
+  test('resolves a US abbreviation and reports resolved=true', () => {
+    expect(resolveTimezoneZone('EST')).toEqual({ timezone: 'America/New_York', resolved: true });
   });
 
-  test('finds an explicit IANA zone in free text', () => {
-    expect(parseTimezoneFromText('Call scheduled for America/Chicago')).toBe('America/Chicago');
+  test('passes a valid IANA zone through and reports resolved=true', () => {
+    expect(resolveTimezoneZone('America/Chicago')).toEqual({ timezone: 'America/Chicago', resolved: true });
   });
 
-  test('returns null when no timezone is present', () => {
-    expect(parseTimezoneFromText('lunch tomorrow at noon')).toBeNull();
+  test('garbage falls back to the browser zone with resolved=false', () => {
+    const result = resolveTimezoneZone('total garbage zone');
+    expect(result.resolved).toBe(false);
+    expect(result.timezone).toBe(getBrowserTimezone());
+  });
+
+  test('undefined reports resolved=false', () => {
+    const result = resolveTimezoneZone(undefined);
+    expect(result.resolved).toBe(false);
+    expect(result.timezone).toBe(getBrowserTimezone());
   });
 });
 
-describe('convertToIANATimezone', () => {
-  test('delegates to normalizeTimezone', () => {
-    expect(convertToIANATimezone('PST')).toBe('America/Los_Angeles');
-    expect(convertToIANATimezone('America/New_York')).toBe('America/New_York');
+describe('resolveTimezone', () => {
+  // Mislabel fix (plan 012): when raw resolves to the SAME zone as the browser, the old service
+  // returned status 'unknown'. The resolution status is now read from resolveTimezoneZone, so a
+  // resolved zone is correctly 'resolved' regardless of whether it equals the browser zone.
+  test('a resolved zone equal to the browser zone is now resolved/programmatic', () => {
+    expect(resolveTimezone('UTC', 'UTC')).toEqual({
+      timezone: 'UTC',
+      status: 'resolved',
+      source: 'programmatic',
+    });
+  });
+
+  test('a resolved IANA zone equal to the browser zone is resolved', () => {
+    const result = resolveTimezone('America/New_York', 'America/New_York');
+    expect(result.status).toBe('resolved');
+    expect(result.source).toBe('programmatic');
+    expect(result.timezone).toBe('America/New_York');
+  });
+
+  test('garbage resolves to the browser zone with unknown/unknown', () => {
+    expect(resolveTimezone('total garbage', 'UTC')).toEqual({
+      timezone: 'UTC',
+      status: 'unknown',
+      source: 'unknown',
+    });
+  });
+
+  test('undefined resolves to the supplied browser zone with unknown/unknown', () => {
+    expect(resolveTimezone(undefined, 'Europe/Paris')).toEqual({
+      timezone: 'Europe/Paris',
+      status: 'unknown',
+      source: 'unknown',
+    });
   });
 });

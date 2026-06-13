@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { getUrlDisplayParts } from '@/utils/url';
 
 interface URLPillProps {
   url: string;
@@ -13,53 +14,33 @@ const URLPill = ({ url, onRemove, large = false }: URLPillProps) => {
   const [showToast, setShowToast] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
 
-  const isMeetupURL = (url: string) => {
-    try {
-      const urlObj = new URL(url);
-      return urlObj.hostname.includes('meetup.com');
-    } catch {
-      return false;
-    }
-  };
-
   const truncateURL = (url: string) => {
     const maxLength = large ? 50 : 12;
     const pathMaxLength = large ? 45 : 10;
     const smallPathMaxLength = large ? 35 : 6;
 
-    try {
-      const urlObj = new URL(url);
-      let hostname = urlObj.hostname.replace(/^www\./, '');
-      const path = urlObj.pathname + urlObj.search;
-
-      if (hostname.includes('meetup.com')) {
-        const pathWithoutSlash = path.replace(/^\//, '');
-        return pathWithoutSlash.length > maxLength ? `${pathWithoutSlash.substring(0, pathMaxLength)}...` : pathWithoutSlash;
-      }
-
-      if (path.length <= (large ? 20 : 8)) {
-        return `${hostname}${path}`;
-      }
-
-      return `${hostname}${path.substring(0, smallPathMaxLength)}...`;
-    } catch {
+    const parts = getUrlDisplayParts(url);
+    if (!parts) {
       return url.length > maxLength ? `${url.substring(0, pathMaxLength)}...` : url;
     }
+    const { hostname, path, isMeetup } = parts;
+
+    if (isMeetup) {
+      const pathWithoutSlash = path.replace(/^\//, '');
+      return pathWithoutSlash.length > maxLength ? `${pathWithoutSlash.substring(0, pathMaxLength)}...` : pathWithoutSlash;
+    }
+
+    if (path.length <= (large ? 20 : 8)) {
+      return `${hostname}${path}`;
+    }
+
+    return `${hostname}${path.substring(0, smallPathMaxLength)}...`;
   };
 
   const getTooltipText = (url: string) => {
-    try {
-      const urlObj = new URL(url);
-      const hostname = urlObj.hostname.replace(/^www\./, '');
-
-      if (hostname.includes('meetup.com')) {
-        return `Copy Meetup Event ${url}`;
-      }
-
-      return url;
-    } catch {
-      return url;
-    }
+    const parts = getUrlDisplayParts(url);
+    if (!parts) return url;
+    return parts.isMeetup ? `Copy Meetup Event ${url}` : url;
   };
 
   const handlePillClick = async () => {

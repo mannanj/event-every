@@ -1,7 +1,8 @@
 export function normalizeUrl(raw?: string | null): string | undefined {
   if (!raw) return undefined;
-  // Strip whitespace + zero-width chars (BOM, ZWJ, ZWNJ) that LLM/OCR may emit
-  const cleaned = raw.replace(/[\s​-‍﻿]+/g, '').trim();
+  // Strip only zero-width junk (BOM, ZWSP/ZWNJ/ZWJ, word-joiner) that LLM/OCR may emit.
+  // Do NOT strip ASCII spaces — a space in a path is real and must be percent-encoded by new URL(), not deleted.
+  const cleaned = raw.replace(/[​-‍⁠﻿]/g, '').trim();
   if (!cleaned) return undefined;
 
   const withProtocol = /^https?:\/\//i.test(cleaned) ? cleaned : `https://${cleaned}`;
@@ -17,6 +18,27 @@ export function normalizeUrl(raw?: string | null): string | undefined {
   }
 }
 
-export function isValidUrl(raw?: string | null): boolean {
-  return normalizeUrl(raw) !== undefined;
+export function safeParseUrl(url: string): URL | null {
+  try {
+    return new URL(url);
+  } catch {
+    return null;
+  }
+}
+
+export interface UrlDisplayParts {
+  hostname: string;   // www. stripped
+  path: string;       // pathname + search
+  isMeetup: boolean;
+}
+
+export function getUrlDisplayParts(url: string): UrlDisplayParts | null {
+  const parsed = safeParseUrl(url);
+  if (!parsed) return null;
+  const hostname = parsed.hostname.replace(/^www\./, '');
+  return {
+    hostname,
+    path: parsed.pathname + parsed.search,
+    isMeetup: hostname.includes('meetup.com'),
+  };
 }

@@ -1,3 +1,5 @@
+import { TimezoneStatus, TimezoneSource } from '@/types/event';
+
 const TIMEZONE_ABBREVIATIONS: Record<string, string> = {
   'PST': 'America/Los_Angeles',
   'PDT': 'America/Los_Angeles',
@@ -31,6 +33,8 @@ const TIMEZONE_ABBREVIATIONS: Record<string, string> = {
   'NZDT': 'Pacific/Auckland',
 };
 
+const KNOWN_ABBREVIATIONS = new Set(Object.keys(TIMEZONE_ABBREVIATIONS));
+
 export function getBrowserTimezone(): string {
   try {
     return Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -39,7 +43,7 @@ export function getBrowserTimezone(): string {
   }
 }
 
-export function parseTimezoneFromText(text: string): string | null {
+function parseTimezoneFromText(text: string): string | null {
   const upperText = text.toUpperCase();
 
   for (const [abbr, iana] of Object.entries(TIMEZONE_ABBREVIATIONS)) {
@@ -73,29 +77,45 @@ export function isValidIANATimezone(timezone: string): boolean {
   }
 }
 
-export function normalizeTimezone(timezone: string | undefined): string {
-  if (!timezone) {
-    return getBrowserTimezone();
-  }
-
-  const upperTimezone = timezone.toUpperCase();
-  if (TIMEZONE_ABBREVIATIONS[upperTimezone]) {
-    return TIMEZONE_ABBREVIATIONS[upperTimezone];
-  }
-
-  if (isValidIANATimezone(timezone)) {
-    return timezone;
-  }
-
-  const parsedTz = parseTimezoneFromText(timezone);
-  if (parsedTz) {
-    return parsedTz;
-  }
-
-  return getBrowserTimezone();
+export interface ResolvedTimezone {
+  timezone: string;   // always a valid IANA zone (falls back to browser zone)
+  resolved: boolean;  // true iff `raw` was understood; false iff we fell back blindly
 }
 
-export function convertToIANATimezone(timezone: string): string {
-  const normalized = normalizeTimezone(timezone);
-  return normalized;
+export function resolveTimezoneZone(raw: string | undefined): ResolvedTimezone {
+  if (!raw) return { timezone: getBrowserTimezone(), resolved: false };
+
+  const upper = raw.toUpperCase().trim();
+  if (KNOWN_ABBREVIATIONS.has(upper)) {
+    return { timezone: TIMEZONE_ABBREVIATIONS[upper], resolved: true };
+  }
+  if (isValidIANATimezone(raw)) {
+    return { timezone: raw, resolved: true };
+  }
+  const parsed = parseTimezoneFromText(raw);
+  if (parsed) return { timezone: parsed, resolved: true };
+
+  return { timezone: getBrowserTimezone(), resolved: false };
+}
+
+export function normalizeTimezone(timezone: string | undefined): string {
+  return resolveTimezoneZone(timezone).timezone;
+}
+
+export interface TimezoneResolution {
+  timezone: string;
+  status: TimezoneStatus;
+  source: TimezoneSource | 'unknown';
+}
+
+export function resolveTimezone(
+  rawTimezone: string | undefined,
+  browserTimezone?: string
+): TimezoneResolution {
+  const browserTZ = browserTimezone || getBrowserTimezone();
+  const { timezone, resolved } = resolveTimezoneZone(rawTimezone);
+  if (resolved) {
+    return { timezone, status: 'resolved', source: 'programmatic' };
+  }
+  return { timezone: browserTZ, status: 'unknown', source: 'unknown' };
 }

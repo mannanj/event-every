@@ -22,7 +22,7 @@ import { eventStorage } from '@/services/storage';
 import { parseICSFile } from '@/services/icsParser';
 import { getClientContext } from '@/utils/clientContext';
 import { exportAllEvents } from '@/services/exportAll';
-import { resolveTimezone } from '@/services/timezoneResolver';
+import { resolveTimezone } from '@/utils/timezone';
 import { convertRawToDate } from '@/utils/timeConversion';
 import { getBrowserTimezone } from '@/utils/timezone';
 import { normalizeUrl } from '@/utils/url';

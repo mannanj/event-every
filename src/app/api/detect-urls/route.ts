@@ -8,6 +8,7 @@ import {
   openRouterChat,
   ToolDefinition,
 } from '@/lib/llm';
+import { normalizeUrl } from '@/utils/url';
 
 const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || 'mistralai/mistral-large-2512';
 
@@ -108,7 +109,17 @@ export async function POST(request: NextRequest) {
     }
 
     const result = JSON.parse(toolCalls[0].function.arguments) as URLDetectionResult;
-    return NextResponse.json(result);
+
+    // utils/url is the single normalization gate: salvage bare hosts, drop junk before scraping.
+    const normalizedUrls = result.urls
+      .map((u) => normalizeUrl(u))
+      .filter((u): u is string => Boolean(u));
+
+    return NextResponse.json({
+      ...result,
+      urls: normalizedUrls,
+      hasUrls: normalizedUrls.length > 0,
+    });
   } catch (error) {
     console.error('URL detection API error:', error);
 
