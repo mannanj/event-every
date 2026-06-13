@@ -1,10 +1,10 @@
-# Summon
+# Event Every
 
-Snap an image, paste text, or drop a link. Summon turns it into a calendar event.
+Event everything. Flyer, screenshot, email, link — into a calendar event.
 
 ## What It Does
 
-Summon converts any event information into calendar events:
+Event Every converts any event information into calendar events:
 - **Image to Event**: Upload a photo of a poster, flyer, or screenshot
 - **Text to Event**: Paste or type event details
 - **Smart Detection**: Automatically extracts dates, times, locations, and descriptions

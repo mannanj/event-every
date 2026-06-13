@@ -43,7 +43,7 @@ async function saveSignup(email: string, userAgent: string | null): Promise<Save
     try {
       const result = await d1Query(
         'INSERT INTO waitlist (email, source, user_agent) VALUES (?, ?, ?) ON CONFLICT(email) DO NOTHING',
-        [email, 'summon', userAgent]
+        [email, 'event-every', userAgent]
       );
       return { saved: true, alreadyJoined: (result.meta?.changes ?? 0) === 0, store: 'd1' };
     } catch (error) {
@@ -57,7 +57,7 @@ async function saveSignup(email: string, userAgent: string | null): Promise<Save
       // can be drained into D1 later (keys: waitlist:pending:<email>).
       const created = await getRedis().setnx(
         `waitlist:pending:${email}`,
-        JSON.stringify({ email, source: 'summon', userAgent, createdAt: new Date().toISOString() })
+        JSON.stringify({ email, source: 'event-every', userAgent, createdAt: new Date().toISOString() })
       );
       return { saved: true, alreadyJoined: created === 0, store: 'redis' };
     } catch (error) {
@@ -78,18 +78,18 @@ async function sendConfirmationEmail(email: string): Promise<boolean> {
     '',
     "You joined the waitlist for the Spirit & Hammer collective. When membership opens, you'll receive an invitation at this address.",
     '',
-    'Membership provides access to several member apps, including Summon.',
+    'Membership provides access to several member apps, including Event Every.',
     '',
     '— Spirit & Hammer',
     '',
-    "You're receiving this one-time confirmation because this address was submitted to the Summon waitlist (summonit.app). If this wasn't you, you can ignore this email.",
+    "You're receiving this one-time confirmation because this address was submitted to the Event Every waitlist (summonit.app). If this wasn't you, you can ignore this email.",
   ].join('\n');
   const html = `<div style="font-family: -apple-system, Helvetica, Arial, sans-serif; color: #000000; max-width: 480px; margin: 0 auto; padding: 24px;">
   <h1 style="font-size: 20px; border-bottom: 2px solid #000000; padding-bottom: 12px;">You&rsquo;re on the list.</h1>
   <p style="font-size: 15px; line-height: 1.6;">You joined the waitlist for the <strong>Spirit &amp; Hammer</strong> collective. When membership opens, you&rsquo;ll receive an invitation at this address.</p>
-  <p style="font-size: 15px; line-height: 1.6;">Membership provides access to several member apps, including <strong>Summon</strong>.</p>
+  <p style="font-size: 15px; line-height: 1.6;">Membership provides access to several member apps, including <strong>Event Every</strong>.</p>
   <p style="font-size: 15px;">&mdash; Spirit &amp; Hammer</p>
-  <p style="font-size: 12px; color: #666666; margin-top: 32px;">You&rsquo;re receiving this one-time confirmation because this address was submitted to the Summon waitlist (summonit.app). If this wasn&rsquo;t you, you can ignore this email.</p>
+  <p style="font-size: 12px; color: #666666; margin-top: 32px;">You&rsquo;re receiving this one-time confirmation because this address was submitted to the Event Every waitlist (summonit.app). If this wasn&rsquo;t you, you can ignore this email.</p>
 </div>`;
 
   try {

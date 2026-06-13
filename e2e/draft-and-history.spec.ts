@@ -274,7 +274,7 @@ test.describe('Streaming selection', () => {
   });
 });
 
-test.describe('Recent summons — summaries', () => {
+test.describe('Recent — summaries', () => {
   test('a 2-3 word summary appears on the card after transform', async ({ page }) => {
     await setupLocal(page);
     await mockSummarize(page, 'Coffee Catchup');
@@ -308,7 +308,7 @@ test.describe('Recent summons — summaries', () => {
   });
 });
 
-test.describe('Recent summons — search', () => {
+test.describe('Recent — search', () => {
   test('search filters entries and clearing restores all', async ({ page }) => {
     await setupLocal(page);
     await mockParseAPI(page, SINGLE_EVENT);

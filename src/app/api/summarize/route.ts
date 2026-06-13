@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
       headers: {
         Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
-        'X-Title': 'summon',
+        'X-Title': 'event-every',
       },
       body: JSON.stringify({
         model: OPENROUTER_SUMMARY_MODEL,

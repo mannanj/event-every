@@ -1,5 +1,7 @@
 import { InputDraft, InputHistoryEntry } from '@/types/input';
 
+// Internal IndexedDB name. Kept stable across the Event Every ↔ Summon renames so existing
+// users keep their drafts and input history — renaming the store would orphan their data.
 const DB_NAME = 'summon-input';
 const DB_VERSION = 1;
 const DRAFT_STORE = 'draft';

@@ -73,7 +73,7 @@ export default function CommunityLimitScreen({ resetAt, onEnterPattern }: Commun
       data-testid="community-limit-screen"
     >
       <div className="bg-white border-2 border-black p-8 max-w-xl w-full">
-        <h1 className="text-3xl font-black retro-rainbow-text tracking-wider text-center mb-8">Summon it</h1>
+        <h1 className="text-3xl font-black retro-rainbow-text tracking-wider text-center mb-8">Event Every</h1>
 
         <p className="text-black text-base leading-relaxed mb-6" data-testid="community-limit-message">
           This app is community sponsored. The usage limits have been hit today and reset {resetText}.

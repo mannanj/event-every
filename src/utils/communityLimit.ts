@@ -1,5 +1,5 @@
 export const COMMUNITY_LIMIT_CODE = 'community_limit';
-export const COMMUNITY_LIMIT_EVENT = 'summon:community-limit';
+export const COMMUNITY_LIMIT_EVENT = 'event-every:community-limit';
 
 export interface CommunityLimitDetail {
   resetAt?: string;

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Summon**: A minimal image/text-to-calendar-event converter that makes event creation effortless.
+**Event Every**: A minimal image/text-to-calendar-event converter that makes event creation effortless.
 
 **Core Mission**: Snap an image or paste text. Get a calendar event. It's that simple.
 

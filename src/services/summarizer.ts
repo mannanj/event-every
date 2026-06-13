@@ -6,7 +6,7 @@ interface SummarizeResult {
 
 // Best-effort 2-3 word label for a saved input. Never throws and never rejects —
 // a failed/slow summary must never disrupt event extraction, so the caller simply
-// gets an empty string and leaves the Recent-summons card without a label.
+// gets an empty string and leaves the Recent card without a label.
 export async function summarizeInput(params: {
   text?: string;
   eventTitles?: string[];

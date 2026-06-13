@@ -1,4 +1,4 @@
-# Summon - Monetization Strategy
+# Event Every - Monetization Strategy
 
 > A thoughtful, user-first approach to sustainable growth
 
@@ -6,7 +6,7 @@
 
 ## 🎯 Philosophy
 
-Summon exists to make event creation effortless. Any monetization strategy must:
+Event Every exists to make event creation effortless. Any monetization strategy must:
 - **Preserve the minimal, lovable experience**
 - **Respect user privacy and time**
 - **Provide clear, honest value**
@@ -20,7 +20,7 @@ Your users trust you to solve a problem. Our monetization should deepen that rel
 
 ### **Freemium + Usage-Based (Hybrid)**
 
-This is the sweet spot for Summon because:
+This is the sweet spot for Event Every because:
 - Your core costs are AI API calls (which vary by usage)
 - Users get immediate value from the free tier
 - Power users naturally need more, and they'll happily pay
@@ -45,11 +45,11 @@ This is the sweet spot for Summon because:
 - Covers casual users who never need more
 
 **User Message:**
-> "Summon is free to use. Create up to 5 events per month, forever."
+> "Event Every is free to use. Create up to 5 events per month, forever."
 
 ---
 
-## ⭐ Premium Tier - "Summon Plus"
+## ⭐ Premium Tier - "Event Every Plus"
 
 ### Pricing: $4.99/month or $49/year (17% savings)
 
@@ -75,15 +75,15 @@ This is the sweet spot for Summon because:
 
 ---
 
-## 🚀 Pro Tier - "Summon Pro" (Future)
+## 🚀 Pro Tier - "Event Every Pro" (Future)
 
 ### Pricing: $14.99/month or $149/year
 
 **For Teams & Power Users:**
 - Everything in Plus
 - **Team collaboration** - Share event history with team members
-- **API access** - Integrate Summon into your tools
-- **Custom branding** - Remove "Summon" branding from exports
+- **API access** - Integrate Event Every into your tools
+- **Custom branding** - Remove "Event Every" branding from exports
 - **Advanced analytics** - See trends in your event creation
 - **Zapier integration** - Connect to 5,000+ apps
 - **White-label exports** - Professional branded calendar files
@@ -175,7 +175,7 @@ Instead of monthly subscriptions, offer credits:
 ### 3. **Business & Enterprise Partnerships**
 
 **Event Management Companies**
-- White-label Summon for their clients
+- White-label Event Every for their clients
 - License the technology as a plugin
 - Monthly licensing fee per company
 
@@ -210,7 +210,7 @@ Instead of monthly subscriptions, offer credits:
 ### 5. **Content & Media Partnerships**
 
 **Newsletter Platforms (Substack, Beehiiv)**
-- "Summon" widget for newsletter writers
+- "Event Every" widget for newsletter writers
 - Auto-detect events in newsletters
 - Partnership revenue share
 
@@ -288,7 +288,7 @@ Only consider ads if subscription revenue proves insufficient. If you must:
 ```
 You've created 5 events this month! 🎉
 
-You're getting great use out of Summon.
+You're getting great use out of Event Every.
 Want to keep going?
 
 [Upgrade to Plus for unlimited events] [Not now]
@@ -312,7 +312,7 @@ Instead of:
 > "Upgrade now"
 
 Say:
-> "Keep the momentum going with Summon Plus"
+> "Keep the momentum going with Event Every Plus"
 
 ---
 
@@ -326,7 +326,7 @@ Say:
 - FAQ section
 
 **Sample "Why We Charge" Message:**
-> "Summon uses AI to extract event details from any source - that technology costs money to run. Your subscription helps us keep the free tier generous, maintain the service, and build new features you'll love. We're committed to keeping Summon affordable, transparent, and ad-free."
+> "Event Every uses AI to extract event details from any source - that technology costs money to run. Your subscription helps us keep the free tier generous, maintain the service, and build new features you'll love. We're committed to keeping Event Every affordable, transparent, and ad-free."
 
 ---
 
@@ -340,7 +340,7 @@ Say:
 - Track usage patterns
 
 ### **Phase 2: Soft Launch Premium (Months 6-12)**
-- Introduce "Summon Plus" at $4.99/mo
+- Introduce "Event Every Plus" at $4.99/mo
 - Invite power users to beta test
 - Offer founding member discount (50% off for life)
 - Goal: 100 paying subscribers (1% conversion)
@@ -512,7 +512,7 @@ Every interaction should feel:
 
 ## 💬 Final Thoughts
 
-Summon solves a real problem elegantly. Your users will pay for that value if you:
+Event Every solves a real problem elegantly. Your users will pay for that value if you:
 - Keep the free tier genuinely useful
 - Make premium features obviously valuable
 - Price fairly and transparently
@@ -534,4 +534,4 @@ The best monetization feels like a natural extension of the product, not a barri
 
 ---
 
-**Built with care for Summon** 🎉
+**Built with care for Event Every** 🎉

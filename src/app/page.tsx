@@ -7,6 +7,7 @@ import InputHistoryModal from '@/components/InputHistoryModal';
 import ErrorNotification from '@/components/ErrorNotification';
 import RateLimitBanner from '@/components/RateLimitBanner';
 import InlineEventEditor from '@/components/InlineEventEditor';
+import { SiteNav, HowItWorks, TrustPoints, Faq, SiteFooter } from '@/components/landing/LandingSections';
 import { CalendarEvent, ParsedEvent, StreamedEventChunk, EventAttachment, EventSortOption, TimezoneStatus } from '@/types/event';
 import { InputHistoryEntry, StoredInputFile, InputSource } from '@/types/input';
 import { exportToICS } from '@/services/exporter';
@@ -83,7 +84,7 @@ export default function Home() {
       return next;
     });
 
-  // Fire a lightweight 2-3 word summary for a saved Recent-summons entry, in parallel
+  // Fire a lightweight 2-3 word summary for a saved Recent entry, in parallel
   // with (and never blocking) event extraction. Patches the entry once the label lands.
   const summarizeAndStore = (entryId: string | undefined, text: string, events: CalendarEvent[]) => {
     if (!entryId) return;
@@ -805,7 +806,7 @@ export default function Home() {
   const handleSmartInputSubmit = async (data: { text: string; images: File[]; calendarFiles: File[] }) => {
     const { text, images, calendarFiles } = data;
 
-    // Transform always records to Recent summons — re-saving a loaded entry is fine.
+    // Transform always records to Recent — re-saving a loaded entry is fine.
     const entryId = saveInputToHistory(text, images, calendarFiles);
     loadedSigRef.current = null;
 
@@ -1038,18 +1039,36 @@ export default function Home() {
     }
   };
 
-  return (
-    <main className="min-h-screen rainbow-gradient-bg">
-      <RateLimitBanner rateLimitInfo={rateLimitInfo} />
+  const hasStarted =
+    unsavedEvents.length > 0 ||
+    (batchProcessing?.isProcessing ?? false) ||
+    imageProcessingStatuses.length > 0 ||
+    urlProcessingStatus !== null;
+  // New visitors get the full landing; once you start — or if you've used it before — it recedes.
+  const showMarketing = !hasStarted && totalEventsInStorage === 0;
 
-      <div className="w-full px-[14.28%] py-12">
-        <header className="text-center mb-12">
-          <h1 className="text-5xl font-black retro-rainbow-text tracking-wider">Summon it</h1>
-          <p className="text-black text-sm">Turn any flyer, screenshot, or text into a calendar event.</p>
+  return (
+    <main id="top" className="min-h-screen rainbow-gradient-bg flex flex-col">
+      <RateLimitBanner rateLimitInfo={rateLimitInfo} />
+      <SiteNav showHow={showMarketing} />
+
+      <div className="flex-1 w-full max-w-2xl mx-auto px-6 pb-4">
+        {/* Hero — the headline riffs on the name */}
+        <header className="text-center pt-16 pb-9">
+          <h1 className="rise rise-1 display text-[clamp(2.6rem,8vw,4.25rem)] leading-[1.04] text-black">
+            Event <span className="rainbow-flow brand-glow">everything</span>.
+          </h1>
+          <p className="rise rise-2 mt-5 text-lg sm:text-xl text-gray-600 max-w-md mx-auto leading-snug">
+            Flyer, screenshot, email, link — into a calendar event.
+            <span className="text-black"> No typing. No account.</span>
+          </p>
         </header>
 
-        {/* Smart input section */}
-        <div className="border-2 border-black bg-white p-[5px] mb-12 h-[400px]" data-testid="input-box">
+        {/* The input is the hero — offset shadow, staggered in */}
+        <div
+          className="rise rise-3 border-2 border-black bg-white p-[5px] h-[400px] offset-shadow"
+          data-testid="input-box"
+        >
           <SmartInput
             ref={smartInputRef}
             onSubmit={handleSmartInputSubmit}
@@ -1058,6 +1077,9 @@ export default function Home() {
             hasHistory={inputHistory.length > 0}
           />
         </div>
+        <p className="rise rise-4 mt-4 mb-10 text-center eyebrow text-black/40">
+          Works with Apple · Google · Outlook
+        </p>
 
         {/* Error notifications */}
         <ErrorNotification
@@ -1111,9 +1133,19 @@ export default function Home() {
           }}
         />
 
-        {/* History section */}
+        {/* Marketing — recedes the moment you start */}
+        <div className={`collapsible ${showMarketing ? '' : 'is-collapsed'}`}>
+          <div>
+            <HowItWorks />
+            <TrustPoints />
+            <Faq />
+          </div>
+        </div>
+
+        {/* Saved events */}
         {totalEventsInStorage > 0 && (
-          <div className="mb-12">
+          <div className="pt-16">
+            <p className="eyebrow text-black/40 mb-4">Your events</p>
             <div className="mb-4 flex gap-4 items-center justify-between">
               <div className="flex gap-4 items-center">
                 <label htmlFor="sort-select" className="text-black font-semibold">
@@ -1222,6 +1254,8 @@ export default function Home() {
           </div>
         )}
       </div>
+
+      <SiteFooter />
 
       {deleteConfirmId && (
         <>

@@ -27,7 +27,7 @@ const FUN_MESSAGES = [
   'Reading the tea leaves',
   'Consulting the calendar spirits',
   'Decoding the temporal mysteries',
-  'Summoning event details from the void',
+  'Pulling event details from the void',
   'Teaching AI to read your wildest desires',
   'Calculating the space-time coordinates',
   'Extracting the juicy bits',

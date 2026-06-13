@@ -101,7 +101,7 @@ export const exportAllEvents = async (): Promise<ExportResult> => {
     const zipBlob = await zip.generateAsync({ type: 'blob' });
 
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
-    const filename = `summon-export-${timestamp}.zip`;
+    const filename = `event-every-export-${timestamp}.zip`;
 
     downloadBlob(zipBlob, filename);
 

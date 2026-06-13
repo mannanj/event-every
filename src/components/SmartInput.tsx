@@ -522,12 +522,12 @@ const SmartInput = forwardRef<SmartInputHandle, SmartInputProps>(
             </div>
           )}
 
-          {/* Recent summons button — floating, left of the attach icon; only when history exists */}
+          {/* Recent button — floating, left of the attach icon; only when history exists */}
           {hasHistory && (
             <button
               onClick={onOpenHistory}
               className="absolute top-2 right-14 z-20 p-2 text-gray-600 hover:text-black transition-colors focus:outline-none focus:ring-2 focus:ring-black rounded"
-              aria-label="Open recent summons"
+              aria-label="Open recent"
               data-testid="input-history-button"
             >
               <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">

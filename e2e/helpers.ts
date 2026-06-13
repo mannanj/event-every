@@ -45,7 +45,7 @@ export async function mockURLDetection(page: Page) {
   });
 }
 
-// The 2-3 word Recent-summons label. Re-registering later (per-test) overrides the
+// The 2-3 word Recent label. Re-registering later (per-test) overrides the
 // default wired into setupLocal — Playwright matches the most recently added route first.
 export async function mockSummarize(page: Page, summary = 'Test Summary') {
   await page.route('**/api/summarize', async (route: Route) => {

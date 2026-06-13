@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
 
     const response = await fetch(url, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; Summon/1.0; +https://event-every.com)',
+        'User-Agent': 'Mozilla/5.0 (compatible; EventEvery/1.0; +https://event-every.com)',
       },
     });
 
