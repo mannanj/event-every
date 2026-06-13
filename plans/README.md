@@ -29,7 +29,7 @@ Each executor: read your plan fully before starting, honor its STOP conditions, 
 | Plan | Title | Priority | Effort | Depends on | Status |
 |------|-------|----------|--------|------------|--------|
 | 009  | E2E refactor-safety net: `data-testid` hooks, .ics download+parse spec, migrate brittle `h3.font-bold` selectors, URL-scrape + pattern-unlock specs, `reuseExistingServer:!CI` | P1 | M–L | — (complements 003) | DONE (48 e2e pass; 3 new specs; testids additive) |
-| 010  | Purge dead code (`ProcessingSection`, `ProcessingQueuePanel`) + unify the 4 scattered processing-status types into `src/types/processing.ts` | P2 | S–M | — (extends 006) | TODO |
+| 010  | Purge dead code (`ProcessingSection`, `ProcessingQueuePanel`) + unify the 4 scattered processing-status types into `src/types/processing.ts` | P2 | S–M | — (extends 006) | DONE (2 orphans deleted; types+ProcessingStatus union+predicates centralized; queue/hook rewired; `as string` casts gone) |
 | 011  | Unify the OpenRouter client into one `openRouterChat()` in `lib/llm.ts` (collapse 4 fetch copies + 3 type copies) | P2 | M | 003 (soft) | TODO |
 | 012  | Consolidate URL + timezone utils into single authorities (fix `normalizeUrl` interior-whitespace bug, URLPill ×3 dedup, normalize detected URLs, tz abbrev tables ×3→1, merge `timezoneResolver`) | P2 | M | 003 (soft) | TODO |
 | 013  | Unify rate-limit + community-budget into one authority, one reset formula; enforce the per-IP gate on **all** LLM routes | P2 | M | 005, 003 (soft) | TODO |

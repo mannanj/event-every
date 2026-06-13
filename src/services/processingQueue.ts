@@ -1,9 +1,10 @@
 import { CalendarEvent } from '@/types/event';
+import { ProcessingStatus, isActive, isCancelled } from '@/types/processing';
 
 export interface QueueItem {
   id: string;
   type: 'image' | 'text';
-  status: 'queued' | 'processing' | 'complete' | 'error' | 'cancelled';
+  status: ProcessingStatus;
   progress: number;
   payload: File[] | string;
   text?: string;
@@ -94,7 +95,7 @@ class ProcessingQueue {
   }
 
   getActive(): QueueItem[] {
-    return this.queue.filter(i => i.status === 'processing' || i.status === 'queued');
+    return this.queue.filter(i => isActive(i.status));
   }
 
   private getActiveCount(): number {
@@ -129,7 +130,7 @@ class ProcessingQueue {
     try {
       const result = await processor(item);
 
-      if ((item.status as string) === 'cancelled') {
+      if (isCancelled(item.status)) {
         return;
       }
 
@@ -139,7 +140,7 @@ class ProcessingQueue {
       item.completedAt = new Date();
       this.notify();
     } catch (err) {
-      if ((item.status as string) === 'cancelled') {
+      if (isCancelled(item.status)) {
         return;
       }
 

@@ -2,22 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { CalendarEvent } from '@/types/event';
+import { ImageProcessingStatus, URLProcessingStatus } from '@/types/processing';
 import BatchEventList from './BatchEventList';
-
-interface ImageProcessingStatus {
-  id: string;
-  filename: string;
-  status: 'pending' | 'processing' | 'complete' | 'error';
-  error?: string;
-  eventCount?: number;
-}
-
-interface URLProcessingStatus {
-  phase: 'detecting' | 'fetching' | 'extracting' | 'complete';
-  urlCount?: number;
-  fetchedCount?: number;
-  message: string;
-}
 
 interface UnsavedEventsSectionProps {
   events: CalendarEvent[];

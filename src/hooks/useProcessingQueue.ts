@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { processingQueue, QueueItem } from '@/services/processingQueue';
 import { CalendarEvent } from '@/types/event';
+import { isActive, isDone } from '@/types/processing';
 
 export function useProcessingQueue() {
   const [queue, setQueue] = useState<QueueItem[]>([]);
@@ -38,13 +39,9 @@ export function useProcessingQueue() {
     processingQueue.clearCompleted();
   }, []);
 
-  const activeItems = queue.filter(
-    item => item.status === 'processing' || item.status === 'queued'
-  );
+  const activeItems = queue.filter(item => isActive(item.status));
 
-  const completedItems = queue.filter(
-    item => item.status === 'complete' || item.status === 'error'
-  );
+  const completedItems = queue.filter(item => isDone(item.status));
 
   return {
     queue,

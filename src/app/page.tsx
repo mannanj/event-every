@@ -27,37 +27,7 @@ import { convertRawToDate } from '@/utils/timeConversion';
 import { getBrowserTimezone } from '@/utils/timezone';
 import { normalizeUrl } from '@/utils/url';
 import { COMMUNITY_LIMIT_CODE, emitCommunityLimit, emitIfCommunityLimited } from '@/utils/communityLimit';
-
-interface ProcessingEvent {
-  id: string;
-  type: 'image' | 'text';
-  status: 'processing' | 'success' | 'error';
-  event?: CalendarEvent;
-  error?: string;
-}
-
-interface ImageProcessingStatus {
-  id: string;
-  filename: string;
-  status: 'pending' | 'processing' | 'complete' | 'error';
-  error?: string;
-  eventCount?: number;
-}
-
-interface BatchProcessing {
-  id: string;
-  events: CalendarEvent[];
-  isProcessing: boolean;
-  totalExpected?: number;
-  source: 'image' | 'text';
-}
-
-interface URLProcessingStatus {
-  phase: 'detecting' | 'fetching' | 'extracting' | 'complete';
-  urlCount?: number;
-  fetchedCount?: number;
-  message: string;
-}
+import { ProcessingEvent, ImageProcessingStatus, BatchProcessing, URLProcessingStatus } from '@/types/processing';
 
 export default function Home() {
   const [processingEvents, setProcessingEvents] = useState<ProcessingEvent[]>([]);
