@@ -96,8 +96,12 @@ export default function EditableField({
     if (!val) return displayValue ?? placeholder ?? 'Click to edit';
 
     if (type === 'date') {
-      try {
-        const date = new Date(val);
+      // Parse YYYY-MM-DD as LOCAL calendar components. `new Date(val)` would read a date-only
+      // string as UTC midnight and then drift a day when formatted in a zone west of UTC; the
+      // value is already the date to show, so render those exact components (task-194).
+      const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(val);
+      if (m) {
+        const date = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
         if (!isNaN(date.getTime())) {
           return new Intl.DateTimeFormat('en-US', {
             month: 'short',
@@ -105,9 +109,8 @@ export default function EditableField({
             year: 'numeric',
           }).format(date);
         }
-      } catch {
-        return val;
       }
+      return val;
     }
 
     if (type === 'time') {

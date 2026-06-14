@@ -282,3 +282,66 @@ test.describe('Editor edit→export loop (plan 014 bug fixes)', () => {
     expect(parseICSContent(ics)[0].allDay).toBe(true);
   });
 });
+
+// task-194: an all-day calendar date must be the SAME day everywhere, independent of the viewer's
+// timezone. Within one test the create + read zone is fixed (they cancel), so we pin TWO zones that
+// straddle the date line relative to UTC midnight:
+//   - Asia/Tokyo (UTC+9): a LOCAL-midnight creation regression stores the prior UTC day → "Mar 19".
+//   - America/Los_Angeles (UTC-8): a LOCAL-getter display/export regression reads back the prior
+//     day from the UTC-midnight instant → "Mar 19" / 20260319.
+// The correct (UTC-midnight + UTC-read) implementation yields "Mar 20" / 20260320 in BOTH.
+async function createAllDayOffsite(page: import('@playwright/test').Page) {
+  await setupLocal(page);
+  await mockParseAPI(page, [
+    {
+      title: 'Company offsite',
+      startDate: '2026-03-20',
+      allDay: true,
+      location: 'Napa Valley',
+      confidence: 0.85,
+      timezone: null,
+    },
+  ]);
+  await submitText(page, 'Company offsite March 20, Napa Valley');
+  await waitForEvents(page, 1);
+}
+
+async function downloadedICS(page: import('@playwright/test').Page): Promise<string> {
+  const [download] = await Promise.all([
+    page.waitForEvent('download'),
+    page.getByTestId('save-events-button').click(),
+  ]);
+  return fs.readFile((await download.path())!, 'utf-8');
+}
+
+test.describe('all-day date is timezone-independent — created east of UTC (Asia/Tokyo)', () => {
+  test.use({ timezoneId: 'Asia/Tokyo', locale: 'en-US' });
+
+  test('displays and exports March 20, not the prior day a local-midnight creation would store', async ({ page }) => {
+    await createAllDayOffsite(page);
+
+    const card = page.getByTestId('event-card').first();
+    await expect(card).toContainText('Mar 20');
+    await expect(card).not.toContainText('Mar 19');
+
+    const ics = await downloadedICS(page);
+    expect(ics).toContain('DTSTART;VALUE=DATE:20260320');
+    expect(ics).not.toContain('20260319');
+  });
+});
+
+test.describe('all-day date is timezone-independent — read west of UTC (America/Los_Angeles)', () => {
+  test.use({ timezoneId: 'America/Los_Angeles', locale: 'en-US' });
+
+  test('displays and exports March 20, not the prior day a local-getter read would produce', async ({ page }) => {
+    await createAllDayOffsite(page);
+
+    const card = page.getByTestId('event-card').first();
+    await expect(card).toContainText('Mar 20');
+    await expect(card).not.toContainText('Mar 19');
+
+    const ics = await downloadedICS(page);
+    expect(ics).toContain('DTSTART;VALUE=DATE:20260320');
+    expect(ics).not.toContain('20260319');
+  });
+});

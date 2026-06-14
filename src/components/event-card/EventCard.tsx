@@ -2,7 +2,7 @@
 
 import { memo, useState, useRef } from 'react';
 import { CalendarEvent } from '@/types/event';
-import { convertRawToDate, formatDateForInput, formatTimeForInput, resyncRawFields, shiftEndPreservingDuration } from '@/utils/timeConversion';
+import { convertRawToDate, formatDateForInput, formatTimeForInput, parseAllDayDate, resyncRawFields, shiftEndPreservingDuration } from '@/utils/timeConversion';
 import { getBrowserTimezone } from '@/utils/timezone';
 import EventFields from '@/components/EventFields';
 import TimezonePicker, { friendlyTimezoneLabel } from '@/components/TimezonePicker';
@@ -10,6 +10,9 @@ import TimezonePicker, { friendlyTimezoneLabel } from '@/components/TimezonePick
 // Hoisted to module scope: building these per-render (once per card) was ~190 Intl
 // allocations every few seconds while the message-rotation timer churned the list.
 const DATE_FMT = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' });
+// All-day dates are stored as UTC midnight; format them in UTC so the displayed day matches the
+// stored calendar date regardless of the viewer's timezone (task-194).
+const DATE_FMT_ALLDAY = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
 const TIME_FMT = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit' });
 
 interface EventCardProps {
@@ -92,6 +95,18 @@ function EventCard({
     }
     if (field === 'location') {
       onEdit({ ...event, location: value.trim() || undefined });
+      return;
+    }
+
+    // All-day date edit: keep the canonical UTC-midnight representation and shift the end to
+    // preserve the (whole-day) duration. No raw/timezone resync — all-day is timezone-independent
+    // (task-194). The card shows no time field for all-day events, so only 'startDate' arrives here.
+    if (event.allDay) {
+      if (field !== 'startDate') return;
+      const newStart = parseAllDayDate(value);
+      if (isNaN(newStart.getTime())) return;
+      const newEnd = shiftEndPreservingDuration(event.startDate, event.endDate, newStart);
+      onEdit({ ...event, startDate: newStart, endDate: newEnd });
       return;
     }
 
@@ -188,7 +203,7 @@ function EventCard({
                   <input
                     type="date"
                     data-testid="event-card-date-input"
-                    value={formatDateForInput(event.startDate)}
+                    value={formatDateForInput(event.startDate, event.allDay)}
                     onChange={(e) => handleFieldEdit('startDate', e.target.value)}
                     onBlur={() => setEditingField(null)}
                     onKeyDown={(e) => {
@@ -209,40 +224,40 @@ function EventCard({
                       setEditingField('startDate');
                     }}
                   >
-                    {DATE_FMT.format(event.startDate)}
-                  </span>
-                )}{' '}
-                at{' '}
-                {editingField === 'startTime' ? (
-                  <input
-                    type="time"
-                    data-testid="event-card-time-input"
-                    value={formatTimeForInput(event.startDate)}
-                    onChange={(e) => handleFieldEdit('startTime', e.target.value)}
-                    onBlur={() => setEditingField(null)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === 'Escape') {
-                        setEditingField(null);
-                      }
-                    }}
-                    className="border border-black px-1 text-sm focus:outline-none focus:ring-1 focus:ring-black"
-                    style={{ width: '100px' }}
-                    autoFocus
-                    onClick={(e) => e.stopPropagation()}
-                  />
-                ) : (
-                  <span
-                    className="cursor-pointer hover:bg-gray-200 rounded"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setEditingField('startTime');
-                    }}
-                  >
-                    {TIME_FMT.format(event.startDate)}
+                    {(event.allDay ? DATE_FMT_ALLDAY : DATE_FMT).format(event.startDate)}
                   </span>
                 )}
                 {!event.allDay && (
                   <>
+                    {' '}at{' '}
+                    {editingField === 'startTime' ? (
+                      <input
+                        type="time"
+                        data-testid="event-card-time-input"
+                        value={formatTimeForInput(event.startDate)}
+                        onChange={(e) => handleFieldEdit('startTime', e.target.value)}
+                        onBlur={() => setEditingField(null)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === 'Escape') {
+                            setEditingField(null);
+                          }
+                        }}
+                        className="border border-black px-1 text-sm focus:outline-none focus:ring-1 focus:ring-black"
+                        style={{ width: '100px' }}
+                        autoFocus
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    ) : (
+                      <span
+                        className="cursor-pointer hover:bg-gray-200 rounded"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingField('startTime');
+                        }}
+                      >
+                        {TIME_FMT.format(event.startDate)}
+                      </span>
+                    )}
                     <span onClick={(e) => e.stopPropagation()} className="inline-block align-middle">
                       <TimezonePicker
                         date={event.startDate}

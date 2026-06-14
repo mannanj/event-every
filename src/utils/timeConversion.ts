@@ -176,13 +176,23 @@ export function getTimezoneAbbreviation(date: Date, timezone: string): string {
 }
 
 /**
- * Format a Date as the 'YYYY-MM-DD' value an <input type="date"> expects, using LOCAL getters
- * (the editor displays/edits wall-clock dates in the user's local time).
+ * Parse an all-day "YYYY-MM-DD" date as UTC midnight, so the calendar date is timezone-independent.
+ * Read it back with getUTC* getters / a UTC formatter (see formatDateForInput(date, true)). This is
+ * the all-day counterpart to convertRawToDate; it never shifts the day with the viewer's zone.
  */
-export function formatDateForInput(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
+export function parseAllDayDate(ymd: string): Date {
+  return new Date(`${ymd.slice(0, 10)}T00:00:00.000Z`);
+}
+
+/**
+ * Format a Date as the 'YYYY-MM-DD' value an <input type="date"> expects. Timed events use LOCAL
+ * getters (the editor edits wall-clock dates in the viewer's zone); all-day events are stored as
+ * UTC midnight and read back with UTC getters so the date is stable across timezones (task-194).
+ */
+export function formatDateForInput(date: Date, allDay = false): string {
+  const year = allDay ? date.getUTCFullYear() : date.getFullYear();
+  const month = String((allDay ? date.getUTCMonth() : date.getMonth()) + 1).padStart(2, '0');
+  const day = String(allDay ? date.getUTCDate() : date.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
 }
 

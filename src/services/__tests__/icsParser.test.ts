@@ -18,19 +18,15 @@ describe('parseICSContent', () => {
     expect(events[0].endDate.toISOString()).toBe('2026-03-13T20:00:00.000Z');
   });
 
-  test('an 8-char VALUE=DATE all-day event parses at LOCAL midnight', () => {
+  test('an 8-char VALUE=DATE all-day event parses at UTC midnight (timezone-independent)', () => {
     const ics = wrap('BEGIN:VEVENT\nSUMMARY:Company Offsite\nDTSTART;VALUE=DATE:20260320\nEND:VEVENT');
     const events = parseICSContent(ics);
     expect(events).toHaveLength(1);
     expect(events[0].allDay).toBe(true);
-    // KNOWN QUIRK (plans/008): an 8-digit DATE becomes new Date(y, m, d) — LOCAL midnight, not
-    // UTC — so the absolute instant drifts by the runner's offset. Assert the local calendar
-    // components, which round-trip regardless of the runner timezone.
-    const d = events[0].startDate;
-    expect(d.getFullYear()).toBe(2026);
-    expect(d.getMonth()).toBe(2); // March (0-indexed)
-    expect(d.getDate()).toBe(20);
-    expect(d.getHours()).toBe(0);
+    // task-194: all-day dates are now stored as UTC midnight, so the calendar date is identical on
+    // every machine (the old new Date(y,m,d) local-midnight drifted by the runner's offset). Assert
+    // the ABSOLUTE instant, which holds in any runner timezone.
+    expect(events[0].startDate.toISOString()).toBe('2026-03-20T00:00:00.000Z');
   });
 
   test('a TZID datetime imports to the correct UTC instant regardless of runner zone', () => {

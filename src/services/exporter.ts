@@ -113,10 +113,12 @@ export function exportToICS(event: CalendarEvent): ExportResult {
 
 function dateToArray(date: Date, allDay: boolean = false): [number, number, number, number, number] | [number, number, number] {
   if (allDay) {
+    // All-day dates are stored as UTC midnight; read the calendar date with UTC getters so the
+    // exported VALUE=DATE is identical regardless of the exporting machine's zone (task-194).
     return [
-      date.getFullYear(),
-      date.getMonth() + 1,
-      date.getDate(),
+      date.getUTCFullYear(),
+      date.getUTCMonth() + 1,
+      date.getUTCDate(),
     ];
   }
   // Use UTC components — Date objects now represent correct UTC moments

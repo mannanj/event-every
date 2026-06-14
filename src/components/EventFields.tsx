@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { CalendarEvent } from '@/types/event';
-import { convertRawToDate, formatDateForInput, formatTimeForInput, resyncRawFields, clampEndNotBeforeStart } from '@/utils/timeConversion';
+import { convertRawToDate, formatDateForInput, formatTimeForInput, parseAllDayDate, resyncRawFields, clampEndNotBeforeStart } from '@/utils/timeConversion';
 import { getBrowserTimezone } from '@/utils/timezone';
 import { normalizeUrl } from '@/utils/url';
 import { validateEvent, EventFormValues } from '@/utils/validation';
@@ -39,9 +39,9 @@ interface FormData {
 function seedFormData(event: CalendarEvent): FormData {
   return {
     title: event.title || '',
-    startDate: formatDateForInput(event.startDate),
+    startDate: formatDateForInput(event.startDate, event.allDay),
     startTime: formatTimeForInput(event.startDate),
-    endDate: formatDateForInput(event.endDate),
+    endDate: formatDateForInput(event.endDate, event.allDay),
     endTime: formatTimeForInput(event.endDate),
     location: event.location || '',
     description: event.description || '',
@@ -74,9 +74,9 @@ export default function EventFields({
   useEffect(() => {
     setFormData(prev => ({
       title: editingField === 'title' ? prev.title : (event.title || ''),
-      startDate: editingField === 'startDate' ? prev.startDate : formatDateForInput(event.startDate),
+      startDate: editingField === 'startDate' ? prev.startDate : formatDateForInput(event.startDate, event.allDay),
       startTime: editingField === 'startTime' ? prev.startTime : formatTimeForInput(event.startDate),
-      endDate: editingField === 'endDate' ? prev.endDate : formatDateForInput(event.endDate),
+      endDate: editingField === 'endDate' ? prev.endDate : formatDateForInput(event.endDate, event.allDay),
       endTime: editingField === 'endTime' ? prev.endTime : formatTimeForInput(event.endDate),
       location: editingField === 'location' ? prev.location : (event.location || ''),
       description: editingField === 'description' ? prev.description : (event.description || ''),
@@ -107,10 +107,10 @@ export default function EventFields({
   // sync with what the user typed — this is the fix for the lost-keystroke bug.
   const emit = (data: FormData) => {
     const startDateTime = data.allDay
-      ? new Date(data.startDate)
+      ? parseAllDayDate(data.startDate)
       : new Date(`${data.startDate}T${data.startTime}`);
     let endDateTime = data.allDay
-      ? new Date(data.endDate)
+      ? parseAllDayDate(data.endDate)
       : new Date(`${data.endDate}T${data.endTime}`);
 
     // Enforce start <= end at edit time rather than deferring to export validation (task-195): an

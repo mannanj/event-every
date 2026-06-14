@@ -150,11 +150,12 @@ function parseICSDate(dateString: string, tzid?: string): Date {
   // Format: YYYYMMDD or YYYYMMDDTHHMMSS or YYYYMMDDTHHMMSSZ. Any ;PARAMETERS (incl. TZID) were
   // already split off upstream in parseICSContent; the TZID is passed back in separately.
   if (dateString.length === 8) {
-    // Date only (YYYYMMDD) — all-day. (The local-midnight zone-dependence is addressed by task-194.)
+    // Date only (YYYYMMDD) — all-day. Stored as UTC midnight so the calendar date is
+    // timezone-independent end to end (task-194); read back with getUTC* / a UTC formatter.
     const year = parseInt(dateString.substring(0, 4));
     const month = parseInt(dateString.substring(4, 6)) - 1;
     const day = parseInt(dateString.substring(6, 8));
-    return new Date(year, month, day);
+    return new Date(Date.UTC(year, month, day));
   } else if (dateString.length >= 15) {
     // DateTime (YYYYMMDDTHHMMSS or YYYYMMDDTHHMMSSZ)
     const year = parseInt(dateString.substring(0, 4));

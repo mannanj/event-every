@@ -9,6 +9,8 @@ import {
   resyncRawFields,
   shiftEndPreservingDuration,
   clampEndNotBeforeStart,
+  parseAllDayDate,
+  formatDateForInput,
 } from '@/utils/timeConversion';
 import { getBrowserTimezone } from '@/utils/timezone';
 import { CalendarEvent } from '@/types/event';
@@ -178,5 +180,26 @@ describe('clampEndNotBeforeStart', () => {
     const start = new Date('2026-03-13T15:00:00.000Z');
     const end = new Date('2026-03-13T16:00:00.000Z');
     expect(clampEndNotBeforeStart(start, end).toISOString()).toBe('2026-03-13T16:00:00.000Z');
+  });
+});
+
+// ---- All-day date representation (task-194) ----
+
+describe('parseAllDayDate / formatDateForInput(allDay)', () => {
+  test('parseAllDayDate yields UTC midnight (timezone-independent)', () => {
+    expect(parseAllDayDate('2026-03-20').toISOString()).toBe('2026-03-20T00:00:00.000Z');
+  });
+
+  test('formatDateForInput(allDay=true) reads UTC components — stable in any runner zone', () => {
+    expect(formatDateForInput(parseAllDayDate('2026-03-20'), true)).toBe('2026-03-20');
+    // A late-UTC instant: UTC date is Dec 31, but a runner east of UTC would see Jan 1 locally.
+    // The all-day path must report the UTC calendar date, never the local one.
+    expect(formatDateForInput(new Date('2026-12-31T23:30:00.000Z'), true)).toBe('2026-12-31');
+  });
+
+  test('formatDateForInput(allDay=false) reads LOCAL components (timed events, unchanged)', () => {
+    // Construct an instant at local midnight so local getters give a deterministic Y-M-D in any zone.
+    const localMidnight = new Date(2026, 2, 20, 0, 0, 0);
+    expect(formatDateForInput(localMidnight, false)).toBe('2026-03-20');
   });
 });

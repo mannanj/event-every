@@ -24,7 +24,7 @@ import { parseICSFile } from '@/services/icsParser';
 import { getClientContext } from '@/utils/clientContext';
 import { exportAllEvents } from '@/services/exportAll';
 import { resolveTimezone, isValidIANATimezone } from '@/utils/timezone';
-import { convertRawToDate } from '@/utils/timeConversion';
+import { convertRawToDate, parseAllDayDate } from '@/utils/timeConversion';
 import { getBrowserTimezone } from '@/utils/timezone';
 import { normalizeUrl } from '@/utils/url';
 import { COMMUNITY_LIMIT_CODE, emitCommunityLimit, emitIfCommunityLimited } from '@/utils/communityLimit';
@@ -154,10 +154,12 @@ export default function Home() {
     let endDate: Date;
 
     if (parsed.allDay) {
-      // All-day events: parse as local date, no timezone conversion
-      startDate = rawStart ? new Date(rawStart + 'T00:00:00') : now;
+      // All-day events: timezone-independent UTC midnight, read back with UTC getters everywhere
+      // (display, export, edit) so the calendar date never drifts when the viewer's zone changes
+      // (task-194). new Date(ymd + 'T00:00:00') was LOCAL midnight — an instant that shifted day.
+      startDate = rawStart ? parseAllDayDate(rawStart) : now;
       const defaultEnd = new Date(startDate.getTime() + 24 * 60 * 60 * 1000);
-      endDate = rawEnd ? new Date(rawEnd + 'T00:00:00') : defaultEnd;
+      endDate = rawEnd ? parseAllDayDate(rawEnd) : defaultEnd;
     } else {
       // Timed events: convert from source timezone to correct UTC moment
       if (rawStart) {

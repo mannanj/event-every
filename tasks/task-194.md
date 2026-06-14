@@ -23,16 +23,16 @@ change between create and read, the local getters resolve the stored UTC instant
 calendar day → ±1 day shift. The display path (`DATE_FMT`, browser-local) shifts the same way.
 
 #### Fix direction
-- [ ] Make all-day dates timezone-independent end to end: represent the all-day date as a plain
+- [x] Make all-day dates timezone-independent end to end: represent the all-day date as a plain
       Y-M-D (string or `Date.UTC`-based midnight) and read it back with UTC getters consistently in
       `dateToArray`, so the exported/displayed DATE never depends on the viewing zone.
-- [ ] Keep the `ics` lib `startInputType/startOutputType: 'local'` semantics consistent with the
+- [x] Keep the `ics` lib `startInputType/startOutputType: 'local'` semantics consistent with the
       chosen representation (a floating `VALUE=DATE` is correct for all-day per RFC 5545).
-- [ ] Audit the display path (`EventCard` `DATE_FMT`) for the same zone-dependence.
+- [x] Audit the display path (`EventCard` `DATE_FMT`) for the same zone-dependence.
 
 #### Tests (write them, then mutation-prove they fail on the bug)
-- [ ] Unit: an all-day date round-trips to the same Y-M-D under two different `TZ` values.
-- [ ] E2E (webkit): create an all-day event with `test.use({ timezoneId })` pinned to two different
+- [x] Unit: an all-day date round-trips to the same Y-M-D under two different `TZ` values.
+- [x] E2E (webkit): create an all-day event with `test.use({ timezoneId })` pinned to two different
       zones; assert the card shows the same date and the exported DTSTART is the same `VALUE=DATE`.
 
 - Location: `src/app/page.tsx` (allDay branch ~156-160), `src/services/exporter.ts` (`dateToArray` 114-130), `src/services/storage.ts`, `src/components/event-card/EventCard.tsx` (`DATE_FMT`)
