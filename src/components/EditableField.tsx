@@ -12,6 +12,14 @@ interface EditableFieldProps {
   readOnly?: boolean;
   required?: boolean;
   error?: string;
+  // 'block' (default): stacked label-over-value layout. 'inline': a clickable inline
+  // <span> that swaps to a compact inline <input>/<textarea> on click (matches the
+  // former inline event-editor field appearance).
+  mode?: 'inline' | 'block';
+  // Inline-mode only: hint sizing for the compact input (e.g. date 140px, time 100px).
+  inlineWidth?: string;
+  // Inline-mode only: text shown when the field has no value (display fallback).
+  displayValue?: string;
 }
 
 export default function EditableField({
@@ -24,14 +32,20 @@ export default function EditableField({
   readOnly = false,
   required = false,
   error,
+  mode = 'block',
+  inlineWidth,
+  displayValue,
 }: EditableFieldProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [localValue, setLocalValue] = useState(value);
   const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null);
 
+  // Flow prop updates into the buffer ONLY while not editing, so a re-render from a
+  // sibling card / the TZ-suggestion timer can refresh the displayed value without
+  // clobbering an in-progress edit (the in-progress value lives in localValue).
   useEffect(() => {
-    setLocalValue(value);
-  }, [value]);
+    if (!isEditing) setLocalValue(value);
+  }, [value, isEditing]);
 
   useEffect(() => {
     if (isEditing && inputRef.current) {
@@ -48,26 +62,28 @@ export default function EditableField({
     }
   };
 
-  const handleBlur = () => {
-    setIsEditing(false);
+  const commit = () => {
     if (localValue !== value) {
       onChange(localValue);
     }
   };
 
+  const handleBlur = () => {
+    setIsEditing(false);
+    commit();
+  };
+
+  // Buffer only; commit happens on blur / Enter. (No per-keystroke onChange — that
+  // double-fire defeated the buffer and caused the lost-keystroke class of bugs.)
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const newValue = e.target.value;
-    setLocalValue(newValue);
-    onChange(newValue);
+    setLocalValue(e.target.value);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !multiline) {
       e.preventDefault();
       setIsEditing(false);
-      if (localValue !== value) {
-        onChange(localValue);
-      }
+      commit();
     }
     if (e.key === 'Escape') {
       e.preventDefault();
@@ -77,7 +93,7 @@ export default function EditableField({
   };
 
   const formatDisplayValue = (val: string) => {
-    if (!val) return placeholder || 'Click to edit';
+    if (!val) return displayValue ?? placeholder ?? 'Click to edit';
 
     if (type === 'date') {
       try {
@@ -126,6 +142,87 @@ export default function EditableField({
     return val;
   };
 
+  // ---- Inline mode: clickable span ↔ compact input (former inline event-editor look) ----
+  if (mode === 'inline') {
+    if (isEditing) {
+      const inlineInputClass =
+        'inline-block border border-black px-1 text-sm focus:outline-none focus:ring-1 focus:ring-black align-baseline';
+      const inlineStyle: React.CSSProperties = multiline
+        ? {}
+        : { height: '1.5rem', lineHeight: '1.5rem', verticalAlign: 'baseline', width: inlineWidth };
+
+      if (multiline) {
+        return (
+          <textarea
+            ref={inputRef as React.RefObject<HTMLTextAreaElement>}
+            value={localValue}
+            onChange={handleChange}
+            onBlur={handleBlur}
+            onKeyDown={handleKeyDown}
+            placeholder={placeholder}
+            className="block w-full border border-black px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-black mt-1"
+            rows={3}
+            aria-label={label}
+            aria-invalid={!!error}
+          />
+        );
+      }
+
+      return (
+        <>
+          <input
+            ref={inputRef as React.RefObject<HTMLInputElement>}
+            type={type === 'textarea' ? 'text' : type}
+            value={localValue}
+            onChange={handleChange}
+            onBlur={handleBlur}
+            onKeyDown={handleKeyDown}
+            placeholder={placeholder}
+            className={inlineInputClass}
+            style={inlineStyle}
+            aria-label={label}
+            aria-invalid={!!error}
+          />
+          {error && (
+            <span className="ml-1 text-xs text-red-600" role="alert">
+              {error}
+            </span>
+          )}
+        </>
+      );
+    }
+
+    return (
+      <>
+        <span
+          onClick={(e) => {
+            e.stopPropagation();
+            handleClick();
+          }}
+          role="button"
+          tabIndex={readOnly ? -1 : 0}
+          onKeyDown={(e) => {
+            if (!readOnly && (e.key === 'Enter' || e.key === ' ')) {
+              e.preventDefault();
+              handleClick();
+            }
+          }}
+          className={`${readOnly ? '' : 'cursor-pointer hover:bg-gray-200'} px-1 rounded`}
+          aria-label={`${label}: ${formatDisplayValue(localValue)}. Click to edit.`}
+          aria-invalid={!!error}
+        >
+          {formatDisplayValue(localValue)}
+        </span>
+        {error && (
+          <span className="ml-1 text-xs text-red-600" role="alert">
+            {error}
+          </span>
+        )}
+      </>
+    );
+  }
+
+  // ---- Block mode: stacked label-over-value (unchanged) ----
   if (isEditing) {
     const inputClassName = `w-full px-3 py-2 border-2 ${
       error ? 'border-red-600' : 'border-black'

@@ -116,3 +116,23 @@ export function getTimezoneAbbreviation(date: Date, timezone: string): string {
     return timezone;
   }
 }
+
+/**
+ * Format a Date as the 'YYYY-MM-DD' value an <input type="date"> expects, using LOCAL getters
+ * (the editor displays/edits wall-clock dates in the user's local time).
+ */
+export function formatDateForInput(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+/**
+ * Format a Date as the 'HH:mm' value an <input type="time"> expects, using LOCAL getters.
+ */
+export function formatTimeForInput(date: Date): string {
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  return `${hours}:${minutes}`;
+}

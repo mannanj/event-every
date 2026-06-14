@@ -6,7 +6,7 @@ import UnsavedEventsSection from '@/components/UnsavedEventsSection';
 import InputHistoryModal from '@/components/InputHistoryModal';
 import ErrorNotification from '@/components/ErrorNotification';
 import RateLimitBanner from '@/components/RateLimitBanner';
-import InlineEventEditor from '@/components/InlineEventEditor';
+import EventFields from '@/components/EventFields';
 import { SiteNav, HowItWorks, TrustPoints, Faq, SiteFooter } from '@/components/landing/LandingSections';
 import { CalendarEvent, ParsedEvent, StreamedEventChunk, EventAttachment, EventSortOption, TimezoneStatus } from '@/types/event';
 import { InputHistoryEntry, StoredInputFile, InputSource } from '@/types/input';
@@ -1185,7 +1185,8 @@ export default function Home() {
                 >
                   <div className="flex justify-between items-start mb-3">
                     <div className="flex-1">
-                      <InlineEventEditor
+                      <EventFields
+                        mode="inline"
                         event={event}
                         onChange={(updatedEvent) => updateEvent(updatedEvent)}
                         showAttachments={true}

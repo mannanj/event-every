@@ -180,3 +180,105 @@ test.describe('ICS export download', () => {
     expect(parsed.every((e) => e.title !== 'Design Review')).toBe(true);
   });
 });
+
+// These pin the three bugs that plan 014 fixed by construction in the consolidated editor
+// (EventFields, built on the fixed EditableField). Each drives the REAL edit→Save→.ics loop
+// through the expanded editor and asserts on the downloaded bytes — so a regression to any of
+// the old hand-rolled-editor mechanisms (lost-keystroke isNaN guard, missing all-day toggle,
+// per-keystroke double-fire) would flip these red.
+test.describe('Editor edit→export loop (plan 014 bug fixes)', () => {
+  // Expand the (only) event card via its chevron so the EventFields editor mounts.
+  // (Clicking the title enters title-edit mode; it does NOT expand.)
+  async function expandCard(page: import('@playwright/test').Page) {
+    await page.getByRole('button', { name: 'Expand' }).first().click();
+    // The all-day checkbox only exists inside the expanded EventFields editor.
+    await expect(page.getByLabel('All-day event')).toBeVisible({ timeout: 5000 });
+  }
+
+  test('Bug 1 (lost keystroke): a time typed in the editor then immediately Saved survives into the .ics', async ({ page }) => {
+    await setupLocal(page);
+    await mockParseAPI(page, [
+      {
+        title: 'Edited Meeting',
+        startDate: '2026-03-13T19:00:00',
+        endDate: '2026-03-13T20:00:00',
+        confidence: 0.9,
+        allDay: false,
+        timezone: null,
+      },
+    ]);
+
+    await submitText(page, 'Edited Meeting March 13 at 7pm');
+    await waitForEvents(page, 1);
+
+    // The collapsed card header mirrors the COMMITTED event state (its date/time spans read
+    // event.startDate). We use it as a probe: under the old double-fire editor, onChange fired
+    // on every keystroke, so the header would update mid-edit; under the buffered editor the
+    // header must stay stale until the edit is committed on Enter/blur.
+    const card = page.getByTestId('event-card').first();
+    const header = card.locator('p.text-sm.text-gray-600').first();
+    await expect(header).toContainText('7:00 PM');
+
+    await expandCard(page);
+
+    // Open the start-time input and type a new time WITHOUT committing yet.
+    await page.getByRole('button', { name: /^Start time:/ }).first().click();
+    const timeInput = page.getByLabel('Start time', { exact: true });
+    // 19:45 keeps the event valid (start < end 20:00) so export still fires.
+    await timeInput.fill('19:45');
+
+    // Bug 1/3 discriminator: the committed state (header) must NOT have moved to 7:45 PM yet —
+    // the keystroke lives only in the field buffer. (Old per-keystroke onChange would already
+    // show 7:45 PM here.)
+    await expect(header).toContainText('7:00 PM');
+    await expect(header).not.toContainText('7:45 PM');
+
+    // Commit the edit; now the committed state catches up.
+    await timeInput.press('Enter');
+    await expect(header).toContainText('7:45 PM');
+
+    const [download] = await Promise.all([
+      page.waitForEvent('download'),
+      page.getByTestId('save-events-button').click(),
+    ]);
+    const ics = await fs.readFile((await download.path())!, 'utf-8');
+
+    // 19:45 local, browser tz pinned to UTC → DTSTART ...T194500Z. (Old bug: stays 190000Z.)
+    expect(ics).toMatch(/DTSTART(;[^:]*)?:\d{8}T194500Z/);
+  });
+
+  test('Bug 2 (all-day): toggling the editor all-day checkbox then Saving emits a VALUE=DATE DTSTART', async ({ page }) => {
+    await setupLocal(page);
+    await mockParseAPI(page, [
+      {
+        title: 'Toggle To AllDay',
+        startDate: '2026-03-13T19:00:00',
+        endDate: '2026-03-13T20:00:00',
+        confidence: 0.9,
+        allDay: false,
+        timezone: null,
+      },
+    ]);
+
+    await submitText(page, 'Toggle To AllDay March 13 at 7pm');
+    await waitForEvents(page, 1);
+    await expandCard(page);
+
+    // The old editor had NO all-day toggle at all — this control only exists post-014.
+    await page.getByLabel('All-day event').check();
+
+    const [download] = await Promise.all([
+      page.waitForEvent('download'),
+      page.getByTestId('save-events-button').click(),
+    ]);
+    const ics = await fs.readFile((await download.path())!, 'utf-8');
+
+    // All-day → DATE-valued DTSTART (8 digits, no time/Z). Old bug: still a timed DTSTART.
+    expect(ics).toMatch(/DTSTART;VALUE=DATE:\d{8}(\r?\n|$)/);
+    const dtstartLine = ics.split(/\r?\n/).find((l) => l.startsWith('DTSTART'))!;
+    const dtstartValue = dtstartLine.slice(dtstartLine.indexOf(':') + 1);
+    expect(dtstartValue).toMatch(/^\d{8}$/);
+    expect(dtstartValue).not.toContain('T');
+    expect(parseICSContent(ics)[0].allDay).toBe(true);
+  });
+});

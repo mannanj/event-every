@@ -25,8 +25,7 @@ const COMMON_TIMEZONES: { value: string; label: string }[] = [
   { value: 'Australia/Sydney', label: 'Sydney' },
   { value: 'Pacific/Auckland', label: 'Auckland' },
 ];
-import InlineEventEditor from './InlineEventEditor';
-import EditableField from './EditableField';
+import EventFields from './EventFields';
 
 /**
  * Batch event list component for reviewing and exporting multiple events.
@@ -522,7 +521,8 @@ export default function BatchEventList({
               {/* Expanded details with inline editing */}
               {isExpanded && (
                 <div className="border-t-2 border-black p-4 bg-gray-50">
-                  <InlineEventEditor
+                  <EventFields
+                    mode="inline"
                     event={event}
                     onChange={(updatedEvent) => {
                       onEdit(updatedEvent);
