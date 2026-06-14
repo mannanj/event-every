@@ -1,0 +1,24 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: bun install --frozen-lockfile
+      - run: bun run type-check
+      - run: bun run lint
+      - run: bun run test
+      # Deliberately excluded from CI:
+      # - Playwright e2e (test:e2e): needs a running dev server + a browser download,
+      #   so it stays a local / pre-release step rather than a per-push gate.
+      # - bun run build: Vercel already builds every push to main, so duplicating the
+      #   build here would double CI time for little added signal.

@@ -26,7 +26,6 @@ export function useRotatingMessage(messages: string[]): string {
     const timeout = scheduleNext();
     return () => clearTimeout(timeout);
     // messages is a module-level constant from the caller; length is stable.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messages.length]);
 
   return messages[index];

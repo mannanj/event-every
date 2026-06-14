@@ -18,7 +18,7 @@ Each executor: read your plan fully before starting, honor its STOP conditions, 
 | 001  | Rotate admin unlock patterns out of source; Redis-backed lockout; AUTH_SECRET explicit | P1 | M | — | TODO |
 | 002  | Close the SSRF/open-proxy hole in /api/scrape-url | P1 | S–M | — | TODO |
 | 003  | `bun test` baseline: unit tests on ICS, timezone, budget, ratelimit | P1 | M | — | DONE (58 tests/125 assertions; +@types/bun dev) |
-| 004  | Fix lint (ESLint 9 flat config) + GitHub Actions CI | P1 | M | 003 (soft) | TODO |
+| 004  | Fix lint (ESLint 9 flat config) + GitHub Actions CI | P1 | M | 003 (soft) | DONE (eslint.config.mjs FlatCompat→next configs; eslint ^9 + hoisted plugins; `bun run lint` 0 errors/19 warns; CI runs type-check+lint+test. OPERATOR: enable branch protection on main) |
 | 005  | Rate limiter: atomic, fixed UTC-day window, shared getClientIP | P2 | S–M | 003 | DONE (atomic incr + UTC-day key + nextResetMs; `clientIp.ts` extracted; 2 quirk tests flipped) |
 | 006  | Delete dead components, drop unused deps, fix run.sh to bun | P2 | S | — (see 010/014) | TODO |
 | 007  | Docs truth pass: README / CLAUDE.md / .env.example | P2 | S | — | TODO |

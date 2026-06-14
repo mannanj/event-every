@@ -43,7 +43,7 @@ function mockFetch(status: number, body: unknown) {
 
 // Captures the JSON body passed to fetch so request-shape assertions can read it.
 function captureFetch(status: number, body: unknown) {
-  const fetchMock = mock(async (_url: string, init?: { body?: string }) => {
+  const fetchMock = mock(async (_url: string, _init?: { body?: string }) => {
     return new Response(JSON.stringify(body), { status });
   });
   globalThis.fetch = fetchMock as unknown as typeof fetch;

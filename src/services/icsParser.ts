@@ -27,7 +27,7 @@ export function parseICSContent(icsText: string): CalendarEvent[] {
   const lines = icsText.split(/\r\n|\n|\r/);
 
   let currentEvent: ICSEvent | null = null;
-  let currentField = '';
+  const currentField = '';
 
   for (let i = 0; i < lines.length; i++) {
     let line = lines[i];
@@ -54,7 +54,7 @@ export function parseICSContent(icsText: string): CalendarEvent[] {
 
       let fieldName: string;
       let fieldValue: string;
-      let params: Record<string, string> = {};
+      const params: Record<string, string> = {};
 
       if (semicolonIndex !== -1 && (colonIndex === -1 || semicolonIndex < colonIndex)) {
         // Field has parameters (e.g., DTSTART;VALUE=DATE:20240101)

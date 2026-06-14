@@ -41,7 +41,7 @@ export default function EmailRequestModal({ onClose }: EmailRequestModalProps) {
           <form onSubmit={handleSubmit}>
             <div className="mb-6">
               <label htmlFor="reason" className="block text-base mb-3">
-                Mind sharing why you'd like access?
+                Mind sharing why you&apos;d like access?
               </label>
               <textarea
                 id="reason"
