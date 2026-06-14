@@ -114,6 +114,9 @@ export default function Home() {
   }, [unsavedEvents, hasLoadedTempEvents]);
 
   const updateRateLimitFromHeaders = (headers: Headers) => {
+    // All four LLM routes now emit X-RateLimit-* (sourced from the unified
+    // limit authority), so the '5' defaults are only a harmless cold-start
+    // guard for a response that somehow lacks the headers.
     const remaining = parseInt(headers.get('X-RateLimit-Remaining') || '5');
     const total = parseInt(headers.get('X-RateLimit-Limit') || '5');
     const reset = parseInt(headers.get('X-RateLimit-Reset') || '0');

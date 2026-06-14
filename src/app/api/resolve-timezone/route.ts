@@ -2,11 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import {
   CommunityLimitError,
   communityLimitResponse,
-  ensureCommunityBudget,
   getLlmKey,
   getLlmMode,
   openRouterChat,
 } from '@/lib/llm';
+import { evaluateLimits, chargeIpRate } from '@/lib/limits';
+import { DAILY_LIMIT } from '@/lib/ratelimit';
 
 const TZ_RESOLVE_MODEL = process.env.OPENROUTER_TZ_MODEL || 'deepseek/deepseek-chat-v3-0324';
 
@@ -21,11 +22,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    try {
-      await ensureCommunityBudget(mode);
-    } catch (error) {
-      if (error instanceof CommunityLimitError) return communityLimitResponse(error);
-      throw error;
+    const limits = await evaluateLimits(request);
+    if (!limits.allowed) {
+      if (limits.reason === 'community-budget') {
+        return communityLimitResponse(new CommunityLimitError(limits.resetAt));
+      }
+      return NextResponse.json(
+        { error: 'Daily request limit reached', reset: limits.resetAt },
+        {
+          status: 429,
+          headers: {
+            'X-RateLimit-Limit': DAILY_LIMIT.toString(),
+            'X-RateLimit-Remaining': '0',
+            'X-RateLimit-Reset': Date.parse(limits.resetAt).toString(),
+          },
+        }
+      );
     }
 
     const { rawTimezone, rawStartDate, rawEndDate, eventTitle, eventLocation } = await request.json();
@@ -95,6 +107,11 @@ export async function POST(request: NextRequest) {
     }
 
     const result = JSON.parse(toolCalls[0].function.arguments);
+
+    // Charge the per-IP counter only on a successful resolution, so an upstream
+    // failure or empty result (502 above) doesn't consume the user's daily quota.
+    await chargeIpRate(request);
+
     return NextResponse.json({
       timezone: result.timezone,
       confidence: result.confidence ?? 0.5,

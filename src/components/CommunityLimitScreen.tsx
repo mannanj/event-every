@@ -8,12 +8,11 @@ interface CommunityLimitScreenProps {
 }
 
 // "June 11, 2026, 8:00 PM EDT" — the viewer's own timezone, with the zone listed.
+// The server (nextResetISO) is the single source of the reset moment; this only
+// formats a supplied ISO and never recomputes one, so it can't diverge.
 function formatResetTime(resetAt: string | null): string {
-  let date = resetAt ? new Date(resetAt) : null;
-  if (!date || Number.isNaN(date.getTime())) {
-    const now = new Date();
-    date = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1));
-  }
+  const date = resetAt ? new Date(resetAt) : null;
+  if (!date || Number.isNaN(date.getTime())) return 'soon';
   return new Intl.DateTimeFormat(undefined, {
     month: 'long',
     day: 'numeric',

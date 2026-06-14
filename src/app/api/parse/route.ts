@@ -1,30 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { parseEventsBatch } from '@/services/parser';
-import { checkRateLimit, incrementRateLimit, DAILY_LIMIT } from '@/lib/ratelimit';
+import { DAILY_LIMIT } from '@/lib/ratelimit';
+import { evaluateLimits, chargeIpRate } from '@/lib/limits';
 import {
   CommunityLimitError,
   communityLimitResponse,
-  ensureCommunityBudget,
   getLlmKey,
   getLlmMode,
 } from '@/lib/llm';
-import { getClientIP } from '@/lib/clientIp';
 
 export async function POST(request: NextRequest) {
   try {
-    const clientIP = getClientIP(request);
-
-    const rateLimitResult = await checkRateLimit(clientIP);
-
-    if (!rateLimitResult.success) {
-      const resetDate = new Date(rateLimitResult.reset);
-      const hoursUntilReset = Math.ceil((rateLimitResult.reset - Date.now()) / (1000 * 60 * 60));
-
+    // One authority gates both axes: the global USD budget (402) and the per-IP
+    // daily limit (429). Budget is checked first, so a spent pool reports the
+    // community limit even if the user is also under their per-IP cap.
+    const limits = await evaluateLimits(request);
+    if (!limits.allowed) {
+      if (limits.reason === 'community-budget') {
+        return communityLimitResponse(new CommunityLimitError(limits.resetAt));
+      }
+      const resetMs = Date.parse(limits.resetAt);
+      const hoursUntilReset = Math.max(0, Math.ceil((resetMs - Date.now()) / (1000 * 60 * 60)));
       return NextResponse.json(
         {
           error: `Daily limit of ${DAILY_LIMIT} events reached`,
           remaining: 0,
-          reset: resetDate.toISOString(),
+          reset: limits.resetAt,
           hoursUntilReset
         },
         {
@@ -32,19 +33,13 @@ export async function POST(request: NextRequest) {
           headers: {
             'X-RateLimit-Limit': DAILY_LIMIT.toString(),
             'X-RateLimit-Remaining': '0',
-            'X-RateLimit-Reset': rateLimitResult.reset.toString()
+            'X-RateLimit-Reset': resetMs.toString()
           }
         }
       );
     }
 
     const mode = getLlmMode(request);
-    try {
-      await ensureCommunityBudget(mode);
-    } catch (error) {
-      if (error instanceof CommunityLimitError) return communityLimitResponse(error);
-      throw error;
-    }
 
     const body = await request.json();
     const { text, imageBase64, imageMimeType, batch = false, clientContext } = body;
@@ -64,7 +59,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (batch) {
-      await incrementRateLimit(clientIP);
+      await chargeIpRate(request);
 
       const encoder = new TextEncoder();
       const stream = new ReadableStream({
@@ -119,7 +114,7 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      const updatedRateLimit = await checkRateLimit(clientIP);
+      const updated = await evaluateLimits(request);
 
       return new Response(stream, {
         headers: {
@@ -127,8 +122,8 @@ export async function POST(request: NextRequest) {
           'Cache-Control': 'no-cache',
           'Connection': 'keep-alive',
           'X-RateLimit-Limit': DAILY_LIMIT.toString(),
-          'X-RateLimit-Remaining': updatedRateLimit.remaining.toString(),
-          'X-RateLimit-Reset': updatedRateLimit.reset.toString()
+          'X-RateLimit-Remaining': updated.ipRate.remaining.toString(),
+          'X-RateLimit-Reset': Date.parse(updated.ipRate.resetAt).toString()
         },
       });
     }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { AUTH_COOKIE_NAME, verifyAuthToken } from '@/app/api/auth/shared';
 import { getBudgetStatus, nextResetISO, recordCommunitySpend } from './budget';
+import type { BudgetStatus } from './budget';
 
 export const OPENROUTER_BASE_URL =
   process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1';
@@ -37,6 +38,14 @@ export async function ensureCommunityBudget(mode: LlmMode): Promise<void> {
   if (mode === 'admin') return;
   const status = await getBudgetStatus();
   if (status.exhausted) throw new CommunityLimitError(status.resetAt);
+}
+
+// Resolves the community-pool decision for a mode WITHOUT throwing, so the
+// unified limit authority (src/lib/limits.ts) can compose it alongside the
+// per-IP gate. Admins bypass the community pool entirely (unrestricted key).
+export async function getCommunityBudgetStatus(mode: LlmMode): Promise<BudgetStatus | null> {
+  if (mode === 'admin') return null;
+  return getBudgetStatus();
 }
 
 // OpenRouter returns 402 when the key/account is out of credits — for the

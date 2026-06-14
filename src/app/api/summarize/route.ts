@@ -2,11 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import {
   CommunityLimitError,
   communityLimitResponse,
-  ensureCommunityBudget,
   getLlmKey,
   getLlmMode,
   openRouterChat,
 } from '@/lib/llm';
+import { evaluateLimits, chargeIpRate } from '@/lib/limits';
+import { DAILY_LIMIT } from '@/lib/ratelimit';
 
 // Lightweight model for fast 2-3 word labels — kept separate from the heavyweight
 // parse model (OPENROUTER_MODEL) so it can be swapped without touching extraction.
@@ -40,11 +41,22 @@ export async function POST(request: NextRequest) {
       throw new Error('OPENROUTER_API_KEY environment variable is not set');
     }
 
-    try {
-      await ensureCommunityBudget(mode);
-    } catch (error) {
-      if (error instanceof CommunityLimitError) return communityLimitResponse(error);
-      throw error;
+    const limits = await evaluateLimits(request);
+    if (!limits.allowed) {
+      if (limits.reason === 'community-budget') {
+        return communityLimitResponse(new CommunityLimitError(limits.resetAt));
+      }
+      return NextResponse.json(
+        { error: 'Daily request limit reached', reset: limits.resetAt },
+        {
+          status: 429,
+          headers: {
+            'X-RateLimit-Limit': DAILY_LIMIT.toString(),
+            'X-RateLimit-Remaining': '0',
+            'X-RateLimit-Reset': Date.parse(limits.resetAt).toString(),
+          },
+        }
+      );
     }
 
     let body: { text?: unknown; eventTitles?: unknown };
@@ -90,6 +102,10 @@ export async function POST(request: NextRequest) {
       if (error instanceof CommunityLimitError) return communityLimitResponse(error);
       throw error;
     }
+
+    // Charge the per-IP counter only on an accepted (successful) request, so an
+    // upstream failure doesn't consume the user's daily quota.
+    await chargeIpRate(request);
 
     const summary = cleanLabel(data.choices?.[0]?.message?.content || '');
     return NextResponse.json({ summary });
