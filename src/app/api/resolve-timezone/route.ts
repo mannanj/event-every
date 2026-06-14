@@ -8,6 +8,7 @@ import {
 } from '@/lib/llm';
 import { evaluateLimits, chargeIpRate } from '@/lib/limits';
 import { DAILY_LIMIT } from '@/lib/ratelimit';
+import { sanitizeResolvedTimezone } from '@/utils/timezone';
 
 const TZ_RESOLVE_MODEL = process.env.OPENROUTER_TZ_MODEL || 'deepseek/deepseek-chat-v3-0324';
 
@@ -108,14 +109,16 @@ export async function POST(request: NextRequest) {
 
     const result = JSON.parse(toolCalls[0].function.arguments);
 
+    // The model is asked for an IANA id but can return a label/abbreviation/offset. Sanitize at
+    // this trust boundary: emit only a valid IANA zone, or confidence 0 (which the client treats
+    // as "keep your current value") — never a raw string that would shift the event to UTC.
+    const sanitized = sanitizeResolvedTimezone(result.timezone, result.confidence);
+
     // Charge the per-IP counter only on a successful resolution, so an upstream
     // failure or empty result (502 above) doesn't consume the user's daily quota.
     await chargeIpRate(request);
 
-    return NextResponse.json({
-      timezone: result.timezone,
-      confidence: result.confidence ?? 0.5,
-    });
+    return NextResponse.json(sanitized);
   } catch (error) {
     console.error('Timezone resolve error:', error);
     return NextResponse.json(

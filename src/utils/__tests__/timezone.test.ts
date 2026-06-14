@@ -11,6 +11,7 @@ import {
   normalizeTimezone,
   resolveTimezone,
   resolveTimezoneZone,
+  sanitizeResolvedTimezone,
 } from '@/utils/timezone';
 
 describe('isValidIANATimezone', () => {
@@ -126,5 +127,55 @@ describe('resolveTimezone', () => {
       status: 'unknown',
       source: 'unknown',
     });
+  });
+});
+
+describe('numeric GMT/UTC offsets (parser ordering + POSIX sign)', () => {
+  // Regression: the bare \bGMT\b / \bUTC\b abbreviation entries used to short-circuit any
+  // "GMT-04:00" / "UTC+5" string (→ Europe/London / UTC) before the offset branch ran, leaving
+  // that branch dead code. The offset branch now runs first and emits the correct Etc/GMT zone.
+  test('GMT-04:00 → Etc/GMT+4 (UTC-4, Eastern), not Europe/London', () => {
+    expect(resolveTimezoneZone('GMT-04:00')).toEqual({ timezone: 'Etc/GMT+4', resolved: true });
+    expect(normalizeTimezone('GMT-04:00')).toBe('Etc/GMT+4');
+  });
+
+  test('UTC+5 → Etc/GMT-5 (UTC+5), not the bare UTC zone (POSIX sign is inverted)', () => {
+    expect(normalizeTimezone('UTC+5')).toBe('Etc/GMT-5');
+  });
+
+  test('bare GMT (no offset) still maps to Europe/London', () => {
+    expect(normalizeTimezone('GMT')).toBe('Europe/London');
+  });
+});
+
+describe('sanitizeResolvedTimezone (LLM-output trust boundary)', () => {
+  test('passes a valid IANA zone through with its confidence', () => {
+    expect(sanitizeResolvedTimezone('America/New_York', 0.9))
+      .toEqual({ timezone: 'America/New_York', confidence: 0.9 });
+  });
+
+  test('coerces an abbreviation (EDT) to its IANA zone', () => {
+    expect(sanitizeResolvedTimezone('EDT', 0.9))
+      .toEqual({ timezone: 'America/New_York', confidence: 0.9 });
+  });
+
+  test('coerces a numeric GMT offset to its Etc zone', () => {
+    expect(sanitizeResolvedTimezone('GMT-04:00', 0.9))
+      .toEqual({ timezone: 'Etc/GMT+4', confidence: 0.9 });
+  });
+
+  test('zeroes confidence for an unmappable label (the interview-email input)', () => {
+    // "Eastern Time (US & Canada)" cannot be mapped to a real zone here; confidence 0 tells the
+    // client to keep its already-correct browser-zone value rather than apply a garbage zone.
+    expect(sanitizeResolvedTimezone('Eastern Time (US & Canada)', 0.95).confidence).toBe(0);
+  });
+
+  test('defaults a missing confidence to 0.5 for a valid zone', () => {
+    expect(sanitizeResolvedTimezone('UTC', undefined))
+      .toEqual({ timezone: 'UTC', confidence: 0.5 });
+  });
+
+  test('zeroes confidence for a non-string timezone', () => {
+    expect(sanitizeResolvedTimezone(null, 0.9).confidence).toBe(0);
   });
 });

@@ -44,20 +44,24 @@ export function getBrowserTimezone(): string {
 }
 
 function parseTimezoneFromText(text: string): string | null {
-  const upperText = text.toUpperCase();
+  // Numeric UTC/GMT offsets are matched FIRST: "GMT-04:00" must resolve to Etc/GMT+4 (UTC-4),
+  // not short-circuit on the bare \bGMT\b / \bUTC\b entries in the abbreviation map below (which
+  // would return Europe/London / UTC and discard the offset). The offset branch was previously
+  // unreachable for exactly this reason.
+  const utcOffsetMatch = text.match(/(?:UTC|GMT)\s*([+-]\d{1,2})(?::?\d{2})?/i);
+  if (utcOffsetMatch) {
+    const offset = parseInt(utcOffsetMatch[1], 10);
+    if (offset === 0) return 'UTC';
+    // POSIX sign inversion: a UTC-4 wall offset is the IANA zone Etc/GMT+4.
+    const zone = `Etc/GMT${offset < 0 ? '+' : '-'}${Math.abs(offset)}`;
+    if (isValidIANATimezone(zone)) return zone;
+  }
 
   for (const [abbr, iana] of Object.entries(TIMEZONE_ABBREVIATIONS)) {
     const regex = new RegExp(`\\b${abbr}\\b`, 'i');
     if (regex.test(text)) {
       return iana;
     }
-  }
-
-  const utcOffsetMatch = text.match(/UTC([+-]\d{1,2}):?(\d{2})?|GMT([+-]\d{1,2}):?(\d{2})?/i);
-  if (utcOffsetMatch) {
-    const hours = utcOffsetMatch[1] || utcOffsetMatch[3];
-    const minutes = utcOffsetMatch[2] || utcOffsetMatch[4] || '00';
-    return `Etc/GMT${hours > '0' ? '-' : '+'}${Math.abs(parseInt(hours))}`;
   }
 
   const ianaMatch = text.match(/\b([A-Z][a-z]+\/[A-Z][a-z_]+)\b/);
@@ -96,6 +100,31 @@ export function resolveTimezoneZone(raw: string | undefined): ResolvedTimezone {
   if (parsed) return { timezone: parsed, resolved: true };
 
   return { timezone: getBrowserTimezone(), resolved: false };
+}
+
+/**
+ * Sanitize an LLM-proposed timezone before it is applied to an event. The model is asked for an
+ * IANA id but sometimes returns a label ("Eastern Time"), an abbreviation ("EDT"), or an offset
+ * ("GMT-4"). Returns a guaranteed-valid IANA zone with the model's confidence, or confidence 0
+ * when the string cannot be mapped to a real zone. The client treats confidence ≤ 0.8 as "keep
+ * the current value", so a zero here means "do not touch the already-correct fallback" instead
+ * of stamping the wall-clock time as UTC (the 10:30 ET → 6:30 ET corruption).
+ */
+export function sanitizeResolvedTimezone(
+  rawTimezone: unknown,
+  confidence: unknown
+): { timezone: string; confidence: number } {
+  const conf = typeof confidence === 'number' ? confidence : 0.5;
+  if (typeof rawTimezone === 'string' && rawTimezone.trim()) {
+    if (isValidIANATimezone(rawTimezone)) {
+      return { timezone: rawTimezone, confidence: conf };
+    }
+    const { timezone, resolved } = resolveTimezoneZone(rawTimezone);
+    if (resolved) {
+      return { timezone, confidence: conf };
+    }
+  }
+  return { timezone: 'UTC', confidence: 0 };
 }
 
 export function normalizeTimezone(timezone: string | undefined): string {

@@ -6,6 +6,7 @@ import {
   formatTimeInTimezone,
   getTimezoneAbbreviation,
 } from '@/utils/timeConversion';
+import { getBrowserTimezone } from '@/utils/timezone';
 
 describe('convertRawToDate', () => {
   test('summer ET (UTC-4): 19:00 wall time → 23:00Z', () => {
@@ -38,10 +39,23 @@ describe('convertRawToDate', () => {
     expect(Number.isNaN(convertRawToDate('not-an-iso', 'UTC').getTime())).toBe(true);
   });
 
-  test('an invalid timezone silently falls back to a 0 (UTC) offset', () => {
-    // getTimezoneOffsetMinutes catches the Intl throw and returns 0.
-    expect(convertRawToDate('2026-07-04T19:00:00', 'Bad/Zone').toISOString())
-      .toBe('2026-07-04T19:00:00.000Z');
+  test('an invalid timezone falls back to the browser zone, never a silent UTC-0 offset', () => {
+    // Regression (interview-email bug): an unrecognized zone used to return a 0 (UTC) offset,
+    // stamping wall-clock time as UTC and shifting the event (10:30 ET → 6:30 ET). It must now
+    // match the browser-zone interpretation — the same fallback resolveTimezone uses.
+    const raw = '2026-07-04T19:00:00';
+    expect(convertRawToDate(raw, 'Bad/Zone').toISOString())
+      .toBe(convertRawToDate(raw, getBrowserTimezone()).toISOString());
+  });
+
+  test('the interview email: 10:30 ET wall time → 14:30Z (not 10:30Z → 6:30 ET)', () => {
+    // "Jun 15, 2026 10:30am ... Eastern Time". 14:30Z renders as 10:30 AM EDT; the bug stored
+    // 10:30Z (DTSTART:20260615T103000Z), which renders as 6:30 AM EDT.
+    expect(convertRawToDate('2026-06-15T10:30:00', 'America/New_York').toISOString())
+      .toBe('2026-06-15T14:30:00.000Z');
+    // Same instant when the zone arrives as a numeric GMT-04:00 offset (Etc/GMT+4 = UTC-4).
+    expect(convertRawToDate('2026-06-15T10:30:00', 'Etc/GMT+4').toISOString())
+      .toBe('2026-06-15T14:30:00.000Z');
   });
 });
 

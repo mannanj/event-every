@@ -1,3 +1,5 @@
+import { getBrowserTimezone, isValidIANATimezone } from '@/utils/timezone';
+
 /**
  * Convert a raw ISO string (no tz suffix, e.g. "2026-03-14T15:00:00") from a source timezone
  * to a JS Date representing the correct UTC moment.
@@ -9,6 +11,11 @@
  *   → Date representing 2026-03-14T20:00:00Z (ET is UTC-5 in March)
  */
 export function convertRawToDate(rawISO: string, sourceTimezone: string): Date {
+  // An unrecognized zone must never fall through to getTimezoneOffsetMinutes' 0 (UTC) offset —
+  // that stamps wall-clock time as UTC and shifts the event (10:30 ET → 6:30 ET). Treat an
+  // invalid zone the way resolveTimezone does: fall back to the browser's zone.
+  const zone = isValidIANATimezone(sourceTimezone) ? sourceTimezone : getBrowserTimezone();
+
   // Parse the raw ISO components
   const match = rawISO.match(/^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2})(?::(\d{2}))?)?$/);
   if (!match) {
@@ -24,7 +31,7 @@ export function convertRawToDate(rawISO: string, sourceTimezone: string): Date {
   const second = parseInt(secStr || '0');
 
   // Use Intl to figure out the UTC offset for this date+time in the source timezone
-  const offsetMinutes = getTimezoneOffsetMinutes(year, month, day, hour, minute, sourceTimezone);
+  const offsetMinutes = getTimezoneOffsetMinutes(year, month, day, hour, minute, zone);
 
   // Create UTC date by subtracting the offset
   const utcMs = Date.UTC(year, month - 1, day, hour, minute, second) - offsetMinutes * 60_000;

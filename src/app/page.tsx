@@ -23,7 +23,7 @@ import { eventStorage } from '@/services/storage';
 import { parseICSFile } from '@/services/icsParser';
 import { getClientContext } from '@/utils/clientContext';
 import { exportAllEvents } from '@/services/exportAll';
-import { resolveTimezone } from '@/utils/timezone';
+import { resolveTimezone, isValidIANATimezone } from '@/utils/timezone';
 import { convertRawToDate } from '@/utils/timeConversion';
 import { getBrowserTimezone } from '@/utils/timezone';
 import { normalizeUrl } from '@/utils/url';
@@ -220,6 +220,16 @@ export default function Home() {
     });
 
     for (const event of unknownEvents) {
+      // Settle this event to a terminal status (stops the resolving spinner). Every exit path
+      // below must call this — a missing settle on a skip/error path is what left the spinner
+      // spinning forever on a low-confidence or failed resolution.
+      const settle = (status: TimezoneStatus) => {
+        const upd = (e: CalendarEvent) =>
+          e.id === event.id ? { ...e, timezoneStatus: status } : e;
+        setUnsavedEvents(prev => prev.map(upd));
+        setBatchProcessing(prev => prev ? { ...prev, events: prev.events.map(upd) } : prev);
+      };
+
       try {
         const res = await fetch('/api/resolve-timezone', {
           method: 'POST',
@@ -235,23 +245,25 @@ export default function Home() {
 
         if (!res.ok) {
           await emitIfCommunityLimited(res);
+          settle('resolved');
           continue;
         }
 
         const { timezone, confidence } = await res.json();
-        if (confidence <= 0.8) continue;
 
-        const touched = userTouchedTimezones.has(event.id);
+        // The server sanitizes to a valid IANA zone or zeroes confidence; guard
+        // isValidIANATimezone here too so an unrecognized zone can never reach convertRawToDate
+        // and re-introduce the wall-clock-as-UTC shift via this path.
+        if (confidence <= 0.8 || !isValidIANATimezone(timezone)) {
+          settle('resolved');
+          continue;
+        }
 
-        if (touched) {
+        if (userTouchedTimezones.has(event.id)) {
+          // User already picked a zone — surface the AI answer as a dismissible suggestion.
           setTzSuggestions(prev => ({ ...prev, [event.id]: { timezone, confidence } }));
-          // Still mark as resolved since we have an answer
-          const updateStatus = (e: CalendarEvent) =>
-            e.id === event.id ? { ...e, timezoneStatus: 'resolved' as TimezoneStatus } : e;
-          setUnsavedEvents(prev => prev.map(updateStatus));
-          setBatchProcessing(prev => prev ? { ...prev, events: prev.events.map(updateStatus) } : prev);
+          settle('resolved');
         } else {
-          // Auto-apply
           const applyTz = (e: CalendarEvent): CalendarEvent => {
             if (e.id !== event.id) return e;
             const newStart = e.rawStartDate ? convertRawToDate(e.rawStartDate, timezone) : e.startDate;
@@ -269,11 +281,8 @@ export default function Home() {
           setBatchProcessing(prev => prev ? { ...prev, events: prev.events.map(applyTz) } : prev);
         }
       } catch {
-        // Failed to resolve — keep as unknown with browser TZ
-        const markResolved = (e: CalendarEvent) =>
-          e.id === event.id ? { ...e, timezoneStatus: 'resolved' as TimezoneStatus } : e;
-        setUnsavedEvents(prev => prev.map(markResolved));
-        setBatchProcessing(prev => prev ? { ...prev, events: prev.events.map(markResolved) } : prev);
+        // Network/parse failure — keep the browser-zone fallback, just stop the spinner.
+        settle('resolved');
       }
     }
   };
