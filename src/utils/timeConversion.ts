@@ -1,4 +1,5 @@
 import { getBrowserTimezone, isValidIANATimezone } from '@/utils/timezone';
+import { CalendarEvent } from '@/types/event';
 
 /**
  * Convert a raw ISO string (no tz suffix, e.g. "2026-03-14T15:00:00") from a source timezone
@@ -73,6 +74,56 @@ function getTimezoneOffsetMinutes(
   } catch {
     return 0;
   }
+}
+
+/**
+ * Inverse of convertRawToDate: the wall-clock ISO string ("YYYY-MM-DDTHH:mm:ss") that `date` reads
+ * as in `sourceTimezone`. By construction convertRawToDate(formatRawInTimezone(d, tz), tz) returns
+ * the same instant as `d`. Used to resync an event's raw wall-clock fields after a manual edit so
+ * the timezone picker reinterprets the EDITED time, not the stale parsed time.
+ */
+export function formatRawInTimezone(date: Date, sourceTimezone: string): string {
+  const zone = isValidIANATimezone(sourceTimezone) ? sourceTimezone : getBrowserTimezone();
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: zone,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+    hour12: false,
+  }).formatToParts(date);
+  const get = (type: string) => parts.find(p => p.type === type)?.value ?? '00';
+  const hour = get('hour') === '24' ? '00' : get('hour');
+  return `${get('year')}-${get('month')}-${get('day')}T${hour}:${get('minute')}:${get('second')}`;
+}
+
+/**
+ * Resync a timed event's rawStartDate/rawEndDate to its current instants, expressed in the event's
+ * own timezone — preserving the convertRawToDate(raw, timezone) === instant invariant. Call after
+ * any manual start/end edit so a later timezone change transforms the edited time. No-op for all-day
+ * events (their raw handling is timezone-independent; see task-194).
+ */
+export function resyncRawFields(event: CalendarEvent): CalendarEvent {
+  if (event.allDay) return event;
+  const zone = event.timezone || getBrowserTimezone();
+  return {
+    ...event,
+    rawStartDate: formatRawInTimezone(event.startDate, zone),
+    rawEndDate: formatRawInTimezone(event.endDate, zone),
+  };
+}
+
+/**
+ * When a start instant moves to `newStart`, shift the end so the original [oldStart, oldEnd]
+ * duration is preserved. Guarantees the returned end is never before newStart (a non-positive
+ * original duration collapses to zero) — so editing the start can never produce start > end.
+ */
+export function shiftEndPreservingDuration(oldStart: Date, oldEnd: Date, newStart: Date): Date {
+  const duration = Math.max(0, oldEnd.getTime() - oldStart.getTime());
+  return new Date(newStart.getTime() + duration);
+}
+
+/** Clamp `end` up to `start` when it precedes it, enforcing start <= end at edit time. */
+export function clampEndNotBeforeStart(start: Date, end: Date): Date {
+  return end.getTime() < start.getTime() ? new Date(start.getTime()) : new Date(end.getTime());
 }
 
 /**

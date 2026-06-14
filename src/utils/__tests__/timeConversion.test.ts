@@ -5,8 +5,13 @@ import {
   convertRawToDate,
   formatTimeInTimezone,
   getTimezoneAbbreviation,
+  formatRawInTimezone,
+  resyncRawFields,
+  shiftEndPreservingDuration,
+  clampEndNotBeforeStart,
 } from '@/utils/timeConversion';
 import { getBrowserTimezone } from '@/utils/timezone';
+import { CalendarEvent } from '@/types/event';
 
 describe('convertRawToDate', () => {
   test('summer ET (UTC-4): 19:00 wall time → 23:00Z', () => {
@@ -88,5 +93,90 @@ describe('getTimezoneAbbreviation', () => {
 
   test('an invalid zone returns the input string (catch path)', () => {
     expect(getTimezoneAbbreviation(new Date('2026-07-04T16:00:00.000Z'), 'Bad/Zone')).toBe('Bad/Zone');
+  });
+});
+
+// ---- Inline-edit ↔ timezone integrity helpers (task-195) ----
+
+describe('formatRawInTimezone (inverse of convertRawToDate)', () => {
+  test('round-trips an instant through its source zone back to the same wall string + instant', () => {
+    for (const zone of ['UTC', 'America/New_York', 'Asia/Tokyo', 'America/Los_Angeles']) {
+      const raw = '2026-03-13T19:00:00';
+      const instant = convertRawToDate(raw, zone);
+      const recovered = formatRawInTimezone(instant, zone);
+      expect(recovered).toBe(raw);
+      expect(convertRawToDate(recovered, zone).toISOString()).toBe(instant.toISOString());
+    }
+  });
+
+  test('expresses the same instant differently in different zones', () => {
+    // 7:00 PM ET (EDT, UTC-4 on Mar 13 2026) == 23:00 UTC.
+    const instant = convertRawToDate('2026-03-13T19:00:00', 'America/New_York');
+    expect(formatRawInTimezone(instant, 'America/New_York')).toBe('2026-03-13T19:00:00');
+    expect(formatRawInTimezone(instant, 'UTC')).toBe('2026-03-13T23:00:00');
+  });
+});
+
+describe('resyncRawFields', () => {
+  function timed(overrides: Partial<CalendarEvent> = {}): CalendarEvent {
+    return {
+      id: 'e1',
+      title: 'X',
+      startDate: convertRawToDate('2026-03-13T19:00:00', 'America/New_York'),
+      endDate: convertRawToDate('2026-03-13T20:00:00', 'America/New_York'),
+      allDay: false,
+      timezone: 'America/New_York',
+      rawStartDate: 'STALE',
+      rawEndDate: 'STALE',
+      created: new Date('2026-03-01T00:00:00.000Z'),
+      source: 'text',
+      ...overrides,
+    };
+  }
+
+  test('rewrites raw fields so convertRawToDate(raw, timezone) === the current instant', () => {
+    const e = resyncRawFields(timed());
+    expect(e.rawStartDate).toBe('2026-03-13T19:00:00');
+    expect(e.rawEndDate).toBe('2026-03-13T20:00:00');
+    expect(convertRawToDate(e.rawStartDate!, e.timezone!).toISOString()).toBe(e.startDate.toISOString());
+    expect(convertRawToDate(e.rawEndDate!, e.timezone!).toISOString()).toBe(e.endDate.toISOString());
+  });
+
+  test('is a no-op for all-day events (raw left untouched)', () => {
+    const out = resyncRawFields(timed({ allDay: true, rawStartDate: 'KEEP', rawEndDate: 'KEEP' }));
+    expect(out.rawStartDate).toBe('KEEP');
+    expect(out.rawEndDate).toBe('KEEP');
+  });
+});
+
+describe('shiftEndPreservingDuration', () => {
+  test('moves the end by the same delta as the start (duration preserved exactly)', () => {
+    const oldStart = new Date('2026-03-13T12:00:00.000Z');
+    const oldEnd = new Date('2026-03-13T13:30:00.000Z'); // 90 minutes
+    const newStart = new Date('2026-03-13T18:00:00.000Z');
+    const newEnd = shiftEndPreservingDuration(oldStart, oldEnd, newStart);
+    expect(newEnd.getTime() - newStart.getTime()).toBe(90 * 60 * 1000);
+    expect(newEnd.toISOString()).toBe('2026-03-13T19:30:00.000Z');
+  });
+
+  test('never yields an end before the new start (non-positive duration collapses to zero)', () => {
+    const oldStart = new Date('2026-03-13T14:00:00.000Z');
+    const oldEnd = new Date('2026-03-13T13:00:00.000Z'); // already inverted
+    const newStart = new Date('2026-03-13T20:00:00.000Z');
+    expect(shiftEndPreservingDuration(oldStart, oldEnd, newStart).getTime()).toBe(newStart.getTime());
+  });
+});
+
+describe('clampEndNotBeforeStart', () => {
+  test('pulls an end that precedes the start up to the start', () => {
+    const start = new Date('2026-03-13T15:00:00.000Z');
+    const end = new Date('2026-03-13T14:00:00.000Z');
+    expect(clampEndNotBeforeStart(start, end).getTime()).toBe(start.getTime());
+  });
+
+  test('leaves a valid (start <= end) range untouched', () => {
+    const start = new Date('2026-03-13T15:00:00.000Z');
+    const end = new Date('2026-03-13T16:00:00.000Z');
+    expect(clampEndNotBeforeStart(start, end).toISOString()).toBe('2026-03-13T16:00:00.000Z');
   });
 });

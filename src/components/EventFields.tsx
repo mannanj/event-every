@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { CalendarEvent } from '@/types/event';
-import { convertRawToDate, formatDateForInput, formatTimeForInput } from '@/utils/timeConversion';
+import { convertRawToDate, formatDateForInput, formatTimeForInput, resyncRawFields, clampEndNotBeforeStart } from '@/utils/timeConversion';
 import { getBrowserTimezone } from '@/utils/timezone';
 import { normalizeUrl } from '@/utils/url';
 import { validateEvent, EventFormValues } from '@/utils/validation';
@@ -109,9 +109,15 @@ export default function EventFields({
     const startDateTime = data.allDay
       ? new Date(data.startDate)
       : new Date(`${data.startDate}T${data.startTime}`);
-    const endDateTime = data.allDay
+    let endDateTime = data.allDay
       ? new Date(data.endDate)
       : new Date(`${data.endDate}T${data.endTime}`);
+
+    // Enforce start <= end at edit time rather than deferring to export validation (task-195): an
+    // end before the start is clamped up to the start.
+    if (!isNaN(startDateTime.getTime()) && !isNaN(endDateTime.getTime())) {
+      endDateTime = clampEndNotBeforeStart(startDateTime, endDateTime);
+    }
 
     const updatedEvent: CalendarEvent = {
       ...event,
@@ -123,7 +129,10 @@ export default function EventFields({
       url: normalizeUrl(data.url),
       allDay: data.allDay,
     };
-    onChange(updatedEvent);
+    // Keep the raw wall-clock fields in sync with the edited instants so a later timezone change
+    // reinterprets the EDITED time, not the stale parsed time (same fix as the card). All-day raw
+    // is left untouched (timezone-independent).
+    onChange(data.allDay ? updatedEvent : resyncRawFields(updatedEvent));
   };
 
   const handleFieldCommit = (field: keyof FormData, value: string) => {

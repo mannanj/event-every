@@ -2,7 +2,7 @@
 
 import { memo, useState, useRef } from 'react';
 import { CalendarEvent } from '@/types/event';
-import { convertRawToDate, formatDateForInput, formatTimeForInput } from '@/utils/timeConversion';
+import { convertRawToDate, formatDateForInput, formatTimeForInput, resyncRawFields, shiftEndPreservingDuration } from '@/utils/timeConversion';
 import { getBrowserTimezone } from '@/utils/timezone';
 import EventFields from '@/components/EventFields';
 import TimezonePicker, { friendlyTimezoneLabel } from '@/components/TimezonePicker';
@@ -86,23 +86,34 @@ function EventCard({
   };
 
   const handleFieldEdit = (field: string, value: string) => {
-    const updatedEvent = { ...event };
     if (field === 'title') {
-      updatedEvent.title = value;
-    } else if (field === 'startDate') {
+      onEdit({ ...event, title: value });
+      return;
+    }
+    if (field === 'location') {
+      onEdit({ ...event, location: value.trim() || undefined });
+      return;
+    }
+
+    // Date/time edits happen in the browser-local zone (the card shows local time). Rebuild the
+    // start instant, shift the end to preserve duration (so start can never pass end), then resync
+    // the raw wall-clock fields — otherwise a later timezone change re-derives from the STALE parsed
+    // raw and silently reverts this edit (task-195).
+    const newStart = new Date(event.startDate);
+    if (field === 'startDate') {
       const [year, month, day] = value.split('-').map(Number);
-      const newDate = new Date(event.startDate);
-      newDate.setFullYear(year, month - 1, day);
-      updatedEvent.startDate = newDate;
+      if ([year, month, day].some(Number.isNaN)) return;
+      newStart.setFullYear(year, month - 1, day);
     } else if (field === 'startTime') {
       const [hours, minutes] = value.split(':').map(Number);
-      const newDate = new Date(event.startDate);
-      newDate.setHours(hours, minutes);
-      updatedEvent.startDate = newDate;
-    } else if (field === 'location') {
-      updatedEvent.location = value.trim() || undefined;
+      if ([hours, minutes].some(Number.isNaN)) return;
+      newStart.setHours(hours, minutes);
+    } else {
+      return;
     }
-    onEdit(updatedEvent);
+
+    const newEnd = shiftEndPreservingDuration(event.startDate, event.endDate, newStart);
+    onEdit(resyncRawFields({ ...event, startDate: newStart, endDate: newEnd }));
   };
 
   return (

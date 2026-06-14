@@ -25,16 +25,30 @@
 wall-time strings) but shares the stale-raw-fields issue.
 
 #### Fix direction
-- [ ] On any manual date/time edit, recompute `rawStartDate` / `rawEndDate` from the new local wall
+- [x] On any manual date/time edit, recompute `rawStartDate` / `rawEndDate` from the new local wall
       time (keep raw ↔ instant in sync) so a subsequent timezone change doesn't revert the edit.
-- [ ] When `startDate` moves, shift `endDate` to preserve duration; never allow start > end (clamp or
+- [x] When `startDate` moves, shift `endDate` to preserve duration; never allow start > end (clamp or
       shift) — export validation should not be the first line of defense.
-- [ ] Add end date/time inline editing to `EventCard`, or route all card editing through `EventFields`.
-- [ ] Decide & document the model: card shows "your local time" (current behavior, per the tooltip)
+- [x] Add end date/time inline editing to `EventCard`, or route all card editing through `EventFields`.
+- [x] Decide & document the model: card shows "your local time" (current behavior, per the tooltip)
       vs. the event's source zone — make edit + display consistent with that choice.
 
 #### Tests (write them, then mutation-prove they fail on the bug)
-- [ ] E2E (webkit): edit start time → change timezone → the edited time is preserved.
-- [ ] Unit/E2E: moving start past end preserves duration (end shifts); the start ≤ end invariant holds.
+- [x] E2E (webkit): edit start time → change timezone → the edited time is preserved.
+- [x] Unit/E2E: moving start past end preserves duration (end shifts); the start ≤ end invariant holds.
 
 - Location: `src/components/event-card/EventCard.tsx` (88-106, 66-86), `src/components/EventFields.tsx` (108-165)
+
+#### Resolution & model decision (implemented)
+- **Invariant restored:** every manual edit now calls `resyncRawFields` (new in `timeConversion.ts`,
+  the inverse of `convertRawToDate` via `formatRawInTimezone`), so `convertRawToDate(rawStartDate,
+  timezone) === startDate` always holds and a later timezone change reinterprets the EDITED time.
+- **start ≤ end:** the card edits start only and shifts the end to preserve duration
+  (`shiftEndPreservingDuration`); the expanded editor clamps (`clampEndNotBeforeStart`). Both
+  guarantee start ≤ end at edit time, so export validation is no longer the first line of defense.
+- **End editing:** kept in the expanded `EventFields` (chose the spec's "route … through EventFields"
+  branch over adding end fields to the collapsed one-line card, per the Minimal-UI principle). Card
+  start-edits preserve duration, so the end tracks automatically without a second inline field.
+- **Display model (documented):** the card shows times in the viewer's local zone ("Times shown in
+  your local time"); edits happen in that local zone; raw is stored in the event's source zone; the
+  timezone picker reinterprets the source wall time in the chosen zone.
