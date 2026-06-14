@@ -115,33 +115,38 @@ async function waitForEvents(page: Page, count = 1) {
 }
 
 test.describe('Event Extraction Scenarios', () => {
-  test('Scenario 1: Single text event with specific time', async ({ page }) => {
-    await setupPage(page);
-    await mockParseAPI(page, [
-      {
-        title: "Dinner at Luigi's",
-        startDate: '2026-03-13T19:00:00',
-        endDate: '2026-03-13T20:00:00',
-        location: "Luigi's Restaurant",
-        confidence: 0.92,
-        allDay: false,
-        timezone: null,
-      },
-    ]);
+  // Pin BOTH the browser zone and the event zone so the rendered wall-clock time is
+  // deterministic: TIME_FMT has no timeZone, so the card renders in the browser zone. With both
+  // = America/New_York, a 7pm-ET event must read back as exactly "7:00 PM"; a +1h regression in
+  // convertRawToDate reads "8:00 PM". (The old /\d{1,2}:\d{2}\s?[AP]M/ matched any time shape —
+  // and the [AP]M actually came from the TimezonePicker <option> text, not the displayed time.)
+  test.describe('Scenario 1: specific time (pinned ET)', () => {
+    test.use({ timezoneId: 'America/New_York' });
 
-    await submitText(page, "Dinner at Luigi's, Friday March 13 at 7pm");
-    await waitForEvents(page, 1);
+    test('renders the exact wall-clock time and date', async ({ page }) => {
+      await setupPage(page);
+      await mockParseAPI(page, [
+        {
+          title: "Dinner at Luigi's",
+          startDate: '2026-03-13T19:00:00',
+          endDate: '2026-03-13T20:00:00',
+          location: "Luigi's Restaurant",
+          confidence: 0.92,
+          allDay: false,
+          timezone: 'America/New_York',
+        },
+      ]);
 
-    const card = page.getByTestId('event-card').first();
-    await expect(page.getByTestId('event-card-title').first()).toContainText("Dinner at Luigi's");
-    // Rendered date + time on the card's one-line summary. The date token is
-    // robust; the exact wall-clock hour depends on the runner's browser tz
-    // (timezone:null → display in browser tz), so assert a time token shape,
-    // not a fixed hour.
-    await expect(card).toContainText('Mar 13');
-    await expect(card).toContainText(/\d{1,2}:\d{2}\s?[AP]M/);
-    // Location renders inline even while collapsed (EventCard.tsx collapsed summary).
-    await expect(card).toContainText("Luigi's Restaurant");
+      await submitText(page, "Dinner at Luigi's, Friday March 13 at 7pm");
+      await waitForEvents(page, 1);
+
+      const card = page.getByTestId('event-card').first();
+      await expect(page.getByTestId('event-card-title').first()).toContainText("Dinner at Luigi's");
+      await expect(card).toContainText('Mar 13');
+      await expect(card).toContainText('7:00 PM');
+      // Location renders inline even while collapsed (EventCard.tsx collapsed summary).
+      await expect(card).toContainText("Luigi's Restaurant");
+    });
   });
 
   test('Scenario 2: All-day event (no times mentioned)', async ({ page }) => {
@@ -268,31 +273,39 @@ test.describe('Event Extraction Scenarios', () => {
     await expect(page.getByTestId('event-card-title').first()).toContainText('Lunch with Alice, Bob, and Carol');
   });
 
-  test('Scenario 7: Event with timezone preserved', async ({ page }) => {
-    await setupPage(page);
-    await mockParseAPI(page, [
-      {
-        title: 'Team Sync',
-        startDate: '2026-03-15T15:00:00',
-        endDate: '2026-03-15T16:00:00',
-        confidence: 0.93,
-        allDay: false,
-        timezone: 'UTC',
-      },
-    ]);
+  // The visible tz chip renders the BROWSER zone abbreviation (getBrowserTimezone()), because the
+  // card shows times in local time. Pin the browser to UTC and assert the EXACT chip text, scoped
+  // to data-testid="tz-chip" so we read the rendered chip — not hidden <select> option text. (The
+  // old loose regex matched the COMMON_TIMEZONES options and stayed green even on a broken chip.)
+  test.describe('Scenario 7: timezone chip (pinned UTC)', () => {
+    test.use({ timezoneId: 'UTC' });
 
-    await submitText(page, 'Team Sync at 3:00 PM UTC on March 15');
-    await waitForEvents(page, 1);
+    test('renders the visible timezone chip', async ({ page }) => {
+      await setupPage(page);
+      await mockParseAPI(page, [
+        {
+          title: 'Team Sync',
+          startDate: '2026-03-15T15:00:00',
+          endDate: '2026-03-15T16:00:00',
+          confidence: 0.93,
+          allDay: false,
+          timezone: 'UTC',
+        },
+      ]);
 
-    const card = page.getByTestId('event-card').first();
-    await expect(page.getByTestId('event-card-title').first()).toContainText('Team Sync');
-    // Timed events render a timezone abbreviation chip (EventCard.tsx via TimezonePicker).
-    // The exact abbreviation depends on the runner's browser tz, so assert the
-    // chip exists via a loose token shape rather than a fixed value.
-    await expect(card).toContainText(/[A-Z]{2,5}T|UTC|GMT/);
+      await submitText(page, 'Team Sync at 3:00 PM UTC on March 15');
+      await waitForEvents(page, 1);
+
+      const card = page.getByTestId('event-card').first();
+      await expect(page.getByTestId('event-card-title').first()).toContainText('Team Sync');
+      await expect(card.getByTestId('tz-chip')).toHaveText('UTC');
+    });
   });
 
-  test('Scenario 8: Low-confidence events are filtered out', async ({ page }) => {
+  // Confidence filtering happens SERVER-SIDE in parser.ts (filterByConfidence); the mocked
+  // /api/parse bypasses the server, so this E2E cannot exercise the filter. The filter contract is
+  // unit-tested in src/services/__tests__/parser.test.ts. Here we only assert the event renders.
+  test('Scenario 8: renders an extracted event', async ({ page }) => {
     await setupPage(page);
     await mockParseAPI(page, [
       {
@@ -304,7 +317,7 @@ test.describe('Event Extraction Scenarios', () => {
       },
     ]);
 
-    await submitText(page, 'Real Meeting at 10am March 16. Also the sky is blue.');
+    await submitText(page, 'Real Meeting at 10am March 16.');
     await waitForEvents(page, 1);
 
     await expect(page.getByTestId('event-card-title')).toHaveCount(1);
@@ -330,7 +343,7 @@ test.describe('UI Interaction Tests', () => {
     await expect(submitButton).toBeEnabled();
   });
 
-  test('Event card expands to show details on click', async ({ page }) => {
+  test('Event card expands to reveal the description', async ({ page }) => {
     await setupPage(page);
     await mockParseAPI(page, [
       {
@@ -348,12 +361,17 @@ test.describe('UI Interaction Tests', () => {
     await submitText(page, 'Test Event April 1 at 2pm in Room 42');
     await waitForEvents(page, 1);
 
-    // Click the event card to expand
-    const eventCard = page.getByTestId('event-card-title').first();
-    await eventCard.click();
+    const card = page.getByTestId('event-card').first();
+    // The description renders ONLY in the expanded EventFields — never in the collapsed summary
+    // (which shows title/date/time/location). The old test clicked the title (→ edit mode, not
+    // expand) and asserted "Room 42", which is already in the collapsed summary, so disabling
+    // toggleExpand entirely stayed green.
+    const description = page.getByText('A test event with details');
+    await expect(description).toBeHidden();
 
-    // After expanding, location should be visible
-    await expect(page.getByText('Room 42')).toBeVisible({ timeout: 5000 });
+    await card.getByRole('button', { name: 'Expand' }).click();
+
+    await expect(description).toBeVisible({ timeout: 5000 });
   });
 
   test('Error notification can be dismissed', async ({ page }) => {

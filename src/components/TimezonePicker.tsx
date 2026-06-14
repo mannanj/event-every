@@ -53,7 +53,7 @@ export default function TimezonePicker({ date, value, onChange }: TimezonePicker
 
   return (
     <span className="group relative inline-block ml-0.5 border-0 border-b border-dotted border-gray-400 hover:border-black cursor-pointer">
-      <span className="text-gray-500 text-sm pointer-events-none">
+      <span data-testid="tz-chip" className="text-gray-500 text-sm pointer-events-none">
         {tzAbbr}
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 6 4" className="inline-block w-1.5 h-1 ml-0.5 mb-0.5 opacity-0 group-hover:opacity-100 transition-opacity" fill="currentColor"><path d="M0 0l3 4 3-4z"/></svg>
       </span>

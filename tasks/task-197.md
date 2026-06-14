@@ -11,17 +11,17 @@ code *runs*, not that it's *correct*. These are test improvements, not app bugs 
    matches any time-shaped string, so a +1h date-math regression escapes. (Worse: `TIME_FMT` emits no
    AM/PM — the `[AP]M` the regex matches actually comes from the TimezonePicker `<select>` option
    text, so the regex isn't even anchored to the displayed time element.)
-   - [ ] Pin the browser zone: `test.use({ timezoneId: 'America/New_York' })` on the describe.
-   - [ ] Give the mock event `timezone: 'America/New_York'`; assert exact `'7:00 PM'` and `'Mar 13'`.
-   - [ ] Mutation-prove: +1h in `convertRawToDate` → "8:00 PM" → red.
+   - [x] Pin the browser zone: `test.use({ timezoneId: 'America/New_York' })` on the describe.
+   - [x] Give the mock event `timezone: 'America/New_York'`; assert exact `'7:00 PM'` and `'Mar 13'`.
+   - [x] Mutation-prove: +1h in `convertRawToDate` → "8:00 PM" → red.
 
 2. **Scenario 7 ("timezone preserved") — the timezone is unverified.** `toContainText(/[A-Z]{2,5}T|UTC|GMT/)`
    always passes because the card renders the whole `TimezonePicker` dropdown (COMMON_TIMEZONES
    includes `UTC` plus abbreviations ending in `T`), and `toContainText` reads hidden `<option>` text.
    Rendering the visible chip as "zzz" still stayed green.
-   - [ ] Add `data-testid="tz-chip"` to the visible chip span in `src/components/TimezonePicker.tsx`
+   - [x] Add `data-testid="tz-chip"` to the visible chip span in `src/components/TimezonePicker.tsx`
          (~line 56, the `<select>`'s sibling).
-   - [ ] Pin `test.use({ timezoneId: 'UTC' })`; assert `card.getByTestId('tz-chip')` has text `'UTC'`.
+   - [x] Pin `test.use({ timezoneId: 'UTC' })`; assert `card.getByTestId('tz-chip')` has text `'UTC'`.
 
 3. **Scenario 8 ("low-confidence filtered out") — does not exercise any filter.** It streams one
    high-confidence (0.85) event and asserts count 1. IMPORTANT: low-confidence filtering IS
@@ -29,15 +29,15 @@ code *runs*, not that it's *correct*. These are test improvements, not app bugs 
    → dropped, ~line 218). The mocked E2E bypasses the server, so it can never test the filter. (The
    audit sub-agent initially reported the filter as missing; that was wrong — it only checked the
    client. Verified present in parser.ts.)
-   - [ ] Move the filtering assertion to a parser-level unit test: feed a mixed-confidence event set;
+   - [x] Move the filtering assertion to a parser-level unit test: feed a mixed-confidence event set;
          assert sub-threshold events are dropped and supra-threshold survive.
-   - [ ] Rename the E2E to "renders an extracted event" (what it actually verifies), or stream two
+   - [x] Rename the E2E to "renders an extracted event" (what it actually verifies), or stream two
          events and assert order/identity — but don't claim it tests filtering.
 
 4. **UI "card expands on click" — verifies neither the click-to-expand nor the reveal.** It clicks the
    title (which enters title-EDIT mode, not expand) and asserts "Room 42", which is already in the
    collapsed summary. Disabling `toggleExpand` entirely stayed green.
-   - [ ] Assert on `description` ("A test event with details"), which renders ONLY in the expanded
+   - [x] Assert on `description` ("A test event with details"), which renders ONLY in the expanded
          `EventFields`: first `toBeHidden()`, click `button[aria-label="Expand"]`, then `toBeVisible()`.
 
 #### Coverage gap the audit could not reach

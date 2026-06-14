@@ -18,7 +18,27 @@ function formatClientContext(context?: ClientContext): string {
 Use this ONLY to interpret relative dates like "tomorrow", "next week", etc. Convert relative dates to absolute ISO 8601.`;
 }
 
-const CONFIDENCE_THRESHOLD = 0.4;
+export const CONFIDENCE_THRESHOLD = 0.4;
+
+/**
+ * Drop events the model scored below CONFIDENCE_THRESHOLD (likely speculative, not real events).
+ * A missing score defaults to 0.5 (above threshold) — we only discard explicit low confidence.
+ * Pure + exported so the filter contract is unit-testable without driving the LLM call.
+ */
+export function filterByConfidence(events: ParsedEvent[]): ParsedEvent[] {
+  return events
+    .map((event) => ({
+      ...event,
+      confidence: event.confidence ?? 0.5,
+    }))
+    .filter((event) => {
+      if (event.confidence < CONFIDENCE_THRESHOLD) {
+        console.warn(`[parser] Dropping low-confidence event (${event.confidence}): "${event.title}"`);
+        return false;
+      }
+      return true;
+    });
+}
 
 const BATCH_EVENT_PARSING_PROMPT = `You are an event extraction assistant. Extract ALL event details EXACTLY as written — do NOT convert or interpret timezones.
 
@@ -209,18 +229,7 @@ export async function* parseEventsBatch(
       );
     }
 
-    const normalizedEvents = parsed.events
-      .map((event) => ({
-        ...event,
-        confidence: event.confidence ?? 0.5,
-      }))
-      .filter((event) => {
-        if (event.confidence < CONFIDENCE_THRESHOLD) {
-          console.warn(`[parser] Dropping low-confidence event (${event.confidence}): "${event.title}"`);
-          return false;
-        }
-        return true;
-      });
+    const normalizedEvents = filterByConfidence(parsed.events);
 
     if (normalizedEvents.length === 0) {
       throw new Error('No events could be extracted from the provided input. The content may not contain calendar event information.');
