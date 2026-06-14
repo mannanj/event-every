@@ -140,7 +140,7 @@ test.describe('Event Extraction Scenarios', () => {
     // not a fixed hour.
     await expect(card).toContainText('Mar 13');
     await expect(card).toContainText(/\d{1,2}:\d{2}\s?[AP]M/);
-    // Location renders inline even while collapsed (BatchEventList.tsx:453).
+    // Location renders inline even while collapsed (EventCard.tsx collapsed summary).
     await expect(card).toContainText("Luigi's Restaurant");
   });
 
@@ -286,7 +286,7 @@ test.describe('Event Extraction Scenarios', () => {
 
     const card = page.getByTestId('event-card').first();
     await expect(page.getByTestId('event-card-title').first()).toContainText('Team Sync');
-    // Timed events render a timezone abbreviation chip (BatchEventList.tsx:400).
+    // Timed events render a timezone abbreviation chip (EventCard.tsx via TimezonePicker).
     // The exact abbreviation depends on the runner's browser tz, so assert the
     // chip exists via a loose token shape rather than a fixed value.
     await expect(card).toContainText(/[A-Z]{2,5}T|UTC|GMT/);

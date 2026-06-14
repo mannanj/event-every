@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import SmartInput, { SmartInputHandle } from '@/components/SmartInput';
 import UnsavedEventsSection from '@/components/UnsavedEventsSection';
 import InputHistoryModal from '@/components/InputHistoryModal';
@@ -14,6 +14,7 @@ import { exportToICS } from '@/services/exporter';
 import { useHistory } from '@/hooks/useHistory';
 import { useInputHistory } from '@/hooks/useInputHistory';
 import { useProcessingQueue } from '@/hooks/useProcessingQueue';
+import { useEventSelection } from '@/hooks/useEventSelection';
 import { detectURLs } from '@/services/urlDetector';
 import { summarizeInput } from '@/services/summarizer';
 import { scrapeURLsBatch } from '@/services/webScraper';
@@ -33,6 +34,10 @@ export default function Home() {
   const [processingEvents, setProcessingEvents] = useState<ProcessingEvent[]>([]);
   const [batchProcessing, setBatchProcessing] = useState<BatchProcessing | null>(null);
   const [unsavedEvents, setUnsavedEvents] = useState<CalendarEvent[]>([]);
+  // Selection for the unsaved batch lives here so it can outlive any single
+  // sub-component and (later) be shared with a header/footer. Streamed arrivals
+  // default to selected without resetting the user's manual deselects.
+  const selection = useEventSelection(unsavedEvents);
   const [imageProcessingStatuses, setImageProcessingStatuses] = useState<ImageProcessingStatus[]>([]);
   const [urlProcessingStatus, setUrlProcessingStatus] = useState<URLProcessingStatus | null>(null);
   const [rateLimitInfo, setRateLimitInfo] = useState<{ remaining: number; total: number; resetTime: number } | undefined>();
@@ -878,11 +883,12 @@ export default function Home() {
     setDeleteConfirmId(null);
   };
 
-  const handleBatchEventEdit = (updatedEvent: CalendarEvent) => {
+  // Stable so it doesn't defeat the <EventCard> memo on unrelated page re-renders.
+  const handleBatchEventEdit = useCallback((updatedEvent: CalendarEvent) => {
     setUnsavedEvents(prev =>
       prev.map(e => e.id === updatedEvent.id ? updatedEvent : e)
     );
-  };
+  }, []);
 
   const handleBatchEventDelete = (eventId: string) => {
     setUnsavedEvents(prev => prev.filter(e => e.id !== eventId));
@@ -900,6 +906,34 @@ export default function Home() {
     setImageProcessingStatuses([]);
     setUrlProcessingStatus(null);
   };
+
+  // Stable identities (state setters + a module import only) so the memoized
+  // <EventCard>s aren't re-rendered just because the page re-rendered.
+  const handleTzSuggestionApply = useCallback((eventId: string, timezone: string) => {
+    setTzSuggestions(prev => {
+      const next = { ...prev };
+      delete next[eventId];
+      return next;
+    });
+    setUnsavedEvents(prev => prev.map(e => {
+      if (e.id !== eventId) return e;
+      const newStart = e.rawStartDate ? convertRawToDate(e.rawStartDate, timezone) : e.startDate;
+      const newEnd = e.rawEndDate ? convertRawToDate(e.rawEndDate, timezone) : e.endDate;
+      return { ...e, timezone, startDate: newStart, endDate: newEnd, timezoneSource: 'llm' as const, timezoneStatus: 'resolved' as const };
+    }));
+  }, []);
+
+  const handleTzSuggestionDismiss = useCallback((eventId: string) => {
+    setTzSuggestions(prev => {
+      const next = { ...prev };
+      delete next[eventId];
+      return next;
+    });
+  }, []);
+
+  const handleTimezoneUserChange = useCallback((eventId: string) => {
+    setUserTouchedTimezones(prev => new Set([...prev, eventId]));
+  }, []);
 
   const formatDate = (date: Date) => {
     if (isNaN(date.getTime())) {
@@ -1067,6 +1101,7 @@ export default function Home() {
         {/* Unified processing and unsaved events section */}
         <UnsavedEventsSection
           events={unsavedEvents}
+          selection={selection}
           imageProcessingStatuses={imageProcessingStatuses}
           urlProcessingStatus={urlProcessingStatus}
           isProcessing={batchProcessing?.isProcessing || false}
@@ -1080,30 +1115,9 @@ export default function Home() {
             setTotalEventsInStorage(prev => prev + events.length);
           }}
           tzSuggestions={tzSuggestions}
-          onTzSuggestionApply={(eventId, timezone) => {
-            setTzSuggestions(prev => {
-              const next = { ...prev };
-              delete next[eventId];
-              return next;
-            });
-            // Apply TZ to the event
-            setUnsavedEvents(prev => prev.map(e => {
-              if (e.id !== eventId) return e;
-              const newStart = e.rawStartDate ? convertRawToDate(e.rawStartDate, timezone) : e.startDate;
-              const newEnd = e.rawEndDate ? convertRawToDate(e.rawEndDate, timezone) : e.endDate;
-              return { ...e, timezone, startDate: newStart, endDate: newEnd, timezoneSource: 'llm', timezoneStatus: 'resolved' };
-            }));
-          }}
-          onTzSuggestionDismiss={(eventId) => {
-            setTzSuggestions(prev => {
-              const next = { ...prev };
-              delete next[eventId];
-              return next;
-            });
-          }}
-          onTimezoneUserChange={(eventId) => {
-            setUserTouchedTimezones(prev => new Set([...prev, eventId]));
-          }}
+          onTzSuggestionApply={handleTzSuggestionApply}
+          onTzSuggestionDismiss={handleTzSuggestionDismiss}
+          onTimezoneUserChange={handleTimezoneUserChange}
         />
 
         {/* Marketing — recedes the moment you start */}

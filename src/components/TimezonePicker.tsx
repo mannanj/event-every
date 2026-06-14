@@ -3,9 +3,9 @@
 import { getTimezoneAbbreviation } from '@/utils/timeConversion';
 import { getBrowserTimezone } from '@/utils/timezone';
 
-// The single canonical list of selectable timezones. Both EventFields (via TimezonePicker)
-// and BatchEventList's card header read this; plan 015 migrates the card header onto this
-// component and removes its duplicate copy of this list.
+// The single canonical list of selectable timezones. The event editor (EventFields, via
+// TimezonePicker) and the batch event card header both read this; the card header was
+// migrated onto this component in plan 015, removing its former duplicate copy of the list.
 export const COMMON_TIMEZONES: { value: string; label: string }[] = [
   { value: 'America/New_York', label: 'Eastern Time' },
   { value: 'America/Chicago', label: 'Central Time' },
