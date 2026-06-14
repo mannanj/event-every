@@ -1,11 +1,15 @@
 import { CalendarEvent } from '@/types/event';
 import { normalizeUrl } from '@/utils/url';
+import { convertRawToDate } from '@/utils/timeConversion';
+import { resolveTimezoneZone } from '@/utils/timezone';
 
 interface ICSEvent {
   uid?: string;
   summary?: string;
   dtstart?: string;
   dtend?: string;
+  dtstartTzid?: string;
+  dtendTzid?: string;
   location?: string;
   description?: string;
   url?: string;
@@ -27,7 +31,6 @@ export function parseICSContent(icsText: string): CalendarEvent[] {
   const lines = icsText.split(/\r\n|\n|\r/);
 
   let currentEvent: ICSEvent | null = null;
-  const currentField = '';
 
   for (let i = 0; i < lines.length; i++) {
     let line = lines[i];
@@ -89,12 +92,14 @@ export function parseICSContent(icsText: string): CalendarEvent[] {
           break;
         case 'DTSTART':
           currentEvent.dtstart = fieldValue;
+          currentEvent.dtstartTzid = params['TZID'];
           if (params['VALUE'] === 'DATE') {
             currentEvent.allDay = true;
           }
           break;
         case 'DTEND':
           currentEvent.dtend = fieldValue;
+          currentEvent.dtendTzid = params['TZID'];
           break;
         case 'LOCATION':
           currentEvent.location = unescapeICSText(fieldValue);
@@ -117,8 +122,10 @@ function convertICSEventToCalendarEvent(icsEvent: ICSEvent): CalendarEvent | nul
     return null;
   }
 
-  const startDate = parseICSDate(icsEvent.dtstart);
-  const endDate = icsEvent.dtend ? parseICSDate(icsEvent.dtend) : new Date(startDate.getTime() + 60 * 60 * 1000);
+  const startDate = parseICSDate(icsEvent.dtstart, icsEvent.dtstartTzid);
+  const endDate = icsEvent.dtend
+    ? parseICSDate(icsEvent.dtend, icsEvent.dtendTzid)
+    : new Date(startDate.getTime() + 60 * 60 * 1000);
 
   if (!startDate) {
     return null;
@@ -139,13 +146,11 @@ function convertICSEventToCalendarEvent(icsEvent: ICSEvent): CalendarEvent | nul
   };
 }
 
-function parseICSDate(dateString: string): Date {
-  // Remove any timezone identifiers for simplicity
-  dateString = dateString.replace(/;.*$/, '');
-
-  // Format: YYYYMMDD or YYYYMMDDTHHMMSS or YYYYMMDDTHHMMSSZ
+function parseICSDate(dateString: string, tzid?: string): Date {
+  // Format: YYYYMMDD or YYYYMMDDTHHMMSS or YYYYMMDDTHHMMSSZ. Any ;PARAMETERS (incl. TZID) were
+  // already split off upstream in parseICSContent; the TZID is passed back in separately.
   if (dateString.length === 8) {
-    // Date only (YYYYMMDD)
+    // Date only (YYYYMMDD) — all-day. (The local-midnight zone-dependence is addressed by task-194.)
     const year = parseInt(dateString.substring(0, 4));
     const month = parseInt(dateString.substring(4, 6)) - 1;
     const day = parseInt(dateString.substring(6, 8));
@@ -160,12 +165,23 @@ function parseICSDate(dateString: string): Date {
     const second = parseInt(dateString.substring(13, 15));
 
     if (dateString.endsWith('Z')) {
-      // UTC time
+      // Explicit UTC.
       return new Date(Date.UTC(year, month, day, hour, minute, second));
-    } else {
-      // Local time
-      return new Date(year, month, day, hour, minute, second);
     }
+
+    if (tzid) {
+      // Honor the declared source zone: normalize the TZID (IANA name / abbreviation / numeric
+      // offset) to a valid IANA zone, then reuse convertRawToDate — the same chokepoint the rest
+      // of the app uses — so a zoned time imports to the correct instant regardless of the
+      // importer's zone. An unresolvable TZID degrades to the browser zone (resolveTimezoneZone).
+      const zone = resolveTimezoneZone(tzid).timezone;
+      const ymd = `${dateString.substring(0, 4)}-${dateString.substring(4, 6)}-${dateString.substring(6, 8)}`;
+      const hms = `${dateString.substring(9, 11)}:${dateString.substring(11, 13)}:${dateString.substring(13, 15)}`;
+      return convertRawToDate(`${ymd}T${hms}`, zone);
+    }
+
+    // No TZID and no Z: a floating wall time → interpret in the importer's local zone.
+    return new Date(year, month, day, hour, minute, second);
   }
 
   // Fallback to current date if parsing fails

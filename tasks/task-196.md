@@ -17,12 +17,12 @@ So the stated source zone is dropped and the wall time is reinterpreted in the i
 is the import-side mirror of the parse-side bug just fixed (unknown zone → silent local/UTC default).
 
 #### Fix direction
-- [ ] Capture the `TZID` parameter instead of stripping it; when present, convert the wall time with
+- [x] Capture the `TZID` parameter instead of stripping it; when present, convert the wall time with
       the existing authority `convertRawToDate(rawISO, tzid)` (REUSE it — do not add a parallel
       converter). Fall back to the browser zone only when there is no `TZID` and no trailing `Z`.
-- [ ] Normalize common non-IANA TZID labels via `resolveTimezoneZone` (the same authority the parser
+- [x] Normalize common non-IANA TZID labels via `resolveTimezoneZone` (the same authority the parser
       bugfix now uses), so `TZID=Eastern Time` etc. resolve rather than silently localizing.
-- [ ] Flip the KNOWN QUIRK assertion in `icsParser.test.ts` in lockstep, and add a case asserting a
+- [x] Flip the KNOWN QUIRK assertion in `icsParser.test.ts` in lockstep, and add a case asserting a
       `TZID=America/New_York` time imports to the correct UTC instant regardless of the runner's zone.
 
 - Location: `src/services/icsParser.ts` (`parseICSDate` 142-173), `src/services/__tests__/icsParser.test.ts`, cross-ref `plans/008`
