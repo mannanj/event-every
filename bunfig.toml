@@ -1,2 +1,8 @@
 [install]
 linker = "isolated"
+
+[test]
+# Loaded before any test/source module so the shared @upstash/redis mock registers
+# first — makes the mock order-independent and fixes the CI-only collision where
+# budget.test.ts and ratelimit.test.ts each registered a clashing global stub.
+preload = ["./src/lib/__tests__/_redisMock.ts"]

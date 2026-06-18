@@ -1,21 +1,8 @@
 // Characterization tests for the community USD budget. The Redis SDK is mocked at the module
 // boundary (the class constructor returns a shared stub). Fail-open behavior is INTENTIONAL
 // (see budget.ts) and is tested as the spec, not a bug.
-import { beforeEach, describe, expect, mock, test } from 'bun:test';
-
-const redisMock = {
-  get: mock((_key: string) => Promise.resolve<number | string | null>(0)),
-  incrbyfloat: mock((_key: string, _amount: number) => Promise.resolve(1)),
-  expire: mock((_key: string, _seconds: number) => Promise.resolve(1)),
-};
-
-mock.module('@upstash/redis', () => ({
-  Redis: class {
-    constructor() {
-      return redisMock;
-    }
-  },
-}));
+import { beforeEach, describe, expect, test } from 'bun:test';
+import { redisMock, resetRedisMock } from './_redisMock';
 
 process.env.KV_REST_API_URL = 'https://test.invalid';
 process.env.KV_REST_API_TOKEN = 'test-token';
@@ -24,12 +11,7 @@ process.env.DAILY_BUDGET_USD = '5';
 const { getBudgetStatus, recordCommunitySpend, DAILY_BUDGET_USD } = await import('@/lib/budget');
 
 beforeEach(() => {
-  redisMock.get.mockReset();
-  redisMock.incrbyfloat.mockReset();
-  redisMock.expire.mockReset();
-  redisMock.get.mockImplementation(() => Promise.resolve(0));
-  redisMock.incrbyfloat.mockImplementation(() => Promise.resolve(1));
-  redisMock.expire.mockImplementation(() => Promise.resolve(1));
+  resetRedisMock();
   process.env.KV_REST_API_URL = 'https://test.invalid';
   process.env.KV_REST_API_TOKEN = 'test-token';
 });

@@ -1,21 +1,8 @@
 // Characterization + correctness tests for the per-identifier rate limiter.
 // plans/005 fixed the window/atomicity bugs the original quirk tests pinned; these
 // now assert the corrected behavior. Fail-open is intentional and tested as spec.
-import { beforeEach, describe, expect, mock, test } from 'bun:test';
-
-const redisMock = {
-  get: mock((_key: string) => Promise.resolve<number | null>(0)),
-  incr: mock((_key: string) => Promise.resolve<number>(1)),
-  expire: mock((_key: string, _ttl: number) => Promise.resolve(1)),
-};
-
-mock.module('@upstash/redis', () => ({
-  Redis: class {
-    constructor() {
-      return redisMock;
-    }
-  },
-}));
+import { beforeEach, describe, expect, test } from 'bun:test';
+import { redisMock, resetRedisMock } from './_redisMock';
 
 process.env.KV_REST_API_URL = 'https://test.invalid';
 process.env.KV_REST_API_TOKEN = 'test-token';
@@ -34,12 +21,7 @@ function expectedReset(): number {
 }
 
 beforeEach(() => {
-  redisMock.get.mockReset();
-  redisMock.incr.mockReset();
-  redisMock.expire.mockReset();
-  redisMock.get.mockImplementation(() => Promise.resolve(0));
-  redisMock.incr.mockImplementation(() => Promise.resolve(1));
-  redisMock.expire.mockImplementation(() => Promise.resolve(1));
+  resetRedisMock();
   process.env.KV_REST_API_URL = 'https://test.invalid';
   process.env.KV_REST_API_TOKEN = 'test-token';
 });
