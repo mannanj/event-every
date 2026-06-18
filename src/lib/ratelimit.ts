@@ -1,4 +1,4 @@
-import { Redis } from '@upstash/redis';
+import { getRedis } from './redisClient';
 
 export interface RateLimitResult {
   success: boolean;
@@ -12,12 +12,6 @@ export const DAILY_LIMIT = 1000;
 const isRedisAvailable = () => {
   return !!(process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN);
 };
-
-const getRedis = () =>
-  new Redis({
-    url: process.env.KV_REST_API_URL!,
-    token: process.env.KV_REST_API_TOKEN!,
-  });
 
 // Fixed per-UTC-day window: the key embeds the date so each day self-partitions
 // and the limit resets at exactly midnight UTC, matching the community budget

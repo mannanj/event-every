@@ -1,4 +1,4 @@
-import { Redis } from '@upstash/redis';
+import { getRedis } from './redisClient';
 
 export interface BudgetStatus {
   limitUsd: number;
@@ -15,12 +15,6 @@ export const DAILY_BUDGET_USD = (() => {
 })();
 
 const isRedisAvailable = () => !!(process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN);
-
-const getRedis = () =>
-  new Redis({
-    url: process.env.KV_REST_API_URL!,
-    token: process.env.KV_REST_API_TOKEN!,
-  });
 
 // One shared pool per UTC day; the key embeds the date so days self-partition
 // and the reset moment is exactly midnight UTC.

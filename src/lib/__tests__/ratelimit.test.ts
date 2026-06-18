@@ -1,7 +1,8 @@
 // Characterization + correctness tests for the per-identifier rate limiter.
 // plans/005 fixed the window/atomicity bugs the original quirk tests pinned; these
 // now assert the corrected behavior. Fail-open is intentional and tested as spec.
-import { beforeEach, describe, expect, test } from 'bun:test';
+import { afterAll, beforeEach, describe, expect, test } from 'bun:test';
+import { __setRedisClientForTests, type RedisLike } from '@/lib/redisClient';
 import { redisMock, resetRedisMock } from './_redisMock';
 
 process.env.KV_REST_API_URL = 'https://test.invalid';
@@ -22,8 +23,13 @@ function expectedReset(): number {
 
 beforeEach(() => {
   resetRedisMock();
+  __setRedisClientForTests(redisMock as unknown as RedisLike);
   process.env.KV_REST_API_URL = 'https://test.invalid';
   process.env.KV_REST_API_TOKEN = 'test-token';
+});
+
+afterAll(() => {
+  __setRedisClientForTests(null);
 });
 
 describe('checkRateLimit', () => {

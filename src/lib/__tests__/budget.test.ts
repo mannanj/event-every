@@ -1,7 +1,8 @@
-// Characterization tests for the community USD budget. The Redis SDK is mocked at the module
-// boundary (the class constructor returns a shared stub). Fail-open behavior is INTENTIONAL
-// (see budget.ts) and is tested as the spec, not a bug.
-import { beforeEach, describe, expect, test } from 'bun:test';
+// Characterization tests for the community USD budget. The Redis client is injected as an
+// in-memory fake via __setRedisClientForTests (no global module mock — see _redisMock.ts /
+// redisClient.ts). Fail-open behavior is INTENTIONAL (see budget.ts), tested as the spec.
+import { afterAll, beforeEach, describe, expect, test } from 'bun:test';
+import { __setRedisClientForTests, type RedisLike } from '@/lib/redisClient';
 import { redisMock, resetRedisMock } from './_redisMock';
 
 process.env.KV_REST_API_URL = 'https://test.invalid';
@@ -12,8 +13,13 @@ const { getBudgetStatus, recordCommunitySpend, DAILY_BUDGET_USD } = await import
 
 beforeEach(() => {
   resetRedisMock();
+  __setRedisClientForTests(redisMock as unknown as RedisLike);
   process.env.KV_REST_API_URL = 'https://test.invalid';
   process.env.KV_REST_API_TOKEN = 'test-token';
+});
+
+afterAll(() => {
+  __setRedisClientForTests(null);
 });
 
 describe('DAILY_BUDGET_USD', () => {
