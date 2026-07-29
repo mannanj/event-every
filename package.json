@@ -12,17 +12,23 @@
     "test": "bun test src --isolate",
     "test:e2e": "bunx playwright test",
     "test:e2e:ui": "bunx playwright test --ui",
-    "test:e2e:prod": "E2E_TARGET=prod bunx playwright test"
+    "test:e2e:prod": "E2E_TARGET=prod bunx playwright test",
+    "vendor:scanner": "bun scripts/vendor-event-scanner.ts",
+    "assert:e1-paths": "bun scripts/assert-e1-paths.ts",
+    "assert:e1-protected": "bun scripts/assert-e1-protected.ts",
+    "verify:e1:offline": "bun scripts/run-e1-offline.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.68.0",
+    "@event-every/scanner": "file:vendor/event-every-scanner",
     "@upstash/redis": "^1.34.0",
     "dotenv": "^17.2.3",
     "ics": "^3.8.1",
     "jszip": "^3.10.1",
     "next": "15.5.9",
     "react": "^19.0.1",
-    "react-dom": "^19.0.1"
+    "react-dom": "^19.0.1",
+    "zod": "4.4.3"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",

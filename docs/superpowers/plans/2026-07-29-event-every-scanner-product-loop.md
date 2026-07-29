@@ -33,6 +33,7 @@
 - `scripts/e1-offline-preload.cjs` and `scripts/run-e1-offline.ts` — loopback-only, credential-scrubbed E1 gate.
 - `vendor/event-every-scanner/{package.json,README.md,PROVENANCE.json,dist/**}` — deployable Scanner snapshot.
 - `src/services/__tests__/scannerVendor.test.ts` — vendor provenance, root-allowlist, and offline-guard proof.
+- `src/services/__tests__/inputStorage.test.ts` — WebKit-safe byte DTO round-trip proof for the pre-existing Recent/draft image gate.
 - `src/types/review.ts` — browser review-state contract.
 - `src/services/scannerDraft.ts` and `src/services/__tests__/scannerDraft.test.ts` — candidate/draft projection and edits.
 - `src/services/__tests__/urlServices.test.ts` — preserved URL-enrichment cancellation/signal proof.
@@ -52,6 +53,7 @@
 - `src/lib/llm.ts` and `src/lib/__tests__/llm.test.ts` — admit Scanner’s validated chat request without moving auth, fetch, 402 mapping, or metering.
 - `src/app/page.tsx` — one scan handler and a separate `ReviewDraft[]` state while retaining imported/saved `CalendarEvent` paths.
 - `src/services/{urlDetector.ts,webScraper.ts}` — thread the active scan-submission abort signal through preserved URL enrichment.
+- `src/services/inputStorage.ts` — preserve existing Recent/draft semantics using an IndexedDB-safe byte DTO instead of directly cloning `File`.
 - `src/app/layout.tsx`, `src/app/globals.css`, `playwright.config.ts` — local font and offline Playwright boundary.
 - `src/app/api/__tests__/limit-gating.test.ts`, `src/lib/__tests__/limits.test.ts` — replace the deleted parse-route gate fixture/token with `/api/scan`.
 - `e2e/{community-limit.spec.ts,event-extraction.spec.ts,export-ics.spec.ts,draft-and-history.spec.ts,inline-edit-timezone.spec.ts,timezone-resolution.spec.ts,url-scrape.spec.ts,helpers.ts}` — migrate every live parse-path assertion to the Scanner loop.
@@ -77,11 +79,13 @@
 - Create: `vendor/event-every-scanner/PROVENANCE.json`
 - Create: `vendor/event-every-scanner/dist/**`
 - Create: `src/services/__tests__/scannerVendor.test.ts`
+- Create: `src/services/__tests__/inputStorage.test.ts`
 - Modify: `package.json`
 - Modify: `bun.lock`
 - Modify: `src/app/layout.tsx`
 - Modify: `src/app/globals.css`
 - Modify: `playwright.config.ts`
+- Modify: `src/services/inputStorage.ts`
 
 **Step 1: Write the failing provenance test**
 
@@ -103,6 +107,8 @@ Run `bun test src/services/__tests__/scannerVendor.test.ts --isolate`. It must f
 - resolve the path and run `git rev-parse HEAD`, requiring the pinned full SHA;
 - run `git status --porcelain`, requiring an empty result;
 - run `bun run verify` in that checkout with provider credential variables explicitly removed from the child environment;
+- rerun the pinned local TypeScript compiler with `--listEmittedFiles` and fail unless that exact
+  emitted `dist/**` inventory equals the on-disk `dist/**` inventory, rejecting stale ignored output;
 - delete only a newly created temporary staging directory from `mkdtemp`, never the live vendor directory;
 - copy `package.json`, `README.md`, and `dist/` into staging;
 - rewrite the staged package to retain only `name`, `version`, `private`, `type`, `sideEffects`, `exports`, and runtime `dependencies`;
@@ -149,9 +155,13 @@ node --require=<absolute preload path> node_modules/next/dist/bin/next build
 node --require=<absolute preload path> node_modules/@playwright/test/cli.js test
 ```
 
-When `E1_OFFLINE=1`, `playwright.config.ts` must not load `.env.local`, must force the local base URL, must start its web server with `node --require=<absolute preload path> node_modules/next/dist/bin/next dev -p 3777`, and must configure the browser proxy as `http://127.0.0.1:9` with loopback bypass. Remove `next/font/google` from `src/app/layout.tsx`; define `--font-press-start` and `--font-bubblegum` as local/system fallback stacks in `globals.css`, retaining the existing local Wichy font. A test scans `layout.tsx`, the resolved offline web-server command, and the offline child environment to prove no Google-font import or production target survives, the server has the preload, and every credential-shaped value is empty.
+When `E1_OFFLINE=1`, `playwright.config.ts` must not load `.env.local`, must force the local base URL, must never reuse an existing server, must start its web server with `node --require=<absolute preload path> node_modules/next/dist/bin/next dev -p 3777`, and must configure the browser proxy as `http://127.0.0.1:9` with loopback bypass. Remove `next/font/google` from `src/app/layout.tsx`; define `--font-press-start` and `--font-bubblegum` as local/system fallback stacks in `globals.css`, retaining the existing local Wichy font. A test scans `layout.tsx`, the resolved offline web-server command, and the offline child environment to prove no Google-font import or production target survives, the server has the preload, existing-server reuse is disabled, and every credential-shaped value is empty.
 
-**Step 4: Generate and prove**
+**Step 4: Repair the live WebKit prerequisite exposed by the offline gate**
+
+The first fail-closed baseline run proved that WebKit cannot structured-clone the current stored `File` objects: both existing image draft/history E2Es read back no IndexedDB record, while Chromium passes. In `src/services/inputStorage.ts`, persist each `StoredInputFile` as an internal strict DTO containing its existing metadata plus `bytes: ArrayBuffer`; reconstruct `File` on read. Accept legacy stored `File`/`Blob` values on read, and keep public `InputDraft`/`InputHistoryEntry` types and DB/store/key names unchanged. `inputStorage.test.ts` proves byte/name/MIME/kind/eventCount round trips and legacy hydration. The two existing WebKit E2Es are the integration proof; do not weaken or skip them.
+
+**Step 5: Generate and prove**
 
 Run:
 

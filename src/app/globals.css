@@ -13,6 +13,8 @@
 :root {
   --background: #ffffff;
   --foreground: #000000;
+  --font-press-start: "Press Start 2P", "Courier New", monospace;
+  --font-bubblegum: "Bubblegum Sans", "Comic Sans MS", cursive;
 }
 
 body {

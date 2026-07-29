@@ -1,0 +1,3 @@
+export { OPENROUTER_TEXT_LINK_MODEL, OPENROUTER_VISION_MODEL, ProviderAdapterError, type OpenRouterChatRequest, type OpenRouterMessage, type OpenRouterTransport, type OpenRouterTransportResult, type ProviderAdapterErrorCode, type ResolvedImageSource, type ResolvedTextLinkSource, type TextLinkSourceResolver, type VisionSourceResolver, } from "./contracts.js";
+export { createOpenRouterTextLinkProvider, createOpenRouterVisionProvider, } from "./adapter.js";
+//# sourceMappingURL=index.d.ts.map

@@ -2,10 +2,17 @@ import { defineConfig, devices } from '@playwright/test';
 import * as dotenv from 'dotenv';
 
 // Load .env.local so secrets like TEST_AUTH_PATTERN reach the prod suite.
-dotenv.config({ path: '.env.local' });
+const isOffline = process.env.E1_OFFLINE === '1';
+if (!isOffline) dotenv.config({ path: '.env.local' });
 
-const isProd = process.env.E2E_TARGET === 'prod';
+const isProd = !isOffline && process.env.E2E_TARGET === 'prod';
 const PROD_URL = process.env.E2E_PROD_URL || 'https://www.summonit.app';
+const localUrl = 'http://localhost:3777';
+const offlinePreload = process.env.E1_OFFLINE_PRELOAD;
+if (isOffline && !offlinePreload) throw new Error('E1_OFFLINE_PRELOAD is required for offline Playwright');
+const devCommand = isOffline
+  ? `node --require=${offlinePreload} node_modules/next/dist/bin/next dev -p 3777`
+  : 'bun run dev';
 
 export default defineConfig({
   testDir: './e2e',
@@ -17,10 +24,11 @@ export default defineConfig({
   workers: isProd ? 1 : undefined,
   reporter: 'html',
   use: {
-    baseURL: isProd ? PROD_URL : 'http://localhost:3777',
+    baseURL: isProd ? PROD_URL : localUrl,
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
+    ...(isOffline ? { proxy: { server: 'http://127.0.0.1:9', bypass: 'localhost,127.0.0.1,::1' } } : {}),
   },
   projects: [
     {
@@ -35,9 +43,9 @@ export default defineConfig({
   webServer: isProd
     ? undefined
     : {
-        command: 'bun run dev',
-        url: 'http://localhost:3777',
-        reuseExistingServer: !process.env.CI,
+        command: devCommand,
+        url: localUrl,
+        reuseExistingServer: !isOffline && !process.env.CI,
         timeout: 120000,
       },
 });
