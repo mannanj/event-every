@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { AUTH_COOKIE_NAME, verifyAuthToken } from '@/app/api/auth/shared';
 import { getBudgetStatus, nextResetISO, recordCommunitySpend } from './budget';
 import type { BudgetStatus } from './budget';
+import type { OpenRouterChatRequest } from '@event-every/scanner/openrouter';
 
 export const OPENROUTER_BASE_URL =
   process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1';
@@ -98,7 +99,7 @@ export type OpenRouterResponse = {
   error?: { message?: string };
 };
 
-type OpenRouterMessage = {
+export type OpenRouterMessage = {
   role: 'system' | 'user' | 'assistant';
   content:
     | string
@@ -122,13 +123,40 @@ export interface LlmCallAuth {
   mode: LlmMode;
 }
 
+export class OpenRouterUpstreamError extends Error {
+  readonly name = 'OpenRouterUpstreamError';
+
+  constructor(
+    public readonly status: number,
+    public readonly retryable: boolean,
+    message = 'OpenRouter API error'
+  ) {
+    super(message);
+  }
+}
+
+function isScannerRequest(
+  options: OpenRouterChatOptions | OpenRouterChatRequest
+): options is OpenRouterChatRequest {
+  return 'response_format' in options;
+}
+
+async function safeErrorMessage(response: Response): Promise<string> {
+  try {
+    const body = await response.json() as { error?: { message?: unknown } };
+    return typeof body.error?.message === 'string' ? body.error.message : 'OpenRouter API error';
+  } catch {
+    return 'OpenRouter API error';
+  }
+}
+
 // One transport for every OpenRouter call: performs the fetch, maps a community
 // 402 to CommunityLimitError, records USD usage once, and returns the parsed
 // body for the caller to read tool_calls or content from. Throws on a missing
 // key or a non-402 upstream error; callers that need a different status (e.g.
 // resolve-timezone's 502) catch and remap.
 export async function openRouterChat(
-  options: OpenRouterChatOptions,
+  options: OpenRouterChatOptions | OpenRouterChatRequest,
   auth: LlmCallAuth
 ): Promise<OpenRouterResponse> {
   if (!auth.key) {
@@ -142,22 +170,34 @@ export async function openRouterChat(
       'Content-Type': 'application/json',
       'X-Title': 'event-every',
     },
-    body: JSON.stringify({
-      model: options.model,
-      messages: options.messages,
-      ...(options.tools ? { tools: options.tools } : {}),
-      ...(options.tool_choice ? { tool_choice: options.tool_choice } : {}),
-      ...(options.max_tokens !== undefined ? { max_tokens: options.max_tokens } : {}),
-      ...(options.temperature !== undefined ? { temperature: options.temperature } : {}),
-    }),
+    body: JSON.stringify(isScannerRequest(options)
+      ? options
+      : {
+        model: options.model,
+        messages: options.messages,
+        ...(options.tools ? { tools: options.tools } : {}),
+        ...(options.tool_choice ? { tool_choice: options.tool_choice } : {}),
+        ...(options.max_tokens !== undefined ? { max_tokens: options.max_tokens } : {}),
+        ...(options.temperature !== undefined ? { temperature: options.temperature } : {}),
+      }),
   });
-
-  const data = (await response.json()) as OpenRouterResponse;
 
   if (!response.ok) {
     const limitError = upstreamCommunityLimit(auth.mode, response.status);
     if (limitError) throw limitError;
-    throw new Error(data.error?.message || 'OpenRouter API error');
+    const message = await safeErrorMessage(response);
+    throw new OpenRouterUpstreamError(
+      response.status,
+      response.status === 408 || response.status === 429 || response.status >= 500,
+      message
+    );
+  }
+
+  let data: OpenRouterResponse;
+  try {
+    data = (await response.json()) as OpenRouterResponse;
+  } catch {
+    throw new Error('OpenRouter API error');
   }
 
   await recordLlmUsage(auth.mode, data.usage);

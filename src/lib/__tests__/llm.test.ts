@@ -18,7 +18,7 @@ mock.module('@/lib/budget', () => ({
   DAILY_BUDGET_USD: 5,
 }));
 
-const { openRouterChat, CommunityLimitError } = await import('@/lib/llm');
+const { openRouterChat, CommunityLimitError, OpenRouterUpstreamError } = await import('@/lib/llm');
 
 const ADMIN = { key: 'sk-test', mode: 'admin' as const };
 const COMMUNITY = { key: 'sk-test', mode: 'community' as const };
@@ -46,6 +46,12 @@ function captureFetch(status: number, body: unknown) {
   const fetchMock = mock(async (_url: string, _init?: { body?: string }) => {
     return new Response(JSON.stringify(body), { status });
   });
+  globalThis.fetch = fetchMock as unknown as typeof fetch;
+  return fetchMock;
+}
+
+function responseFetch(response: Response) {
+  const fetchMock = mock(async () => response);
   globalThis.fetch = fetchMock as unknown as typeof fetch;
   return fetchMock;
 }
@@ -181,5 +187,105 @@ describe('openRouterChat', () => {
     expect(sent.temperature).toBe(0.2);
     expect('tools' in sent).toBe(false);
     expect('tool_choice' in sent).toBe(false);
+  });
+
+  test('forwards Scanner requests exactly without translating them to tool calls', async () => {
+    const fetchMock = captureFetch(200, { choices: [], usage: { cost: 0 } });
+    const scannerRequest = {
+      model: 'deepseek/deepseek-v4-flash' as const,
+      messages: [{ role: 'system' as const, content: 'extract' }],
+      response_format: {
+        type: 'json_schema' as const,
+        json_schema: { name: 'event_scanner_observation' as const, strict: true as const, schema: {} },
+      },
+      temperature: 0 as const,
+      max_completion_tokens: 8192 as const,
+      reasoning: { exclude: true as const },
+      provider: { require_parameters: true as const, data_collection: 'deny' as const, zdr: true as const },
+      stream: false as const,
+    };
+
+    await openRouterChat(scannerRequest, ADMIN);
+
+    const sent = JSON.parse((fetchMock.mock.calls[0][1] as { body: string }).body);
+    expect(sent).toEqual(scannerRequest);
+    expect('tools' in sent).toBe(false);
+  });
+
+  test('records Scanner request usage exactly once for community mode', async () => {
+    mockFetch(200, { choices: [], usage: { cost: 0.25 } });
+    const scannerRequest = {
+      model: 'deepseek/deepseek-v4-flash' as const,
+      messages: [{ role: 'system' as const, content: 'extract' }],
+      response_format: {
+        type: 'json_schema' as const,
+        json_schema: { name: 'event_scanner_observation' as const, strict: true as const, schema: {} },
+      },
+      temperature: 0 as const,
+      max_completion_tokens: 8192 as const,
+      reasoning: { exclude: true as const },
+      provider: { require_parameters: true as const, data_collection: 'deny' as const, zdr: true as const },
+      stream: false as const,
+    };
+
+    await openRouterChat(scannerRequest, COMMUNITY);
+
+    expect(recordCommunitySpend).toHaveBeenCalledTimes(1);
+    expect(recordCommunitySpend).toHaveBeenCalledWith(0.25);
+  });
+
+  test('checks status before JSON and sanitizes malformed successful JSON', async () => {
+    responseFetch(new Response('not json', { status: 200 }));
+
+    await expect(openRouterChat(TOOL_OPTS, ADMIN)).rejects.toThrow('OpenRouter API error');
+  });
+
+  test('maps community 402 before parsing empty, text, or malformed bodies', async () => {
+    for (const body of ['', 'provider leaked this', '{broken']) {
+      const fetchMock = responseFetch(new Response(body, { status: 402 }));
+
+      await expect(openRouterChat(TOOL_OPTS, COMMUNITY)).rejects.toBeInstanceOf(CommunityLimitError);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    }
+  });
+
+  test('sanitizes empty, text, and malformed error bodies into typed upstream errors', async () => {
+    for (const body of ['', 'provider leaked this', '{broken']) {
+      const fetchMock = responseFetch(new Response(body, { status: 503 }));
+      let caught: unknown;
+      try {
+        await openRouterChat(TOOL_OPTS, ADMIN);
+      } catch (error) {
+        caught = error;
+      }
+      expect(caught).toBeInstanceOf(OpenRouterUpstreamError);
+      expect((caught as Error).message).toBe('OpenRouter API error');
+      expect((caught as { status: number }).status).toBe(503);
+      expect((caught as { retryable: boolean }).retryable).toBe(true);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    }
+  });
+
+  test('uses only an error.message from valid upstream error JSON', async () => {
+    mockFetch(429, { error: { message: 'rate limited', detail: 'do not expose' } });
+
+    await expect(openRouterChat(TOOL_OPTS, ADMIN)).rejects.toThrow('rate limited');
+    await expect(openRouterChat(TOOL_OPTS, ADMIN)).rejects.not.toThrow('do not expose');
+  });
+
+  test('sets retryability only for timeout, rate-limit, and server upstream statuses', async () => {
+    for (const [status, retryable] of [[400, false], [408, true], [429, true]] as const) {
+      responseFetch(new Response('not JSON', { status }));
+      let caught: unknown;
+      try {
+        await openRouterChat(TOOL_OPTS, ADMIN);
+      } catch (error) {
+        caught = error;
+      }
+      expect(caught).toBeInstanceOf(OpenRouterUpstreamError);
+      expect((caught as { status: number }).status).toBe(status);
+      expect((caught as { retryable: boolean }).retryable).toBe(retryable);
+      expect((caught as Error).message).toBe('OpenRouter API error');
+    }
   });
 });
