@@ -53,6 +53,31 @@ async function mockResolveTimezone(
   });
 }
 
+async function createTimezoneResponseGate(
+  page: Page,
+  payload: { timezone: string; confidence: number }
+) {
+  let releaseResponse!: () => void;
+  let requestStarted!: () => void;
+  const responseReleased = new Promise<void>((resolve) => (releaseResponse = resolve));
+  const requestReceived = new Promise<void>((resolve) => (requestStarted = resolve));
+
+  await page.route('**/api/resolve-timezone', async (route: Route) => {
+    requestStarted();
+    await responseReleased;
+    await route.fulfill({
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+  });
+
+  return {
+    release: releaseResponse,
+    waitForRequest: () => requestReceived,
+  };
+}
+
 function jsonRoute(body: unknown) {
   return (route: Route) =>
     route.fulfill({
@@ -160,7 +185,10 @@ test.describe('cross-zone apply (viewer in America/Los_Angeles)', () => {
   test('a valid resolved zone re-converts: 10:30 ET renders as 7:30 AM PT', async ({ page }) => {
     await setupPage(page);
     await mockParse(page, [INTERVIEW_EVENT]);
-    await mockResolveTimezone(page, { timezone: 'America/New_York', confidence: 0.95 });
+    const timezoneResponse = await createTimezoneResponseGate(page, {
+      timezone: 'America/New_York',
+      confidence: 0.95,
+    });
 
     const resolved = page.waitForResponse('**/api/resolve-timezone');
     await submitText(page, INTERVIEW_TEXT);
@@ -170,6 +198,8 @@ test.describe('cross-zone apply (viewer in America/Los_Angeles)', () => {
     // Before resolution, the unknown-zone fallback assumes the viewer's own zone (PT) → 10:30 AM.
     await expect(card).toContainText('10:30 AM');
 
+    await timezoneResponse.waitForRequest();
+    timezoneResponse.release();
     await resolved;
     await expect(card.locator('.animate-spin')).toHaveCount(0, { timeout: 10_000 });
 

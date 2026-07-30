@@ -146,7 +146,10 @@ test.describe('community limit screen', () => {
     await page.getByTestId('enter-pattern-link').click();
 
     await expect(page).toHaveURL(/\?unlock/);
-    await expect(page.locator('canvas')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Draw Pattern to Unlock' })).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(page.locator('canvas')).toBeVisible({ timeout: 15_000 });
   });
 
   test('a mid-session community 402 flips the app to the limit screen', async ({ page }) => {
