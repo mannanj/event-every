@@ -12,12 +12,17 @@ export interface BatchScrapedContent {
   errorCount: number;
 }
 
-async function scrapeURL(url: string): Promise<ScrapedContent> {
+function isAbort(error: unknown): boolean {
+  return error instanceof DOMException && error.name === 'AbortError';
+}
+
+async function scrapeURL(url: string, signal?: AbortSignal): Promise<ScrapedContent> {
   try {
     const response = await fetch('/api/scrape-url', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ url }),
+      signal,
     });
 
     if (!response.ok) {
@@ -38,6 +43,9 @@ async function scrapeURL(url: string): Promise<ScrapedContent> {
       status: 'success',
     };
   } catch (error) {
+    if (signal?.aborted || isAbort(error)) {
+      throw error;
+    }
     const errorMessage = error instanceof Error
       ? error.message
       : 'Failed to fetch URL';
@@ -51,9 +59,9 @@ async function scrapeURL(url: string): Promise<ScrapedContent> {
   }
 }
 
-export async function scrapeURLsBatch(urls: string[]): Promise<BatchScrapedContent> {
+export async function scrapeURLsBatch(urls: string[], signal?: AbortSignal): Promise<BatchScrapedContent> {
   const results = await Promise.all(
-    urls.map(url => scrapeURL(url))
+    urls.map(url => scrapeURL(url, signal))
   );
 
   const successCount = results.filter(r => r.status === 'success').length;
@@ -66,6 +74,6 @@ export async function scrapeURLsBatch(urls: string[]): Promise<BatchScrapedConte
   };
 }
 
-export async function scrapeSingleURL(url: string): Promise<ScrapedContent> {
-  return scrapeURL(url);
+export async function scrapeSingleURL(url: string, signal?: AbortSignal): Promise<ScrapedContent> {
+  return scrapeURL(url, signal);
 }

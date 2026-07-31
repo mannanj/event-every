@@ -7,43 +7,47 @@ import InputHistoryModal from '@/components/InputHistoryModal';
 import ErrorNotification from '@/components/ErrorNotification';
 import RateLimitBanner from '@/components/RateLimitBanner';
 import EventFields from '@/components/EventFields';
+import ReviewDraftSection from '@/components/review/ReviewDraftSection';
 import { SiteNav, HowItWorks, TrustPoints, Faq, SiteFooter } from '@/components/landing/LandingSections';
-import { CalendarEvent, ParsedEvent, StreamedEventChunk, EventAttachment, EventSortOption, TimezoneStatus } from '@/types/event';
+import { CalendarEvent, EventSortOption } from '@/types/event';
 import { InputHistoryEntry, StoredInputFile, InputSource } from '@/types/input';
 import { exportToICS } from '@/services/exporter';
 import { useHistory } from '@/hooks/useHistory';
 import { useInputHistory } from '@/hooks/useInputHistory';
 import { useProcessingQueue } from '@/hooks/useProcessingQueue';
 import { useEventSelection } from '@/hooks/useEventSelection';
-import { detectURLs } from '@/services/urlDetector';
+import { buildEnrichedUrlText, detectURLs } from '@/services/urlDetector';
 import { summarizeInput } from '@/services/summarizer';
 import { scrapeURLsBatch } from '@/services/webScraper';
 import { QueueItem } from '@/services/processingQueue';
 import { eventStorage } from '@/services/storage';
 import { parseICSFile } from '@/services/icsParser';
-import { getClientContext } from '@/utils/clientContext';
 import { exportAllEvents } from '@/services/exportAll';
-import { resolveTimezone, isValidIANATimezone } from '@/utils/timezone';
-import { convertRawToDate, parseAllDayDate } from '@/utils/timeConversion';
-import { getBrowserTimezone } from '@/utils/timezone';
-import { normalizeUrl } from '@/utils/url';
-import { COMMUNITY_LIMIT_CODE, emitCommunityLimit, emitIfCommunityLimited } from '@/utils/communityLimit';
+import { convertRawToDate } from '@/utils/timeConversion';
+import { COMMUNITY_LIMIT_CODE, emitCommunityLimit } from '@/utils/communityLimit';
 import { ProcessingEvent, ImageProcessingStatus, BatchProcessing, URLProcessingStatus } from '@/types/processing';
+import { scan, ScanClientError } from '@/services/scanClient';
+import { createReviewDraft, editReviewDraft } from '@/services/scannerDraft';
+import type { ReviewDraft, ReviewFieldEdit } from '@/types/review';
+import type { ScanRequest } from '@/types/scannerHttp';
 
 export default function Home() {
   const [processingEvents, setProcessingEvents] = useState<ProcessingEvent[]>([]);
   const [batchProcessing, setBatchProcessing] = useState<BatchProcessing | null>(null);
   const [unsavedEvents, setUnsavedEvents] = useState<CalendarEvent[]>([]);
+  const [reviewDrafts, setReviewDrafts] = useState<ReviewDraft[]>([]);
+  const [, setUserTouchedTimezones] = useState<Set<string>>(new Set());
+  const [tzSuggestions, setTzSuggestions] = useState<Record<string, { timezone: string; confidence: number }>>({});
   // Selection for the unsaved batch lives here so it can outlive any single
   // sub-component and (later) be shared with a header/footer. Streamed arrivals
   // default to selected without resetting the user's manual deselects.
   const selection = useEventSelection(unsavedEvents);
   const [imageProcessingStatuses, setImageProcessingStatuses] = useState<ImageProcessingStatus[]>([]);
   const [urlProcessingStatus, setUrlProcessingStatus] = useState<URLProcessingStatus | null>(null);
-  const [rateLimitInfo, setRateLimitInfo] = useState<{ remaining: number; total: number; resetTime: number } | undefined>();
+  const [rateLimitInfo] = useState<{ remaining: number; total: number; resetTime: number } | undefined>();
   const [hasLoadedTempEvents, setHasLoadedTempEvents] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
-  const { events, addEvent, deleteEvent, updateEvent, sortOption, setSortOption, dateRange, setDateRange } = useHistory();
+  const { events, addEvent, deleteEvent, updateEvent, sortOption, setSortOption, setDateRange } = useHistory();
   const [totalEventsInStorage, setTotalEventsInStorage] = useState(0);
   const { addToQueue, updateProgress } = useProcessingQueue();
   const smartInputRef = useRef<SmartInputHandle>(null);
@@ -61,7 +65,7 @@ export default function Home() {
 
   // Fire a lightweight 2-3 word summary for a saved Recent entry, in parallel
   // with (and never blocking) event extraction. Patches the entry once the label lands.
-  const summarizeAndStore = (entryId: string | undefined, text: string, events: CalendarEvent[]) => {
+  const summarizeAndStore = (entryId: string | undefined, text: string, events: readonly Pick<CalendarEvent, 'title'>[]) => {
     if (!entryId) return;
     const eventTitles = events.map(e => e.title).filter(t => !!t && t.trim().length > 0);
     if (!text.trim() && eventTitles.length === 0) return;
@@ -71,6 +75,8 @@ export default function Home() {
       .finally(() => markSummaryPending(entryId, false));
   };
   const abortRef = useRef<AbortController | null>(null);
+  const activeSubmissionRef = useRef<string | null>(null);
+  const activeImageBatchRef = useRef<string | null>(null);
   const loadedSigRef = useRef<string | null>(null);
   const [showDateRangePicker, setShowDateRangePicker] = useState(false);
   const [isCustomMode, setIsCustomMode] = useState(false);
@@ -79,6 +85,8 @@ export default function Home() {
   const [exportAllState, setExportAllState] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [exportAllError, setExportAllError] = useState<string | null>(null);
   const [exportCooldownRemaining, setExportCooldownRemaining] = useState(0);
+
+  useEffect(() => () => abortRef.current?.abort(), []);
 
   useEffect(() => {
     const result = eventStorage.getTempUnsavedEvents();
@@ -118,638 +126,149 @@ export default function Home() {
     }
   }, [unsavedEvents, hasLoadedTempEvents]);
 
-  const updateRateLimitFromHeaders = (headers: Headers) => {
-    // All four LLM routes now emit X-RateLimit-* (sourced from the unified
-    // limit authority), so the '5' defaults are only a harmless cold-start
-    // guard for a response that somehow lacks the headers.
-    const remaining = parseInt(headers.get('X-RateLimit-Remaining') || '5');
-    const total = parseInt(headers.get('X-RateLimit-Limit') || '5');
-    const reset = parseInt(headers.get('X-RateLimit-Reset') || '0');
+  const runScan = useCallback(async (request: ScanRequest, signal: AbortSignal): Promise<ReviewDraft[]> => {
+    const response = await scan(request, signal);
+    if (signal.aborted) return [];
 
-    if (reset > 0) {
-      setRateLimitInfo({
-        remaining,
-        total,
-        resetTime: reset,
-      });
+    const createdAt = new Date().toISOString();
+    const drafts = response.candidates.map((candidate) => createReviewDraft(
+      candidate,
+      response.issues,
+      { handle: response.source, label: null },
+      {
+        id: crypto.randomUUID(),
+        exportUid: `${crypto.randomUUID()}@event-every`,
+        createdAt,
+      },
+    ));
+
+    if (!signal.aborted) {
+      setReviewDrafts((previous) => [...previous, ...drafts]);
     }
+    return drafts;
+  }, []);
+
+  const fileToDataUrl = (file: File): Promise<string> => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(reader.error ?? new Error('Unable to read image.'));
+    reader.readAsDataURL(file);
+  });
+
+  const pushProcessingError = (type: 'image' | 'text', error: unknown) => {
+    if (error instanceof ScanClientError && error.code === COMMUNITY_LIMIT_CODE) {
+      emitCommunityLimit(error.resetAt ?? undefined);
+    }
+    const id = `error-${Date.now()}`;
+    const message = error instanceof Error ? error.message : 'Unable to scan this input.';
+    setProcessingEvents((previous) => [...previous, { id, type, status: 'error', error: message }]);
+    setTimeout(() => setProcessingEvents((previous) => previous.filter((item) => item.id !== id)), 5000);
   };
 
-  const convertParsedToCalendarEvent = (
-    parsed: ParsedEvent,
-    source: 'image' | 'text',
-    originalInput?: string,
-    attachments?: EventAttachment[]
-  ): CalendarEvent => {
-    const now = new Date();
-    const browserTZ = getBrowserTimezone();
-
-    const rawStart = parsed.startDate;
-    const rawEnd = parsed.endDate;
-    const rawTz = parsed.timezone || undefined;
-
-    const tzResolution = resolveTimezone(rawTz, browserTZ);
-
-    let startDate: Date;
-    let endDate: Date;
-
-    if (parsed.allDay) {
-      // All-day events: timezone-independent UTC midnight, read back with UTC getters everywhere
-      // (display, export, edit) so the calendar date never drifts when the viewer's zone changes
-      // (task-194). new Date(ymd + 'T00:00:00') was LOCAL midnight — an instant that shifted day.
-      startDate = rawStart ? parseAllDayDate(rawStart) : now;
-      const defaultEnd = new Date(startDate.getTime() + 24 * 60 * 60 * 1000);
-      endDate = rawEnd ? parseAllDayDate(rawEnd) : defaultEnd;
-    } else {
-      // Timed events: convert from source timezone to correct UTC moment
-      if (rawStart) {
-        startDate = convertRawToDate(rawStart, tzResolution.timezone);
-      } else {
-        startDate = now;
-      }
-      if (rawEnd) {
-        endDate = convertRawToDate(rawEnd, tzResolution.timezone);
-      } else {
-        endDate = new Date(startDate.getTime() + 60 * 60 * 1000);
-      }
-    }
-
-    if (isNaN(startDate.getTime())) startDate = now;
-    if (isNaN(endDate.getTime())) endDate = new Date(startDate.getTime() + 60 * 60 * 1000);
-
-    return {
-      id: `event-${Date.now()}-${Math.random().toString(36).substring(7)}`,
-      title: parsed.title || 'Untitled Event',
-      startDate,
-      endDate,
-      location: parsed.location,
-      description: parsed.description,
-      url: normalizeUrl(parsed.url),
-      allDay: parsed.allDay ?? false,
-      timezone: tzResolution.timezone,
-      rawStartDate: rawStart,
-      rawEndDate: rawEnd,
-      rawTimezone: rawTz,
-      timezoneStatus: tzResolution.status,
-      timezoneSource: tzResolution.source === 'unknown' ? undefined : tzResolution.source,
-      created: now,
-      source,
-      originalInput,
-      attachments,
-    };
-  };
-
-  const [userTouchedTimezones, setUserTouchedTimezones] = useState<Set<string>>(new Set());
-  const [tzSuggestions, setTzSuggestions] = useState<Record<string, { timezone: string; confidence: number }>>({});
-
-  const resolveTimezoneAsync = async (events: CalendarEvent[]) => {
-    const unknownEvents = events.filter(
-      e => e.timezoneStatus === 'unknown' && e.rawTimezone && !e.allDay
-    );
-    if (unknownEvents.length === 0) return;
-
-    // Mark as resolving
-    const ids = new Set(unknownEvents.map(e => e.id));
-    setUnsavedEvents(prev =>
-      prev.map(e => ids.has(e.id) ? { ...e, timezoneStatus: 'resolving' as TimezoneStatus } : e)
-    );
-    setBatchProcessing(prev => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        events: prev.events.map(e => ids.has(e.id) ? { ...e, timezoneStatus: 'resolving' as TimezoneStatus } : e),
-      };
-    });
-
-    for (const event of unknownEvents) {
-      // Settle this event to a terminal status (stops the resolving spinner). Every exit path
-      // below must call this — a missing settle on a skip/error path is what left the spinner
-      // spinning forever on a low-confidence or failed resolution.
-      const settle = (status: TimezoneStatus) => {
-        const upd = (e: CalendarEvent) =>
-          e.id === event.id ? { ...e, timezoneStatus: status } : e;
-        setUnsavedEvents(prev => prev.map(upd));
-        setBatchProcessing(prev => prev ? { ...prev, events: prev.events.map(upd) } : prev);
-      };
+  const handleImageSelect = async (files: File[], summaryEntryId?: string) => {
+    if (files.length === 0) return;
+    addToQueue('image', files, undefined, async (queueItem: QueueItem) => {
+      const imageFiles = queueItem.payload as File[];
+      const controller = new AbortController();
+      abortRef.current?.abort();
+      abortRef.current = controller;
+      const batchId = crypto.randomUUID();
+      activeSubmissionRef.current = batchId;
+      activeImageBatchRef.current = batchId;
+      const statuses = imageFiles.map((file, index) => ({
+        id: `image-${Date.now()}-${index}`,
+        filename: file.name,
+        status: 'pending' as const,
+      }));
+      setBatchProcessing({ id: batchId, events: [], isProcessing: true, source: 'image' });
+      setImageProcessingStatuses(statuses);
+      const titles: string[] = [];
 
       try {
-        const res = await fetch('/api/resolve-timezone', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            rawTimezone: event.rawTimezone,
-            rawStartDate: event.rawStartDate,
-            rawEndDate: event.rawEndDate,
-            eventTitle: event.title,
-            eventLocation: event.location,
-          }),
-        });
-
-        if (!res.ok) {
-          await emitIfCommunityLimited(res);
-          settle('resolved');
-          continue;
-        }
-
-        const { timezone, confidence } = await res.json();
-
-        // The server sanitizes to a valid IANA zone or zeroes confidence; guard
-        // isValidIANATimezone here too so an unrecognized zone can never reach convertRawToDate
-        // and re-introduce the wall-clock-as-UTC shift via this path.
-        if (confidence <= 0.8 || !isValidIANATimezone(timezone)) {
-          settle('resolved');
-          continue;
-        }
-
-        if (userTouchedTimezones.has(event.id)) {
-          // User already picked a zone — surface the AI answer as a dismissible suggestion.
-          setTzSuggestions(prev => ({ ...prev, [event.id]: { timezone, confidence } }));
-          settle('resolved');
-        } else {
-          const applyTz = (e: CalendarEvent): CalendarEvent => {
-            if (e.id !== event.id) return e;
-            const newStart = e.rawStartDate ? convertRawToDate(e.rawStartDate, timezone) : e.startDate;
-            const newEnd = e.rawEndDate ? convertRawToDate(e.rawEndDate, timezone) : e.endDate;
-            return {
-              ...e,
-              timezone,
-              startDate: newStart,
-              endDate: newEnd,
-              timezoneStatus: 'resolved',
-              timezoneSource: 'llm',
-            };
-          };
-          setUnsavedEvents(prev => prev.map(applyTz));
-          setBatchProcessing(prev => prev ? { ...prev, events: prev.events.map(applyTz) } : prev);
-        }
-      } catch {
-        // Network/parse failure — keep the browser-zone fallback, just stop the spinner.
-        settle('resolved');
-      }
-    }
-  };
-
-  const handleBatchStream = async (
-    source: 'image' | 'text',
-    body: Record<string, unknown>,
-    originalInput?: string,
-    attachments?: EventAttachment[]
-  ) => {
-    const batchId = `batch-${Date.now()}`;
-    setBatchProcessing(prev => ({
-      id: batchId,
-      events: prev?.events || [],
-      isProcessing: true,
-      source,
-    }));
-
-    try {
-      const clientContext = getClientContext();
-      const response = await fetch('/api/parse', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...body, batch: true, clientContext }),
-      });
-
-      if (!response.ok) {
-        await emitIfCommunityLimited(response);
-        const errorData = await response.json().catch(() => ({ error: 'Failed to process batch' }));
-        throw new Error(errorData.error || 'Failed to process batch');
-      }
-
-      updateRateLimitFromHeaders(response.headers);
-
-      const reader = response.body?.getReader();
-      if (!reader) {
-        throw new Error('No response stream');
-      }
-
-      const decoder = new TextDecoder();
-      let buffer = '';
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n\n');
-        buffer = lines.pop() || '';
-
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const data = JSON.parse(line.slice(6));
-
-            if (data.error) {
-              if (data.code === COMMUNITY_LIMIT_CODE) {
-                emitCommunityLimit(typeof data.resetAt === 'string' ? data.resetAt : undefined);
-              }
-              throw new Error(data.error);
-            }
-
-            const chunk = data as StreamedEventChunk;
-
-            if (chunk.isComplete) {
-              setBatchProcessing(prev => {
-                if (!prev) return null;
-                // Fire async TZ resolution for all collected batch events
-                resolveTimezoneAsync(prev.events);
-                return { ...prev, isProcessing: false };
-              });
-              break;
-            }
-
-            if (chunk.events && chunk.events.length > 0) {
-              const newEvents = chunk.events.map(parsed =>
-                convertParsedToCalendarEvent(parsed, source, originalInput, attachments)
-              );
-
-              setBatchProcessing(prev => {
-                if (!prev) return null;
-                return {
-                  ...prev,
-                  events: [...prev.events, ...newEvents],
-                };
-              });
-            }
-          }
-        }
-      }
-    } catch (err) {
-      const errorMessage = err instanceof Error
-        ? err.message
-        : 'Failed to process batch';
-
-      const processingId = `error-${Date.now()}`;
-      setProcessingEvents(prev => [...prev, {
-        id: processingId,
-        type: source,
-        status: 'error',
-        error: errorMessage,
-      }]);
-
-      setBatchProcessing(null);
-
-      setTimeout(() => {
-        setProcessingEvents(prev => prev.filter(p => p.id !== processingId));
-      }, 5000);
-    }
-  };
-
-  const handleImageSelect = async (files: File[], additionalText?: string, summaryEntryId?: string) => {
-    if (files.length === 0) return;
-
-    addToQueue(
-      'image',
-      files,
-      additionalText,
-      async (queueItem: QueueItem) => {
-        const imageFiles = queueItem.payload as File[];
-        const allEvents: CalendarEvent[] = [];
-
-        const controller = new AbortController();
-        abortRef.current = controller;
-
-        const batchId = `batch-${Date.now()}`;
-        setBatchProcessing({
-          id: batchId,
-          events: [],
-          isProcessing: true,
-          source: 'image',
-        });
-
-        const initialStatuses: ImageProcessingStatus[] = imageFiles.map((file, index) => ({
-          id: `image-${Date.now()}-${index}`,
-          filename: file.name,
-          status: 'pending' as const,
-        }));
-
-        setImageProcessingStatuses(initialStatuses);
-
-        for (let i = 0; i < imageFiles.length; i++) {
+        for (let index = 0; index < imageFiles.length; index += 1) {
           if (controller.signal.aborted) break;
-          const file = imageFiles[i];
-          const statusId = initialStatuses[i].id;
-
-          setImageProcessingStatuses(prev =>
-            prev.map(s => s.id === statusId ? { ...s, status: 'processing' as const } : s)
-          );
-
-          updateProgress(queueItem.id, Math.round((i / imageFiles.length) * 100));
-
-          try {
-            const reader = new FileReader();
-            const base64Promise = new Promise<string>((resolve, reject) => {
-              reader.onload = () => {
-                const result = reader.result as string;
-                const base64 = result.split(',')[1];
-                resolve(base64);
-              };
-              reader.onerror = reject;
-              reader.readAsDataURL(file);
-            });
-
-            const base64 = await base64Promise;
-            const mimeType = file.type;
-
-            const attachment: EventAttachment = {
-              id: `attachment-${Date.now()}-${i}`,
-              filename: file.name,
-              mimeType,
-              data: base64,
-              type: 'original-image',
-              size: file.size,
-            };
-
-            const clientContext = getClientContext();
-            const response = await fetch('/api/parse', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                imageBase64: base64,
-                imageMimeType: mimeType,
-                text: queueItem.text,
-                batch: true,
-                clientContext,
-              }),
-              signal: controller.signal,
-            });
-
-            if (!response.ok) {
-              const errorData = await response.json().catch(() => ({ error: 'Failed to process image' }));
-              throw new Error(errorData.error || 'Failed to process image');
-            }
-
-            updateRateLimitFromHeaders(response.headers);
-
-            const reader2 = response.body?.getReader();
-            if (!reader2) {
-              throw new Error('No response stream');
-            }
-
-            const decoder = new TextDecoder();
-            let buffer = '';
-            let eventsFromThisImage = 0;
-
-            while (true) {
-              const { done, value } = await reader2.read();
-              if (done) break;
-
-              buffer += decoder.decode(value, { stream: true });
-              const lines = buffer.split('\n\n');
-              buffer = lines.pop() || '';
-
-              for (const line of lines) {
-                if (line.startsWith('data: ')) {
-                  const data = JSON.parse(line.slice(6));
-
-                  if (data.error) {
-                    throw new Error(data.error);
-                  }
-
-                  const chunk = data as StreamedEventChunk;
-
-                  if (chunk.isComplete) {
-                    break;
-                  }
-
-                  if (chunk.events && chunk.events.length > 0) {
-                    const newEvents = chunk.events.map(parsed =>
-                      convertParsedToCalendarEvent(parsed, 'image', URL.createObjectURL(file), [attachment])
-                    );
-
-                    eventsFromThisImage += newEvents.length;
-                    allEvents.push(...newEvents);
-
-                    setUnsavedEvents(prev => [...prev, ...newEvents]);
-                  }
-                }
-              }
-            }
-
-            setImageProcessingStatuses(prev =>
-              prev.map(s => s.id === statusId ? { ...s, status: 'complete' as const, eventCount: eventsFromThisImage } : s)
-            );
-          } catch (err) {
-            if (controller.signal.aborted || (err instanceof Error && err.name === 'AbortError')) {
-              break;
-            }
-            const errorMessage = err instanceof Error
-              ? err.message
-              : 'Unable to extract event details from this image.';
-
-            setImageProcessingStatuses(prev =>
-              prev.map(s => s.id === statusId ? { ...s, status: 'error' as const, error: errorMessage } : s)
-            );
-          }
+          const status = statuses[index];
+          setImageProcessingStatuses((previous) => previous.map((item) =>
+            item.id === status.id ? { ...item, status: 'processing' as const } : item,
+          ));
+          updateProgress(queueItem.id, Math.round((index / imageFiles.length) * 100));
+          const dataUrl = await fileToDataUrl(imageFiles[index]);
+          if (controller.signal.aborted || activeSubmissionRef.current !== batchId) break;
+          const drafts = await runScan({ kind: 'image', dataUrl }, controller.signal);
+          if (controller.signal.aborted || activeSubmissionRef.current !== batchId) break;
+          titles.push(...drafts.map((draft) => draft.candidate.title.value).filter((title): title is string => title !== null));
+          setImageProcessingStatuses((previous) => previous.map((item) =>
+            item.id === status.id ? { ...item, status: 'complete' as const, eventCount: drafts.length } : item,
+          ));
         }
-
-        setBatchProcessing(prev => prev ? { ...prev, isProcessing: false } : null);
-
-        // Fire async timezone resolution for events with unknown TZ
-        resolveTimezoneAsync(allEvents);
-        summarizeAndStore(summaryEntryId, additionalText ?? '', allEvents);
-
-        setTimeout(() => {
-          setImageProcessingStatuses([]);
+        if (!controller.signal.aborted) summarizeAndStore(summaryEntryId, '', titles.map((title) => ({ title })));
+      } catch (error) {
+        if (!controller.signal.aborted && !(error instanceof DOMException && error.name === 'AbortError')) {
+          pushProcessingError('image', error);
+        }
+      } finally {
+        const current = abortRef.current === controller;
+        if (current) abortRef.current = null;
+        setBatchProcessing((previous) => previous?.id === batchId ? { ...previous, isProcessing: false } : previous);
+        if (current) setTimeout(() => {
+          if (activeImageBatchRef.current === batchId && activeSubmissionRef.current === batchId) setImageProcessingStatuses([]);
         }, 10000);
-
-        return allEvents;
-      },
-      { fileCount: files.length }
-    );
+      }
+      return [];
+    }, { fileCount: files.length });
   };
 
   const handleTextSubmit = async (text: string, summaryEntryId?: string) => {
-    addToQueue(
-      'text',
-      text,
-      undefined,
-      async (queueItem: QueueItem) => {
-        const inputText = queueItem.payload as string;
+    addToQueue('text', text, undefined, async (queueItem: QueueItem) => {
+      const inputText = queueItem.payload as string;
+      const controller = new AbortController();
+      abortRef.current?.abort();
+      if (activeImageBatchRef.current !== null) setImageProcessingStatuses([]);
+      abortRef.current = controller;
+      const batchId = crypto.randomUUID();
+      activeSubmissionRef.current = batchId;
+      setBatchProcessing({ id: batchId, events: [], isProcessing: true, source: 'text' });
 
-        const controller = new AbortController();
-        abortRef.current = controller;
-
-        try {
+      try {
+        setUrlProcessingStatus({ phase: 'detecting', message: 'Detecting URLs...' });
+        const detection = await detectURLs(inputText, controller.signal);
+        if (controller.signal.aborted || activeSubmissionRef.current !== batchId) return [];
+        let combinedText = inputText;
+        if (detection.hasUrls && detection.urls.length > 0) {
           setUrlProcessingStatus({
-            phase: 'detecting',
-            message: 'Detecting URLs...',
+            phase: 'fetching',
+            urlCount: detection.urls.length,
+            message: `Fetching ${detection.urls.length} event page${detection.urls.length === 1 ? '' : 's'}...`,
           });
-
-          const urlDetectionResult = await detectURLs(inputText);
-
-          let combinedText = inputText;
-
-          if (urlDetectionResult.hasUrls && urlDetectionResult.urls.length > 0) {
-            setUrlProcessingStatus({
-              phase: 'fetching',
-              urlCount: urlDetectionResult.urls.length,
-              message: `Fetching ${urlDetectionResult.urls.length} event page${urlDetectionResult.urls.length !== 1 ? 's' : ''}...`,
-            });
-
-            updateProgress(queueItem.id, 30);
-
-            const scrapedContent = await scrapeURLsBatch(urlDetectionResult.urls);
-
-            const successfulScrapes = scrapedContent.results.filter(r => r.status === 'success');
-
-            const scrapedTexts = successfulScrapes.map(result => {
-              const content = result.title
-                ? `${result.title}\n\n${result.text}`
-                : result.text;
-              return `${content}\n\n---\nOriginal Event: ${result.url}`;
-            });
-
-            combinedText = [
-              urlDetectionResult.remainingText,
-              ...scrapedTexts,
-            ]
-              .filter(t => t.trim())
-              .join('\n\n');
-
-            if (!combinedText.trim()) {
-              throw new Error('Unable to extract content from the provided URLs. Please check the URLs and try again.');
-            }
-          }
-
+          updateProgress(queueItem.id, 30);
+          const scraped = await scrapeURLsBatch(detection.urls, controller.signal);
+          if (controller.signal.aborted || activeSubmissionRef.current !== batchId) return [];
+          combinedText = buildEnrichedUrlText(inputText, detection.urls, detection.remainingText, scraped.results);
           if (!combinedText.trim()) {
-            throw new Error('Please enter some text or URLs to process.');
+            throw new Error('Unable to extract content from the provided URLs. Please check the URLs and try again.');
           }
-
-          setUrlProcessingStatus({
-            phase: 'extracting',
-            message: 'Extracting events...',
-          });
-
-          updateProgress(queueItem.id, 50);
-
-          const textBase64 = btoa(unescape(encodeURIComponent(inputText)));
-          const textSizeBytes = new Blob([inputText]).size;
-
-          const attachment: EventAttachment = {
-            id: `attachment-${Date.now()}`,
-            filename: 'original-input.txt',
-            mimeType: 'text/plain',
-            data: textBase64,
-            type: 'original-text',
-            size: textSizeBytes,
-          };
-
-          const batchId = `batch-${Date.now()}`;
-          setBatchProcessing({
-            id: batchId,
-            events: [],
-            isProcessing: true,
-            source: 'text',
-          });
-
-          const clientContext = getClientContext();
-          const response = await fetch('/api/parse', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text: combinedText, batch: true, clientContext }),
-            signal: controller.signal,
-          });
-
-          if (!response.ok) {
-            await emitIfCommunityLimited(response);
-            const errorData = await response.json().catch(() => ({ error: 'Failed to process batch' }));
-            throw new Error(errorData.error || 'Failed to process batch');
-          }
-
-          updateRateLimitFromHeaders(response.headers);
-
-          const reader = response.body?.getReader();
-          if (!reader) {
-            throw new Error('No response stream');
-          }
-
-          const decoder = new TextDecoder();
-          let buffer = '';
-          const allEvents: CalendarEvent[] = [];
-
-          updateProgress(queueItem.id, 70);
-
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-
-            buffer += decoder.decode(value, { stream: true });
-            const lines = buffer.split('\n\n');
-            buffer = lines.pop() || '';
-
-            for (const line of lines) {
-              if (line.startsWith('data: ')) {
-                const data = JSON.parse(line.slice(6));
-
-                if (data.error) {
-                  if (data.code === COMMUNITY_LIMIT_CODE) {
-                    emitCommunityLimit(typeof data.resetAt === 'string' ? data.resetAt : undefined);
-                  }
-                  throw new Error(data.error);
-                }
-
-                const chunk = data as StreamedEventChunk;
-
-                if (chunk.isComplete) {
-                  setBatchProcessing(prev => prev ? { ...prev, isProcessing: false } : null);
-                  break;
-                }
-
-                if (chunk.events && chunk.events.length > 0) {
-                  const newEvents = chunk.events.map(parsed =>
-                    convertParsedToCalendarEvent(parsed, 'text', inputText, [attachment])
-                  );
-
-                  allEvents.push(...newEvents);
-
-                  setUnsavedEvents(prev => [...prev, ...newEvents]);
-                }
-              }
-            }
-          }
-
-          setUrlProcessingStatus({
-            phase: 'complete',
-            message: 'Complete',
-          });
-
-          // Fire async timezone resolution for events with unknown TZ
-          resolveTimezoneAsync(allEvents);
-          summarizeAndStore(summaryEntryId, text, allEvents);
-
-          setTimeout(() => {
-            setUrlProcessingStatus(null);
-          }, 3000);
-
-          return allEvents;
-        } catch (err) {
-          if (controller.signal.aborted || (err instanceof Error && err.name === 'AbortError')) {
-            setUrlProcessingStatus(null);
-            return [];
-          }
-          const errorMessage = err instanceof Error
-            ? err.message
-            : 'Unable to extract event details from this text.';
-
-          const processingId = `error-${Date.now()}`;
-          setProcessingEvents(prev => [...prev, {
-            id: processingId,
-            type: 'text',
-            status: 'error',
-            error: errorMessage,
-          }]);
-
-          setUrlProcessingStatus(null);
-
-          setTimeout(() => {
-            setProcessingEvents(prev => prev.filter(p => p.id !== processingId));
-          }, 5000);
-
-          throw err;
         }
+        if (!combinedText.trim()) throw new Error('Please enter some text or URLs to process.');
+
+        setUrlProcessingStatus({ phase: 'extracting', message: 'Extracting events...' });
+        updateProgress(queueItem.id, 50);
+        const drafts = await runScan({ kind: 'text', text: combinedText }, controller.signal);
+        if (controller.signal.aborted || activeSubmissionRef.current !== batchId) return [];
+        const titles = drafts.map((draft) => draft.candidate.title.value).filter((title): title is string => title !== null);
+        summarizeAndStore(summaryEntryId, inputText, titles.map((title) => ({ title })));
+        setUrlProcessingStatus({ phase: 'complete', message: 'Complete' });
+        setTimeout(() => { if (activeSubmissionRef.current === batchId) setUrlProcessingStatus(null); }, 3000);
+      } catch (error) {
+        if (!controller.signal.aborted && !(error instanceof DOMException && error.name === 'AbortError')) {
+          pushProcessingError('text', error);
+        }
+        if (abortRef.current === controller) setUrlProcessingStatus(null);
+      } finally {
+        if (abortRef.current === controller) abortRef.current = null;
+        setBatchProcessing((previous) => previous?.id === batchId ? { ...previous, isProcessing: false } : previous);
       }
-    );
+      return [];
+    });
   };
 
   const inputSignature = (text: string, images: File[], calendarFiles: File[]): string =>
@@ -795,6 +314,31 @@ export default function Home() {
   const handleSmartInputSubmit = async (data: { text: string; images: File[]; calendarFiles: File[] }) => {
     const { text, images, calendarFiles } = data;
 
+    if (text.trim().length > 0 && images.length > 0) {
+      const id = `error-${Date.now()}`;
+      setProcessingEvents((previous) => [...previous, {
+        id,
+        type: 'text',
+        status: 'error',
+        error: 'Scan text and images separately for now.',
+      }]);
+      setTimeout(() => setProcessingEvents((previous) => previous.filter((item) => item.id !== id)), 5000);
+      return;
+    }
+
+    const unsupportedImage = images.find((file) => !['image/png', 'image/jpeg', 'image/webp'].includes(file.type));
+    if (unsupportedImage) {
+      const id = `error-${Date.now()}`;
+      setProcessingEvents((previous) => [...previous, {
+        id,
+        type: 'image',
+        status: 'error',
+        error: `${unsupportedImage.name} cannot be scanned. Use PNG, JPEG, or WebP.`,
+      }]);
+      setTimeout(() => setProcessingEvents((previous) => previous.filter((item) => item.id !== id)), 5000);
+      return;
+    }
+
     // Transform always records to Recent — re-saving a loaded entry is fine.
     const entryId = saveInputToHistory(text, images, calendarFiles);
     loadedSigRef.current = null;
@@ -807,7 +351,7 @@ export default function Home() {
       images.length === 0 && calendarFiles.length === 0 && text.trim().length > 0 ? entryId : undefined;
 
     if (images.length > 0) {
-      handleImageSelect(images, text.trim().length > 0 ? text.trim() : undefined, imageEntryId);
+      handleImageSelect(images, imageEntryId);
     }
 
     if (calendarFiles.length > 0) {
@@ -909,10 +453,23 @@ export default function Home() {
     exportToICS(event);
   };
 
+  const handleReviewDraftEdit = useCallback((id: string, edit: ReviewFieldEdit) => {
+    setReviewDrafts((previous) => previous.map((draft) =>
+      draft.id === id ? editReviewDraft(draft, edit) : draft,
+    ));
+  }, []);
+
+  const handleReviewDraftDelete = useCallback((id: string) => {
+    setReviewDrafts((previous) => previous.filter((draft) => draft.id !== id));
+  }, []);
+
+  // Task 6 wires this selection to Scanner-owned ICS generation. Keeping the callback
+  // boundary here means review drafts never cross into legacy CalendarEvent export code.
+  const handleReviewDraftExport = useCallback((_drafts: readonly ReviewDraft[]) => {}, []);
+
   const handleCancelBatch = () => {
     abortRef.current?.abort();
     abortRef.current = null;
-    setUnsavedEvents([]);
     setBatchProcessing(null);
     setImageProcessingStatuses([]);
     setUrlProcessingStatus(null);
@@ -1059,6 +616,7 @@ export default function Home() {
 
   const hasStarted =
     unsavedEvents.length > 0 ||
+    reviewDrafts.length > 0 ||
     (batchProcessing?.isProcessing ?? false) ||
     imageProcessingStatuses.length > 0 ||
     urlProcessingStatus !== null;
@@ -1129,6 +687,13 @@ export default function Home() {
           onTzSuggestionApply={handleTzSuggestionApply}
           onTzSuggestionDismiss={handleTzSuggestionDismiss}
           onTimezoneUserChange={handleTimezoneUserChange}
+        />
+
+        <ReviewDraftSection
+          drafts={reviewDrafts}
+          onEdit={handleReviewDraftEdit}
+          onDelete={handleReviewDraftDelete}
+          onExport={handleReviewDraftExport}
         />
 
         {/* Marketing — recedes the moment you start */}

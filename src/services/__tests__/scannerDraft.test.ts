@@ -94,12 +94,51 @@ describe('scanner review drafts', () => {
     }
   });
 
+  test('keeps absent optional claims null with Scanner omissions and blocks an unknown all-day state', () => {
+    const optionalAbsent = draftFor(candidate({
+      description: claim(null),
+      location: claim(null),
+      url: claim(null),
+      temporal: claim({ start: floatingStart, end: null, duration: null, allDay: false }),
+      recurrence: claim(null),
+    }));
+    const unknownAllDay = draftFor(candidate({
+      temporal: claim({ start: floatingStart, end: null, duration: null, allDay: 'unknown' }),
+    }));
+
+    expect(optionalAbsent.candidate.location.value).toBeNull();
+    expect(optionalAbsent.candidate.url.value).toBeNull();
+    expect(optionalAbsent.candidate.temporal.value?.end).toBeNull();
+    expect(optionalAbsent.candidate.recurrence.value).toBeNull();
+    expect(optionalAbsent.readiness.canGenerate).toBe(true);
+    expect(optionalAbsent.readiness.omittedFields).toEqual(['title', 'description', 'location', 'url', 'recurrence', 'end']);
+    expect(optionalAbsent.readiness.warnings.map(({ code }) => code)).toContain('field_not_found');
+    expect(unknownAllDay.readiness.canGenerate).toBe(false);
+    if (!unknownAllDay.readiness.canGenerate) {
+      expect(unknownAllDay.readiness.blockers.map(({ code }) => code)).toContain('unknown_all_day');
+    }
+  });
+
   test('uses only caller-injected draft identity and export policy values', () => {
     const draft = draftFor(candidate());
 
     expect(draft.id).toBe(identity.id);
     expect(draft.exportUid).toBe(identity.exportUid);
     expect(draft.createdAt).toBe(identity.createdAt);
+  });
+
+  test('constructs multiple drafts from caller-provided identities and one shared timestamp', () => {
+    const createdAt = '2026-07-30T10:00:00.000Z';
+    const drafts = ['one', 'two'].map((suffix) => createReviewDraft(candidate({ candidateId: `candidate-${suffix}` }), [], source, {
+      id: `draft-${suffix}`,
+      exportUid: `export-${suffix}@example.test`,
+      createdAt,
+    }));
+
+    expect(drafts.map((draft) => [draft.id, draft.exportUid, draft.createdAt])).toEqual([
+      ['draft-one', 'export-one@example.test', createdAt],
+      ['draft-two', 'export-two@example.test', createdAt],
+    ]);
   });
 
   test('parses construction candidates and every edit through the Scanner schema', () => {
