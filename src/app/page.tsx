@@ -29,6 +29,7 @@ import { ProcessingEvent, ImageProcessingStatus, BatchProcessing, URLProcessingS
 import { scan, ScanClientError } from '@/services/scanClient';
 import { createReviewDraft, editReviewDraft } from '@/services/scannerDraft';
 import { createBrowserDownloadEffects, createScannerExporter } from '@/services/scannerExporter';
+import { reviewStorage } from '@/services/reviewStorage';
 import type { ReviewDraft, ReviewFieldEdit } from '@/types/review';
 import type { ScanRequest } from '@/types/scannerHttp';
 
@@ -37,6 +38,7 @@ export default function Home() {
   const [batchProcessing, setBatchProcessing] = useState<BatchProcessing | null>(null);
   const [unsavedEvents, setUnsavedEvents] = useState<CalendarEvent[]>([]);
   const [reviewDrafts, setReviewDrafts] = useState<ReviewDraft[]>([]);
+  const [hasLoadedReviewDrafts, setHasLoadedReviewDrafts] = useState(false);
   const [, setUserTouchedTimezones] = useState<Set<string>>(new Set());
   const [tzSuggestions, setTzSuggestions] = useState<Record<string, { timezone: string; confidence: number }>>({});
   // Selection for the unsaved batch lives here so it can outlive any single
@@ -91,6 +93,12 @@ export default function Home() {
   useEffect(() => () => abortRef.current?.abort(), []);
 
   useEffect(() => {
+    const reviewResult = reviewStorage.load();
+    if (reviewResult.success && reviewResult.data) {
+      setReviewDrafts(reviewResult.data);
+      setHasLoadedReviewDrafts(true);
+    }
+
     const result = eventStorage.getTempUnsavedEvents();
     if (result.success && result.data && result.data.length > 0) {
       setUnsavedEvents(result.data);
@@ -127,6 +135,15 @@ export default function Home() {
       eventStorage.clearTempUnsavedEvents();
     }
   }, [unsavedEvents, hasLoadedTempEvents]);
+
+  useEffect(() => {
+    if (!hasLoadedReviewDrafts) return;
+    if (reviewDrafts.length === 0) {
+      reviewStorage.clear();
+    } else {
+      reviewStorage.save(reviewDrafts);
+    }
+  }, [hasLoadedReviewDrafts, reviewDrafts]);
 
   const runScan = useCallback(async (request: ScanRequest, signal: AbortSignal): Promise<ReviewDraft[]> => {
     const response = await scan(request, signal);
@@ -466,9 +483,14 @@ export default function Home() {
   }, []);
 
   // Scanner review drafts never cross into the legacy CalendarEvent exporters.
-  const handleReviewDraftExport = useCallback((drafts: readonly ReviewDraft[]) => (
-    scannerExporter.exportReviewDrafts(drafts, 'scanner-reviewed-events')
-  ), [scannerExporter]);
+  const handleReviewDraftExport = useCallback((drafts: readonly ReviewDraft[]) => {
+    const result = scannerExporter.exportReviewDrafts(drafts, 'scanner-reviewed-events');
+    if (result.ok) {
+      const exportedIds = new Set(drafts.map(({ id }) => id));
+      setReviewDrafts((previous) => previous.filter(({ id }) => !exportedIds.has(id)));
+    }
+    return result;
+  }, [scannerExporter]);
 
   const handleCancelBatch = () => {
     abortRef.current?.abort();
