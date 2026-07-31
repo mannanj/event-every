@@ -2,13 +2,14 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { ReviewDraft, ReviewFieldEdit } from '@/types/review';
+import type { ScannerExportResult } from '@/services/scannerExporter';
 import ReviewDraftCard from './ReviewDraftCard';
 
 type ReviewDraftSectionProps = Readonly<{
   drafts: readonly ReviewDraft[];
   onEdit: (id: string, edit: ReviewFieldEdit) => void;
   onDelete: (id: string) => void;
-  onExport: (drafts: readonly ReviewDraft[]) => void;
+  onExport: (drafts: readonly ReviewDraft[]) => ScannerExportResult;
 }>;
 
 export default function ReviewDraftSection({ drafts, onEdit, onDelete, onExport }: ReviewDraftSectionProps) {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import SmartInput, { SmartInputHandle } from '@/components/SmartInput';
 import UnsavedEventsSection from '@/components/UnsavedEventsSection';
 import InputHistoryModal from '@/components/InputHistoryModal';
@@ -28,6 +28,7 @@ import { COMMUNITY_LIMIT_CODE, emitCommunityLimit } from '@/utils/communityLimit
 import { ProcessingEvent, ImageProcessingStatus, BatchProcessing, URLProcessingStatus } from '@/types/processing';
 import { scan, ScanClientError } from '@/services/scanClient';
 import { createReviewDraft, editReviewDraft } from '@/services/scannerDraft';
+import { createBrowserDownloadEffects, createScannerExporter } from '@/services/scannerExporter';
 import type { ReviewDraft, ReviewFieldEdit } from '@/types/review';
 import type { ScanRequest } from '@/types/scannerHttp';
 
@@ -54,6 +55,7 @@ export default function Home() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const { entries: inputHistory, addEntry: addInputHistory, setSummary: setInputSummary } = useInputHistory();
   const [pendingSummaryIds, setPendingSummaryIds] = useState<Set<string>>(new Set());
+  const scannerExporter = useMemo(() => createScannerExporter(createBrowserDownloadEffects()), []);
 
   const markSummaryPending = (id: string, pending: boolean) =>
     setPendingSummaryIds(prev => {
@@ -463,9 +465,10 @@ export default function Home() {
     setReviewDrafts((previous) => previous.filter((draft) => draft.id !== id));
   }, []);
 
-  // Task 6 wires this selection to Scanner-owned ICS generation. Keeping the callback
-  // boundary here means review drafts never cross into legacy CalendarEvent export code.
-  const handleReviewDraftExport = useCallback((_drafts: readonly ReviewDraft[]) => {}, []);
+  // Scanner review drafts never cross into the legacy CalendarEvent exporters.
+  const handleReviewDraftExport = useCallback((drafts: readonly ReviewDraft[]) => (
+    scannerExporter.exportReviewDrafts(drafts, 'scanner-reviewed-events')
+  ), [scannerExporter]);
 
   const handleCancelBatch = () => {
     abortRef.current?.abort();
