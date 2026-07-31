@@ -26,6 +26,7 @@ const E1_PATHS = new Set([
   'src/lib/__tests__/llm.test.ts',
   'src/server/scanner/image.ts',
   'src/server/scanner/__tests__/image.test.ts',
+  'src/server/scanner/job.ts',
   'src/app/api/scan/route.ts',
   'src/app/api/scan/__tests__/route.test.ts',
   'src/services/scanClient.ts',

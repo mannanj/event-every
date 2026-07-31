@@ -64,7 +64,7 @@ const { evaluateLimits, chargeIpRate } = await import('@/lib/limits');
 const makeRequest = (opts: { ip?: string; admin?: boolean } = {}) => {
   const headers: Record<string, string> = { 'x-forwarded-for': opts.ip || '203.0.113.7' };
   if (opts.admin) headers['cookie'] = `${AUTH_COOKIE_NAME}=${generateAuthToken()}`;
-  return new NextRequest('http://localhost/api/parse', { method: 'POST', headers });
+  return new NextRequest('http://localhost/api/scan', { method: 'POST', headers });
 };
 
 beforeEach(() => {

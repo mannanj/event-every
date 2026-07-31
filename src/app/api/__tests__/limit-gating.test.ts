@@ -45,17 +45,17 @@ mock.module('@/lib/limits', () => ({
   chargeIpRate,
 }));
 
-// The three non-parse routes derive getLlmKey() BEFORE the gate; give them a key so
-// they reach the authority rather than short-circuiting on a missing-key 500.
+// The three legacy non-scan routes derive getLlmKey() before the gate; give them a
+// key so they reach the authority rather than short-circuiting on a missing-key 500.
 process.env.OPENROUTER_API_KEY = 'sk-test';
 
-const { POST: parsePOST } = await import('@/app/api/parse/route');
+const { POST: scanPOST } = await import('@/app/api/scan/route');
 const { POST: summarizePOST } = await import('@/app/api/summarize/route');
 const { POST: detectUrlsPOST } = await import('@/app/api/detect-urls/route');
 const { POST: resolveTzPOST } = await import('@/app/api/resolve-timezone/route');
 
 const routes: Array<{ name: string; post: (req: NextRequest) => Promise<Response>; body: unknown; path: string }> = [
-  { name: 'parse', post: parsePOST, body: { text: 'meet tomorrow', batch: true }, path: '/api/parse' },
+  { name: 'scan', post: scanPOST, body: { kind: 'text', text: 'meet tomorrow' }, path: '/api/scan' },
   { name: 'summarize', post: summarizePOST, body: { text: 'meet tomorrow' }, path: '/api/summarize' },
   { name: 'detect-urls', post: detectUrlsPOST, body: { text: 'see example.com' }, path: '/api/detect-urls' },
   { name: 'resolve-timezone', post: resolveTzPOST, body: { rawTimezone: 'EST' }, path: '/api/resolve-timezone' },
