@@ -71,6 +71,28 @@ const E1_PATHS = new Set([
   'src/services/__tests__/inputStorage.test.ts',
 ]);
 
+// This is deliberately static. The C1-A path guard validates manifests, but E1
+// must never derive its own allow-list from mutable manifest bytes.
+const C1_A_TASK_1_PATHS = new Set([
+  'docs/superpowers/plans/2026-08-02-event-every-cloudflare-c1-a-runtime-admission.md',
+  'docs/superpowers/specs/2026-08-02-event-every-cloudflare-migration-design.md',
+  '.gitignore', 'bun.lock', 'eslint.config.mjs', 'package.json',
+  'scripts/assert-c1-a-config.test.ts', 'scripts/assert-c1-a-config.ts',
+  'scripts/assert-c1-a-paths.test.ts', 'scripts/assert-c1-a-paths.ts',
+  'scripts/c1-a-offline-preload.test.ts', 'scripts/c1-a-offline-preload.cjs',
+  'scripts/install-c1-a-dependencies.test.ts', 'scripts/install-c1-a-dependencies.ts',
+  'scripts/run-c1-a-offline.test.ts', 'scripts/run-c1-a-offline.ts',
+  'scripts/run-c1-a-cloudflare.test.ts', 'scripts/run-c1-a-cloudflare.ts',
+  'scripts/run-with-open-next.test.ts', 'scripts/run-with-open-next.ts',
+  'scripts/run-e1-offline.ts',
+  'scripts/c1-a-task-paths/task-01.txt', 'scripts/c1-a-task-paths/task-02.txt',
+  'scripts/c1-a-task-paths/task-03.txt', 'scripts/c1-a-task-paths/task-04.txt',
+  'scripts/c1-a-task-paths/task-05.txt', 'scripts/c1-a-task-paths/task-06.txt',
+  'scripts/c1-a-task-paths/task-07.txt', 'scripts/c1-a-task-paths/task-08.txt',
+  'scripts/c1-a-task-paths/task-09.txt', 'scripts/c1-a-task-paths/task-10.txt',
+  'scripts/c1-a-task-paths/task-11.txt',
+]);
+
 function output(command: string, args: string[]): string[] {
   const result = Bun.spawnSync([command, ...args], { stdout: 'pipe', stderr: 'pipe' });
   if (result.exitCode !== 0) {
@@ -172,7 +194,7 @@ const changed = new Set([
   ...staged,
 ]);
 const disallowed = [...changed].filter((file) => (
-  !(E1_PATHS.has(file) || file.startsWith('vendor/event-every-scanner/dist/'))
+  !(E1_PATHS.has(file) || C1_A_TASK_1_PATHS.has(file) || file.startsWith('vendor/event-every-scanner/dist/'))
 ));
 if (disallowed.length > 0) {
   throw new Error(`E1 path guard rejected:\n${disallowed.sort().join('\n')}`);

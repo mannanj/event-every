@@ -1,0 +1,17 @@
+.gitignore
+cloudflare/app-worker.ts
+next.config.js
+open-next.config.ts
+playwright.c1-a.config.ts
+playwright.config.ts
+scripts/assert-c1-a-config.test.ts
+scripts/assert-c1-a-config.ts
+scripts/run-c1-a-worker-e2e.ts
+scripts/run-c1-a-worker-e2e.test.ts
+test/worker/app-worker.test.ts
+test/worker/deny-egress.integration.test.ts
+test/worker/deny-egress.setup.ts
+tsconfig.json
+vitest.config.workers.ts
+worker-configuration.d.ts
+wrangler.jsonc

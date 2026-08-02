@@ -1,0 +1,196 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
+const http = require('node:http');
+const https = require('node:https');
+const net = require('node:net');
+const tls = require('node:tls');
+const dns = require('node:dns');
+
+const CREDENTIAL_NAME = /(OPENROUTER|ANTHROPIC|API_KEY|TOKEN|SECRET|CLOUDFLARE|RESEND|KV_REST|D1|R2|AUTH_PATTERN)/i;
+const LOOPBACK = new Set(['127.0.0.1', 'localhost', '::1', '[::1]']);
+const DNS_METHODS = [
+  'lookup', 'lookupService', 'resolve', 'resolve4', 'resolve6', 'resolveAny', 'resolveCaa', 'resolveCname',
+  'resolveMx', 'resolveNaptr', 'resolveNs', 'resolvePtr', 'resolveSoa', 'resolveSrv', 'resolveTxt', 'reverse',
+];
+const ROUTING_HOOKS = ['dispatcher', 'proxy', 'agent', 'socketPath', 'createConnection', 'lookup', 'connection', 'fd', 'handle'];
+
+function blocked() {
+  const error = new Error('C1_A_EGRESS_BLOCKED');
+  error.code = 'C1_A_EGRESS_BLOCKED';
+  return error;
+}
+
+function hasOwn(value, key) {
+  return Boolean(value && typeof value === 'object' && Object.prototype.hasOwnProperty.call(value, key));
+}
+
+function rejectRoutingHooks(value, extra = []) {
+  if (!value || typeof value !== 'object') return;
+  for (const key of [...ROUTING_HOOKS, ...extra]) if (hasOwn(value, key)) throw blocked();
+}
+
+function exactHost(value) {
+  if (typeof value !== 'string' || value.length === 0) return '';
+  const normalized = value.toLowerCase();
+  if (LOOPBACK.has(normalized)) return normalized;
+  const authority = normalized.match(/^(127\.0\.0\.1|localhost|\[::1\])(?::\d+)?$/);
+  return authority ? authority[1] : '';
+}
+
+function urlHost(value) {
+  try {
+    const raw = typeof value === 'string' ? value : value instanceof URL ? value.href : value && (value.url || value.href);
+    if (typeof raw !== 'string' || !/^https?:\/\//i.test(raw)) return '';
+    const parsed = new URL(raw);
+    if (parsed.username || parsed.password) return '';
+    return exactHost(parsed.hostname);
+  } catch {
+    return '';
+  }
+}
+
+function rejectProxyRequest(options) {
+  if (!options || typeof options !== 'object') return;
+  rejectRoutingHooks(options);
+  if (typeof options.path === 'string' && /^https?:\/\//i.test(options.path)) throw blocked();
+  if (String(options.method || '').toUpperCase() === 'CONNECT') throw blocked();
+  const headers = options.headers;
+  if (headers && typeof headers === 'object') {
+    for (const [name, value] of Object.entries(headers)) {
+      const lower = name.toLowerCase();
+      if (['proxy-authorization', 'forwarded', 'x-forwarded-host'].includes(lower)) throw blocked();
+      if (lower === 'host' && !exactHost(String(value))) throw blocked();
+    }
+  }
+}
+
+function requireHttpTarget(value, options) {
+  rejectProxyRequest(value);
+  rejectProxyRequest(options);
+  let host = '';
+  if (options && typeof options === 'object' && (options.hostname !== undefined || options.host !== undefined)) {
+    host = exactHost(options.hostname || options.host);
+  } else if (value && typeof value === 'object' && !(value instanceof URL) && (value.hostname !== undefined || value.host !== undefined)) {
+    host = exactHost(value.hostname || value.host);
+  } else {
+    host = urlHost(value) || exactHost(value);
+  }
+  if (!host) throw blocked();
+}
+
+function requireDns(value) {
+  if (!LOOPBACK.has(String(value).toLowerCase())) throw blocked();
+}
+
+function requireSocket(args, tlsMode = false) {
+  const first = args[0];
+  if (typeof first === 'number') {
+    rejectRoutingHooks(args[2], tlsMode ? ['socket'] : []);
+    if (!exactHost(args[1])) throw blocked();
+    return;
+  }
+  if (typeof first === 'string') throw blocked();
+  rejectRoutingHooks(first, tlsMode ? ['socket'] : []);
+  rejectRoutingHooks(args[1], tlsMode ? ['socket'] : []);
+  if (!first || !exactHost(first.hostname || first.host)) throw blocked();
+}
+
+for (const name of Object.keys(process.env)) if (CREDENTIAL_NAME.test(name)) process.env[name] = '';
+for (const name of ['BUN_OPTIONS', 'NODE_PATH', 'NODE_REPL_EXTERNAL_MODULE', 'LD_PRELOAD', 'DYLD_INSERT_LIBRARIES', 'DYLD_LIBRARY_PATH', 'HTTP_PROXY', 'HTTPS_PROXY', 'ALL_PROXY', 'NO_PROXY', 'http_proxy', 'https_proxy', 'all_proxy', 'no_proxy']) delete process.env[name];
+process.env.CLOUDFLARE_LOAD_DEV_VARS_FROM_DOT_ENV = 'false';
+process.env.CLOUDFLARE_INCLUDE_PROCESS_ENV = 'false';
+globalThis.__C1_A_OFFLINE_GUARD__ = true;
+
+if (typeof globalThis.fetch === 'function') {
+  const original = globalThis.fetch;
+  globalThis.fetch = function guardedFetch(input, init) {
+    rejectRoutingHooks(init);
+    requireHttpTarget(input);
+    return original.call(this, input, init);
+  };
+}
+
+for (const transport of [http, https]) {
+  for (const method of ['request', 'get']) {
+    const original = transport[method];
+    transport[method] = function guardedRequest(...args) {
+      const options = args.find((arg, index) => index < 2 && arg && typeof arg === 'object' && !(arg instanceof URL));
+      requireHttpTarget(args[0], options);
+      return original.apply(this, args);
+    };
+  }
+}
+
+for (const method of ['connect', 'createConnection']) {
+  const original = net[method];
+  net[method] = function guardedConnection(...args) {
+    requireSocket(args);
+    return original.apply(this, args);
+  };
+}
+const originalTls = tls.connect;
+tls.connect = function guardedTls(...args) {
+  requireSocket(args, true);
+  return originalTls.apply(this, args);
+};
+
+for (const method of DNS_METHODS) {
+  const original = dns[method];
+  if (typeof original === 'function') dns[method] = function guardedDns(...args) { requireDns(args[0]); return original.apply(this, args); };
+}
+if (dns.promises) {
+  for (const method of DNS_METHODS) {
+    const original = dns.promises[method];
+    if (typeof original === 'function') dns.promises[method] = function guardedDnsPromise(...args) { requireDns(args[0]); return original.apply(this, args); };
+  }
+}
+if (dns.Resolver) {
+  const OriginalResolver = dns.Resolver;
+  dns.Resolver = function GuardedResolver(...constructorArgs) {
+    const resolver = new OriginalResolver(...constructorArgs);
+    for (const method of DNS_METHODS.filter((name) => name.startsWith('resolve') || name === 'reverse')) {
+      const original = resolver[method];
+      if (typeof original === 'function') resolver[method] = function guardedResolver(...args) { requireDns(args[0]); return original.apply(this, args); };
+    }
+    return resolver;
+  };
+  dns.Resolver.prototype = OriginalResolver.prototype;
+}
+
+if (globalThis.Bun && typeof globalThis.Bun.connect === 'function') {
+  const original = globalThis.Bun.connect;
+  globalThis.Bun.connect = function guardedBunConnect(...args) {
+    const options = args[0];
+    rejectRoutingHooks(options);
+    if (!options || !exactHost(options.hostname || options.host)) throw blocked();
+    return original.apply(this, args);
+  };
+}
+if (globalThis.Bun && typeof globalThis.Bun.udpSocket === 'function') {
+  const original = globalThis.Bun.udpSocket;
+  const wrap = (socket) => {
+    if (!socket || typeof socket.send !== 'function') return socket;
+    const send = socket.send;
+    socket.send = function guardedUdpSend(data, port, address) {
+      requireDns(address);
+      return send.call(this, data, port, address);
+    };
+    return socket;
+  };
+  globalThis.Bun.udpSocket = function guardedUdpSocket(options = {}) {
+    rejectRoutingHooks(options);
+    const connected = options.connect;
+    if (connected && !exactHost(connected.hostname || connected.host || connected.address)) throw blocked();
+    const result = original.call(this, options);
+    return result && typeof result.then === 'function' ? result.then(wrap) : wrap(result);
+  };
+}
+
+if (typeof globalThis.WebSocket === 'function') {
+  const OriginalWebSocket = globalThis.WebSocket;
+  globalThis.WebSocket = class GuardedWebSocket extends OriginalWebSocket {
+    constructor(url, protocols) {
+      requireHttpTarget(String(url).replace(/^ws(s?):/i, 'http$1:'));
+      super(url, protocols);
+    }
+  };
+}

@@ -1,0 +1,9 @@
+src/app/api/scrape-url/__tests__/route.test.ts
+src/app/api/scrape-url/route.ts
+src/platform/resolver/__tests__/html-to-text.test.ts
+src/platform/resolver/__tests__/url-policy.test.ts
+src/platform/resolver/html-to-text.ts
+src/platform/resolver/url-policy.ts
+src/services/__tests__/urlServices.test.ts
+src/services/webScraper.ts
+test/worker/resolver.integration.test.ts

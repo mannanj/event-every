@@ -1,0 +1,16 @@
+docs/testing/c1-a-mutation-ledger.md
+docs/testing/c1-a-terminal-evidence.json
+docs/testing/c1-a-terminal-evidence.schema.json
+docs/testing/e1-mutation-ledger.md
+e2e/c1-a-runtime-admission.spec.ts
+e2e/url-scrape.spec.ts
+scripts/assert-c1-a-e2e-inventory.ts
+scripts/assert-c1-a-e2e-inventory.test.ts
+scripts/run-c1-a-mutations.ts
+scripts/run-c1-a-mutations.test.ts
+scripts/run-c1-a-offline.ts
+scripts/run-c1-a-offline.test.ts
+scripts/validate-c1-a-evidence.test.ts
+scripts/validate-c1-a-evidence.ts
+scripts/run-e1-focused.test.ts
+scripts/run-e1-focused.ts

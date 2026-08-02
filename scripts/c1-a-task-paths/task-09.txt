@@ -1,0 +1,10 @@
+cloudflare/legacy-keepalive-configuration.d.ts
+cloudflare/legacy-keepalive-worker.ts
+cloudflare/legacy-keepalive-wrangler.jsonc
+scripts/assert-c1-a-config.test.ts
+scripts/assert-c1-a-config.ts
+src/app/api/keep-alive/route.ts
+src/app/api/keep-alive/__tests__/route.test.ts
+src/platform/__tests__/runtime.test.ts
+test/worker/legacy-keepalive.integration.test.ts
+vitest.config.keepalive-workers.ts

@@ -26,6 +26,8 @@ export function createE1OfflineEnvironment(environment: Environment = process.en
     E2E_PROD_URL: '',
     E1_OFFLINE: '1',
     E1_OFFLINE_PRELOAD: preloadPath,
+    CLOUDFLARE_LOAD_DEV_VARS_FROM_DOT_ENV: 'false',
+    CLOUDFLARE_INCLUDE_PROCESS_ENV: 'false',
     NODE_OPTIONS: `--require=${preloadPath}`,
   };
 }

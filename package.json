@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "i": "bun install",
+    "i": "bun scripts/install-c1-a-dependencies.ts frozen",
     "dev": "next dev -p 3777",
     "build": "next build",
     "start": "next start",
@@ -16,7 +16,17 @@
     "vendor:scanner": "bun scripts/vendor-event-scanner.ts",
     "assert:e1-paths": "bun scripts/assert-e1-paths.ts",
     "assert:e1-protected": "bun scripts/assert-e1-protected.ts",
-    "verify:e1:offline": "bun scripts/run-e1-offline.ts"
+    "verify:e1:offline": "bun scripts/run-e1-offline.ts",
+    "build:cloudflare": "opennextjs-cloudflare build",
+    "cf:types": "bun scripts/run-c1-a-cloudflare.ts app-types",
+    "cf:types:keepalive": "bun scripts/run-c1-a-cloudflare.ts keepalive-types",
+    "test:workers": "bun scripts/run-with-open-next.ts -- node node_modules/vitest/vitest.mjs run --config vitest.config.workers.ts",
+    "assert:c1:a-config": "bun scripts/assert-c1-a-config.ts",
+    "assert:c1:a-paths": "bun scripts/assert-c1-a-paths.ts",
+    "test:c1:a-mutations": "bun scripts/run-c1-a-mutations.ts --verify-ledger --all",
+    "validate:c1:a-evidence": "bun scripts/validate-c1-a-evidence.ts docs/testing/c1-a-terminal-evidence.json",
+    "test:e2e:c1:a": "playwright test --config playwright.c1-a.config.ts",
+    "verify:c1:a": "bun scripts/run-c1-a-offline.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.68.0",
@@ -31,25 +41,30 @@
     "zod": "4.4.3"
   },
   "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "0.20.1",
+    "@eslint/eslintrc": "^3",
+    "@next/eslint-plugin-next": "15.5.9",
+    "@opennextjs/cloudflare": "1.20.2",
     "@playwright/test": "^1.58.2",
     "@types/bun": "^1.3.14",
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
-    "@eslint/eslintrc": "^3",
+    "@typescript-eslint/eslint-plugin": "^8",
+    "@typescript-eslint/parser": "^8",
     "autoprefixer": "^10.4.20",
     "eslint": "^9",
     "eslint-config-next": "15.5.9",
-    "@next/eslint-plugin-next": "15.5.9",
-    "@typescript-eslint/eslint-plugin": "^8",
-    "@typescript-eslint/parser": "^8",
     "eslint-import-resolver-typescript": "^3.5.2",
     "eslint-plugin-import": "^2.31.0",
     "eslint-plugin-jsx-a11y": "^6.10.0",
     "eslint-plugin-react": "^7.37.0",
     "eslint-plugin-react-hooks": "^5",
+    "msw": "2.15.0",
     "postcss": "^8.4.47",
     "tailwindcss": "^3.4.14",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "4.1.10",
+    "wrangler": "4.118.0"
   }
 }

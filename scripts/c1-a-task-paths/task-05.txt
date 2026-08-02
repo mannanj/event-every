@@ -1,0 +1,14 @@
+src/app/api/scan/__tests__/route.test.ts
+src/app/api/scan/route.ts
+src/lib/__tests__/llm.test.ts
+src/lib/llm.ts
+src/platform/legacy/__tests__/dispatch.test.ts
+src/platform/legacy/dispatch.ts
+src/platform/legacy/provider.ts
+src/server/scanner/__tests__/image.test.ts
+src/server/scanner/__tests__/scan.test.ts
+src/server/scanner/__tests__/transport.test.ts
+src/server/scanner/image.ts
+src/server/scanner/job.ts
+src/server/scanner/transport.ts
+test/worker/app-worker.test.ts

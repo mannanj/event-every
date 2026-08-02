@@ -27,6 +27,12 @@ yarn-error.log*
 # local env files
 .env*.local
 .env
+.dev.vars
+.dev.vars.*
+
+# C1-A locally generated Cloudflare/OpenNext artifacts
+.open-next/
+.wrangler/
 
 # vercel
 .vercel
