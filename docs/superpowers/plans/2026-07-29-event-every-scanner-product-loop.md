@@ -1405,3 +1405,20 @@ reproducibility while preserving `98aec60` as the historical starting baseline. 
 `/Users/manblack/Documents/codex-agent-routing/.routed-runs/20260802T155801Z-83291-e1-terminal-acceptance-review/report.json`.
 The corrected plan requires focused static proof, an exact docs-only commit, and independent
 rereview before E1 can become proven; Cloudflare remains blocked.
+
+## E1 terminal acceptance — E1-PROVEN (2026-08-02)
+
+The two-document authority correction is committed at `cdae13d` after Task 9 implementation commit
+`195e9b4`. Post-commit static proof passed the 203-path cumulative guard, the 53,300-record
+protected inventory, both diff checks, and exact protected-only status. The resumed controlled
+Sol/high reviewer confirmed that `98aec60` is now historical baseline only, `c03cf1a` is the
+authoritative accepted package/provenance/reproducibility pin, and the live vendor command,
+provenance, tests, README, RPKG acceptance chain, pack digest, and projected-artifact digest agree.
+It returned **`VERIFIED:true`** with no Critical or Important finding. Report:
+`/Users/manblack/Documents/codex-agent-routing/.routed-runs/20260802T160919Z-90528-e1-terminal-acceptance-pin-rereview/report.json`.
+
+Together with the already recorded separate post-`195e9b4` frozen install and full offline replay
+(241/241 units / 943 expectations, zero lint errors, typecheck/build without `/api/parse`, and
+120/120 Chromium/WebKit scenarios), this closes Event Every E1 Tasks 1–9. Protected user paths
+remain untouched and untracked. No provider call, credential use, external network, deployment,
+publication, or remote action occurred. E1 is proven; Cloudflare planning is the next program gate.

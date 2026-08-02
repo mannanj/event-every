@@ -3894,3 +3894,15 @@ in this repair. Report:
 `/Users/manblack/Documents/codex-agent-routing/.routed-runs/20260802T155801Z-83291-e1-terminal-acceptance-review/report.json`.
 Static proof, docs-only commit, and independent rereview remain blocking; no mutation row changes
 because this is an authority-document correction rather than a product behavior change.
+
+## E1-PROVEN (2026-08-02)
+
+The correction is committed at `cdae13d`. Post-commit path/protected/diff/status proof passed, and
+the resumed independent controlled Sol/high reviewer returned `VERIFIED:true` with no Critical or
+Important finding. It confirmed the historical-baseline versus accepted-package-pin distinction
+and exact agreement among the plan, RPKG evidence, vendor script, provenance schema 2, tests,
+README, canonical pack digest, and projected artifact digest. Report:
+`/Users/manblack/Documents/codex-agent-routing/.routed-runs/20260802T160919Z-90528-e1-terminal-acceptance-pin-rereview/report.json`.
+No mutation row changes: the accepted E1-M01–E1-M21 behavior evidence and 120-scenario browser
+matrix remain byte-bound to the separately proven Task 9 implementation at `195e9b4`. E1 is
+terminally proven; Cloudflare planning may now begin.
