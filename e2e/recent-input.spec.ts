@@ -1,26 +1,73 @@
-import { test, expect } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
+import type { ScanResponse } from '../src/types/scannerHttp';
 import {
-  setupLocal,
-  mockParseAPI,
-  mockParseAPIDelayed,
+  mockScanAPI,
   mockSummarize,
   mockSummarizeDelayed,
+  setupLocal,
   submitText,
-  waitForEvents,
-  buildSSE,
   TINY_PNG_BASE64,
 } from './helpers';
 
-const SINGLE_EVENT = [
-  {
-    title: 'Coffee with Dana',
-    startDate: '2026-07-01T10:00:00',
-    endDate: '2026-07-01T11:00:00',
-    confidence: 0.9,
-    allDay: false,
-    timezone: null,
-  },
-];
+type ScannerModule = typeof import('@event-every/scanner');
+
+const importScannerModule = new Function(
+  'return import("@event-every/scanner")',
+) as () => Promise<ScannerModule>;
+
+const claim = <Value,>(
+  value: Value,
+  sourceId: string,
+  excerpt = 'Coffee with Dana',
+) => ({
+  value,
+  confidence: 0.9,
+  evidence: [{
+    sourceId,
+    locator: 'body',
+    excerpt,
+    startOffset: 0,
+    endOffset: excerpt.length,
+  }],
+});
+
+async function scanResponse(kind: 'text' | 'image' = 'text'): Promise<ScanResponse> {
+  const { EventCandidateSchema } = await importScannerModule();
+  const sourceId = kind === 'image' ? 'source-recent-image-1' : 'source-recent-text-1';
+  return {
+    source: {
+      sourceId,
+      kind,
+      contentHandle: kind === 'image' ? 'opaque-recent-image-1' : 'opaque-recent-text-1',
+    },
+    candidates: [EventCandidateSchema.parse({
+      candidateId: kind === 'image' ? 'candidate-recent-image-1' : 'candidate-recent-text-1',
+      sourceUid: null,
+      title: claim('Coffee with Dana', sourceId),
+      description: claim(null, sourceId),
+      location: claim(null, sourceId),
+      url: claim(null, sourceId),
+      temporal: claim({
+        start: {
+          kind: 'floating',
+          date: { year: 2026, month: 7, day: 1 },
+          time: { hour: 10, minute: 0, second: 0 },
+        },
+        end: null,
+        duration: 'PT1H',
+        allDay: false,
+      }, sourceId),
+      recurrence: claim(null, sourceId),
+      issues: [],
+    })],
+    issues: [],
+  };
+}
+
+async function waitForReview(page: Page, count = 1): Promise<void> {
+  const review = page.getByRole('region', { name: 'Scanner review drafts' });
+  await expect(review.getByRole('article')).toHaveCount(count, { timeout: 20000 });
+}
 
 test.describe('Input draft persistence', () => {
   test('text draft survives a page reload', async ({ page }) => {
@@ -53,7 +100,7 @@ test.describe('Input draft persistence', () => {
 
   test('a stored image renders (valid src, not empty) when loaded back from history', async ({ page }) => {
     await setupLocal(page);
-    await mockParseAPI(page, SINGLE_EVENT);
+    await mockScanAPI(page, await scanResponse('image'));
     await page.locator('input[type="file"]').setInputFiles({
       name: 'flyer.png',
       mimeType: 'image/png',
@@ -61,7 +108,7 @@ test.describe('Input draft persistence', () => {
     });
     await expect(page.locator('img[alt="Uploaded 1"]')).toBeVisible({ timeout: 8000 });
     await page.locator('button[aria-label="Transform content to events"]').click();
-    await waitForEvents(page, 1);
+    await waitForReview(page, 1);
 
     await page.locator('[data-testid="input-history-button"]').click();
     await page.locator('[data-testid="input-history-card"]').first().click();
@@ -75,17 +122,17 @@ test.describe('Input history', () => {
   test('the history button is hidden until there is history', async ({ page }) => {
     await setupLocal(page);
     await expect(page.locator('[data-testid="input-history-button"]')).toHaveCount(0);
-    await mockParseAPI(page, SINGLE_EVENT);
+    await mockScanAPI(page, await scanResponse());
     await submitText(page, 'First summon');
-    await waitForEvents(page, 1);
+    await waitForReview(page, 1);
     await expect(page.locator('[data-testid="input-history-button"]')).toBeVisible();
   });
 
   test('transforming saves the input to history', async ({ page }) => {
     await setupLocal(page);
-    await mockParseAPI(page, SINGLE_EVENT);
+    await mockScanAPI(page, await scanResponse());
     await submitText(page, 'Coffee with Dana');
-    await waitForEvents(page, 1);
+    await waitForReview(page, 1);
 
     await page.locator('[data-testid="input-history-button"]').click();
     await expect(page.locator('[data-testid="input-history-modal"]')).toBeVisible();
@@ -96,9 +143,9 @@ test.describe('Input history', () => {
 
   test('loading an entry (without changing it) never duplicates it in history', async ({ page }) => {
     await setupLocal(page);
-    await mockParseAPI(page, SINGLE_EVENT);
+    await mockScanAPI(page, await scanResponse());
     await submitText(page, 'Reusable summon text');
-    await waitForEvents(page, 1);
+    await waitForReview(page, 1);
 
     await page.locator('[data-testid="input-history-button"]').click();
     await expect(page.locator('[data-testid="input-history-card"]')).toHaveCount(1);
@@ -116,15 +163,16 @@ test.describe('Input history', () => {
 
   test('loading an entry, modifying it, then transforming saves a new entry', async ({ page }) => {
     await setupLocal(page);
-    await mockParseAPI(page, SINGLE_EVENT);
+    await mockScanAPI(page, await scanResponse());
     await submitText(page, 'Original text');
-    await waitForEvents(page, 1);
+    await waitForReview(page, 1);
 
     await page.locator('[data-testid="input-history-button"]').click();
     await page.locator('[data-testid="input-history-card"]').first().click();
     const ta = page.locator('[data-testid="smart-input-textarea"]');
     await ta.fill('Original text plus an edit');
     await ta.press('Meta+Enter');
+    await waitForReview(page, 2);
 
     await page.locator('[data-testid="input-history-button"]').click();
     await expect(page.locator('[data-testid="input-history-card"]')).toHaveCount(2);
@@ -132,9 +180,9 @@ test.describe('Input history', () => {
 
   test('clicking a history entry loads it back into the input', async ({ page }) => {
     await setupLocal(page);
-    await mockParseAPI(page, SINGLE_EVENT);
+    await mockScanAPI(page, await scanResponse());
     await submitText(page, 'Lunch with Priya');
-    await waitForEvents(page, 1);
+    await waitForReview(page, 1);
     await expect(page.locator('[data-testid="smart-input-textarea"]')).toHaveText('');
 
     await page.locator('[data-testid="input-history-button"]').click();
@@ -145,9 +193,9 @@ test.describe('Input history', () => {
 
   test('applying history with an unsaved draft auto-saves the draft first', async ({ page }) => {
     await setupLocal(page);
-    await mockParseAPI(page, SINGLE_EVENT);
+    await mockScanAPI(page, await scanResponse());
     await submitText(page, 'First input');
-    await waitForEvents(page, 1);
+    await waitForReview(page, 1);
 
     // Type an un-transformed draft, then apply an older history entry.
     await page.locator('[data-testid="smart-input-textarea"]').fill('Unsaved scratch note');
@@ -166,9 +214,9 @@ test.describe('Input history', () => {
 
   test('the history modal locks background page scroll while open', async ({ page }) => {
     await setupLocal(page);
-    await mockParseAPI(page, SINGLE_EVENT);
+    await mockScanAPI(page, await scanResponse());
     await submitText(page, 'scroll lock test');
-    await waitForEvents(page, 1);
+    await waitForReview(page, 1);
 
     await page.locator('[data-testid="input-history-button"]').click();
     await expect(page.locator('[data-testid="input-history-modal"]')).toBeVisible();
@@ -181,9 +229,9 @@ test.describe('Input history', () => {
 
   test('history groups entries into day sections', async ({ page }) => {
     await setupLocal(page);
-    await mockParseAPI(page, SINGLE_EVENT);
+    await mockScanAPI(page, await scanResponse());
     await submitText(page, 'Today input');
-    await waitForEvents(page, 1);
+    await waitForReview(page, 1);
 
     // Seed an older entry directly into IndexedDB (the DB exists after the first save).
     await page.evaluate(
@@ -216,71 +264,13 @@ test.describe('Input history', () => {
   });
 });
 
-test.describe('Job cancellation', () => {
-  test('cancel aborts an in-flight parse and clears the processing card', async ({ page }) => {
-    await setupLocal(page);
-    await mockParseAPIDelayed(page, SINGLE_EVENT, 6000);
-    await submitText(page, 'Some event happening sometime soon');
-
-    const cancelBtn = page.locator('[data-testid="cancel-job-button"]');
-    await expect(cancelBtn).toBeVisible({ timeout: 8000 });
-    await cancelBtn.click();
-
-    await expect(cancelBtn).toBeHidden({ timeout: 8000 });
-    await expect(page.getByTestId('event-card-title')).toHaveCount(0);
-  });
-});
-
-test.describe('Streaming selection', () => {
-  test('events that stream in do not reset the user\'s manual selection', async ({ page }) => {
-    await setupLocal(page);
-
-    let nextBatch: Record<string, unknown>[] = [
-      { title: 'Alpha event', startDate: '2026-07-01T10:00:00', endDate: '2026-07-01T11:00:00', confidence: 0.9, allDay: false, timezone: null },
-      { title: 'Beta event', startDate: '2026-07-02T10:00:00', endDate: '2026-07-02T11:00:00', confidence: 0.9, allDay: false, timezone: null },
-    ];
-    await page.route('**/api/parse', async (route) => {
-      await route.fulfill({
-        status: 200,
-        headers: {
-          'Content-Type': 'text/event-stream',
-          'Cache-Control': 'no-cache',
-          'X-RateLimit-Limit': '50',
-          'X-RateLimit-Remaining': '49',
-          'X-RateLimit-Reset': String(Date.now() + 86400000),
-        },
-        body: buildSSE(nextBatch),
-      });
-    });
-
-    await submitText(page, 'first batch of events');
-    await waitForEvents(page, 2);
-
-    // Deselect one event mid-session.
-    const alpha = page.locator('input[aria-label="Select Alpha event"]');
-    await alpha.uncheck();
-    await expect(alpha).not.toBeChecked();
-
-    // A new event streams in (appends to the batch).
-    nextBatch = [
-      { title: 'Gamma event', startDate: '2026-07-03T10:00:00', endDate: '2026-07-03T11:00:00', confidence: 0.9, allDay: false, timezone: null },
-    ];
-    await submitText(page, 'second batch streams in');
-    await waitForEvents(page, 3);
-
-    // Manual deselection must persist; the newly-arrived event defaults to selected.
-    await expect(page.locator('input[aria-label="Select Alpha event"]')).not.toBeChecked();
-    await expect(page.locator('input[aria-label="Select Gamma event"]')).toBeChecked();
-  });
-});
-
 test.describe('Recent — summaries', () => {
   test('a 2-3 word summary appears on the card after transform', async ({ page }) => {
     await setupLocal(page);
     await mockSummarize(page, 'Coffee Catchup');
-    await mockParseAPI(page, SINGLE_EVENT);
+    await mockScanAPI(page, await scanResponse());
     await submitText(page, 'Grab coffee with Dana tomorrow');
-    await waitForEvents(page, 1);
+    await waitForReview(page, 1);
 
     await page.locator('[data-testid="input-history-button"]').click();
     await expect(
@@ -294,9 +284,9 @@ test.describe('Recent — summaries', () => {
   test('a shimmer shows while the summary is generating, then it resolves to the label', async ({ page }) => {
     await setupLocal(page);
     await mockSummarizeDelayed(page, 'Slow Label', 2500);
-    await mockParseAPI(page, SINGLE_EVENT);
+    await mockScanAPI(page, await scanResponse());
     await submitText(page, 'Something to summon');
-    await waitForEvents(page, 1);
+    await waitForReview(page, 1);
 
     await page.locator('[data-testid="input-history-button"]').click();
     const card = page.locator('[data-testid="input-history-card"]').first();
@@ -311,11 +301,11 @@ test.describe('Recent — summaries', () => {
 test.describe('Recent — search', () => {
   test('search filters entries and clearing restores all', async ({ page }) => {
     await setupLocal(page);
-    await mockParseAPI(page, SINGLE_EVENT);
+    await mockScanAPI(page, await scanResponse());
     await submitText(page, 'Alpha planning meeting');
-    await waitForEvents(page, 1);
+    await waitForReview(page, 1);
     await submitText(page, 'Beta workshop offsite');
-    await waitForEvents(page, 2);
+    await waitForReview(page, 2);
 
     await page.locator('[data-testid="input-history-button"]').click();
     await expect(page.locator('[data-testid="input-history-card"]')).toHaveCount(2);
@@ -333,9 +323,9 @@ test.describe('Recent — search', () => {
   test('search matches on the generated summary, not just the input text', async ({ page }) => {
     await setupLocal(page);
     await mockSummarize(page, 'Birthday Party');
-    await mockParseAPI(page, SINGLE_EVENT);
+    await mockScanAPI(page, await scanResponse());
     await submitText(page, 'zzz unrelated input text');
-    await waitForEvents(page, 1);
+    await waitForReview(page, 1);
 
     await page.locator('[data-testid="input-history-button"]').click();
     // Wait for the summary to attach to the card before searching by it.

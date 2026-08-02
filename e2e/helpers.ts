@@ -1,27 +1,6 @@
-import { Page, Route, expect } from '@playwright/test';
-
-export function buildSSE(events: Record<string, unknown>[], chunkSize = 3): string {
-  const chunks: string[] = [];
-  for (let i = 0; i < events.length; i += chunkSize) {
-    const slice = events.slice(i, i + chunkSize);
-    chunks.push(
-      `data: ${JSON.stringify({ events: slice, chunkIndex: Math.floor(i / chunkSize), isComplete: false })}\n\n`
-    );
-  }
-  chunks.push(
-    `data: ${JSON.stringify({ events: [], chunkIndex: Math.ceil(events.length / chunkSize), isComplete: true })}\n\n`
-  );
-  return chunks.join('');
-}
-
-const SSE_HEADERS = {
-  'Content-Type': 'text/event-stream',
-  'Cache-Control': 'no-cache',
-  Connection: 'keep-alive',
-  'X-RateLimit-Limit': '50',
-  'X-RateLimit-Remaining': '49',
-  'X-RateLimit-Reset': String(Date.now() + 86400000),
-};
+import { Page, Route } from '@playwright/test';
+import { ScanRequestSchema } from '../src/types/scanRequest';
+import type { ScanResponse } from '../src/types/scannerHttp';
 
 // Auth is a server cookie checked via /api/auth/check; mocking it true keeps the
 // pattern lock from blocking the app. (The old localStorage key was a no-op.)
@@ -96,20 +75,46 @@ export async function mockSummarizeDelayed(page: Page, summary: string, delayMs:
   });
 }
 
-export async function mockParseAPI(page: Page, events: Record<string, unknown>[]) {
-  await page.route('**/api/parse', async (route: Route) => {
-    await route.fulfill({ status: 200, headers: SSE_HEADERS, body: buildSSE(events) });
+export async function mockScanAPI(page: Page, response: ScanResponse): Promise<void> {
+  await page.route('**/api/scan', async (route: Route) => {
+    ScanRequestSchema.parse(route.request().postDataJSON());
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(response),
+    });
   });
 }
 
-// Delays the parse response so the processing card is visible long enough to cancel.
-export async function mockParseAPIDelayed(page: Page, events: Record<string, unknown>[], delayMs: number) {
-  await page.route('**/api/parse', async (route: Route) => {
-    await new Promise(resolve => setTimeout(resolve, delayMs));
+// Deliberately accepts unknown fixture data so rejection of malformed successful
+// responses is exercised at the browser's production scan-client boundary.
+export async function mockRawScanAPI(page: Page, response: unknown): Promise<void> {
+  await page.route('**/api/scan', async (route: Route) => {
+    ScanRequestSchema.parse(route.request().postDataJSON());
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(response),
+    });
+  });
+}
+
+export async function mockScanAPIDelayed(
+  page: Page,
+  response: ScanResponse,
+  delayMs: number,
+): Promise<void> {
+  await page.route('**/api/scan', async (route: Route) => {
+    ScanRequestSchema.parse(route.request().postDataJSON());
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
     try {
-      await route.fulfill({ status: 200, headers: SSE_HEADERS, body: buildSSE(events) });
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(response),
+      });
     } catch {
-      // request was aborted by the client mid-delay — expected for the cancel test
+      // The active scan was canceled before the delayed fixture resolved.
     }
   });
 }
@@ -127,10 +132,6 @@ export async function submitText(page: Page, text: string) {
   const textarea = page.locator('[data-testid="smart-input-textarea"]');
   await textarea.fill(text);
   await textarea.press('Meta+Enter');
-}
-
-export async function waitForEvents(page: Page, count = 1) {
-  await expect(page.getByTestId('event-card-title')).toHaveCount(count, { timeout: 20000 });
 }
 
 // A tiny valid 1x1 PNG for file-upload tests.

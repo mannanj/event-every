@@ -6,8 +6,10 @@ import {
 } from '@event-every/scanner';
 import {
   createReviewDraft,
+  createReviewDrafts,
   editReviewDraft,
 } from '../scannerDraft';
+import { ScanResponseSchema } from '../../types/scannerHttp';
 import type { ReviewFieldEdit, ReviewSource } from '../../types/review';
 
 const identity = {
@@ -75,6 +77,23 @@ function draftFor(value: EventCandidate) {
 }
 
 describe('scanner review drafts', () => {
+  test('projects a schema-valid zero-candidate Scanner response to zero review drafts', () => {
+    const response = ScanResponseSchema.parse({
+      source: { sourceId: 'source-zero', kind: 'text', contentHandle: 'opaque-text-zero' },
+      candidates: [],
+      issues: [],
+    });
+    let identityCalls = 0;
+
+    const drafts = createReviewDrafts(response, () => {
+      identityCalls += 1;
+      return identity;
+    });
+
+    expect(drafts).toEqual([]);
+    expect(identityCalls).toBe(0);
+  });
+
   test('preserves a null provider title without an invented fallback', () => {
     const draft = draftFor(candidate());
 

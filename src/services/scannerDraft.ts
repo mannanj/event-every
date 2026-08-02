@@ -9,6 +9,7 @@ import type {
   ReviewFieldEdit,
   ReviewSource,
 } from '../types/review';
+import type { ScanResponse } from '../types/scannerHttp';
 
 const prodId = '-//Event Every//Scanner//EN';
 
@@ -17,6 +18,11 @@ type DraftIdentity = Readonly<{
   exportUid: string;
   createdAt: string;
 }>;
+
+type DraftIdentityFactory = (
+  candidate: EventCandidate,
+  index: number,
+) => DraftIdentity;
 
 function readinessFor(candidate: EventCandidate, identity: Pick<ReviewDraft, 'exportUid' | 'createdAt'>) {
   return validateForIcs(candidate, {
@@ -40,6 +46,18 @@ export function createReviewDraft(
     readiness: readinessFor(parsedCandidate, identity),
     source,
   };
+}
+
+export function createReviewDrafts(
+  response: ScanResponse,
+  createIdentity: DraftIdentityFactory,
+): ReviewDraft[] {
+  return response.candidates.map((candidate, index) => createReviewDraft(
+    candidate,
+    response.issues,
+    { handle: response.source, label: null },
+    createIdentity(candidate, index),
+  ));
 }
 
 export function editReviewDraft(

@@ -1,4 +1,5 @@
 import { test, expect, Page } from '@playwright/test';
+import { ScanRequestSchema } from '../src/types/scanRequest';
 
 const RESET_AT = '2026-06-11T00:00:00.000Z';
 const TZ = 'America/New_York';
@@ -164,21 +165,34 @@ test.describe('community limit screen', () => {
     await page.route('**/api/detect-urls', (route) =>
       route.fulfill({ json: { hasUrls: false, urls: [], remainingText: '' } })
     );
-    await page.route('**/api/parse', (route) =>
-      route.fulfill({
+    await page.route('**/api/scan', async (route) => {
+      expect(ScanRequestSchema.parse(route.request().postDataJSON())).toEqual({
+        kind: 'text',
+        text: 'Dinner with Sam tomorrow at 7pm',
+      });
+      await route.fulfill({
         status: 402,
         json: {
           error: 'This app is community sponsored. The usage limits have been hit today.',
           code: 'community_limit',
           resetAt: RESET_AT,
         },
-      })
-    );
+      });
+    });
     await page.goto('/');
 
     const textarea = page.locator('[data-testid="smart-input-textarea"]');
     await textarea.fill('Dinner with Sam tomorrow at 7pm');
+    const scanResponse = page.waitForResponse('**/api/scan');
     await textarea.press('Meta+Enter');
+
+    const response = await scanResponse;
+    expect(response.status()).toBe(402);
+    expect(await response.json()).toEqual({
+      error: 'This app is community sponsored. The usage limits have been hit today.',
+      code: 'community_limit',
+      resetAt: RESET_AT,
+    });
 
     await expect(page.getByTestId('community-limit-screen')).toBeVisible();
     await expect(page.getByTestId('community-limit-message')).toContainText(expectedResetText());

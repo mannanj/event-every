@@ -27,7 +27,7 @@ import { convertRawToDate } from '@/utils/timeConversion';
 import { COMMUNITY_LIMIT_CODE, emitCommunityLimit } from '@/utils/communityLimit';
 import { ProcessingEvent, ImageProcessingStatus, BatchProcessing, URLProcessingStatus } from '@/types/processing';
 import { scan, ScanClientError } from '@/services/scanClient';
-import { createReviewDraft, editReviewDraft } from '@/services/scannerDraft';
+import { createReviewDrafts, editReviewDraft } from '@/services/scannerDraft';
 import { createBrowserDownloadEffects, createScannerExporter } from '@/services/scannerExporter';
 import { reviewStorage } from '@/services/reviewStorage';
 import type { ReviewDraft, ReviewFieldEdit } from '@/types/review';
@@ -150,16 +150,11 @@ export default function Home() {
     if (signal.aborted) return [];
 
     const createdAt = new Date().toISOString();
-    const drafts = response.candidates.map((candidate) => createReviewDraft(
-      candidate,
-      response.issues,
-      { handle: response.source, label: null },
-      {
-        id: crypto.randomUUID(),
-        exportUid: `${crypto.randomUUID()}@event-every`,
-        createdAt,
-      },
-    ));
+    const drafts = createReviewDrafts(response, () => ({
+      id: crypto.randomUUID(),
+      exportUid: `${crypto.randomUUID()}@event-every`,
+      createdAt,
+    }));
 
     if (!signal.aborted) {
       setReviewDrafts((previous) => [...previous, ...drafts]);

@@ -1,210 +1,215 @@
-import { test, expect, Page, Route } from '@playwright/test';
+import { readFile } from 'node:fs/promises';
+import { expect, test, type Locator, type Page, type Route } from '@playwright/test';
+import { ScanRequestSchema } from '../src/types/scanRequest';
+import type { ScanResponse } from '../src/types/scannerHttp';
+import { setupLocal, submitText } from './helpers';
 
-/**
- * WebKit E2E regression for the interview-email timezone bug.
- *
- * A pasted event whose timezone is a human LABEL ("Eastern Time (US & Canada)") rendered correctly
- * at 10:30 AM, then — after the async /api/resolve-timezone round-trip (the spinner) returned a
- * string that is not a valid IANA zone — the wall-clock time was re-stamped as UTC and shifted to
- * 6:30 AM ET (the exported .ics showed DTSTART:20260615T103000Z instead of ...T143000Z).
- *
- * These tests drive the REAL UI (SmartInput → /api/parse SSE → EventCard) with the network fully
- * mocked, so they validate the CLIENT-side defenses — convertRawToDate's invalid-zone fallback,
- * the isValidIANATimezone guard before auto-apply, and the spinner "settle" — independently of the
- * server-side sanitizer (covered by the timezone.ts unit tests). The browser timezone is pinned so
- * the wall-clock assertions are exact and reproduce the reporter's environment.
- */
+type ScannerModule = typeof import('@event-every/scanner');
 
-const PARSE_HEADERS = {
-  'Content-Type': 'text/event-stream',
-  'Cache-Control': 'no-cache',
-  Connection: 'keep-alive',
-  'X-RateLimit-Limit': '50',
-  'X-RateLimit-Remaining': '49',
-  'X-RateLimit-Reset': String(Date.now() + 86_400_000),
+// Playwright transforms test modules to CommonJS, so a normal dynamic import becomes require().
+const importScannerModule = new Function(
+  'return import("@event-every/scanner")',
+) as () => Promise<ScannerModule>;
+
+function loadScannerModule(): Promise<ScannerModule> {
+  return importScannerModule();
+}
+
+const SCAN_TEXT = 'Timezone authority fixture: June 15, 2026 at 10:30 AM.';
+const SOURCE_ID = 'timezone-source-1';
+
+const claim = <Value,>(value: Value) => ({
+  value,
+  confidence: 0.9,
+  evidence: [{
+    sourceId: SOURCE_ID,
+    locator: 'body',
+    excerpt: SCAN_TEXT,
+    startOffset: 0,
+    endOffset: SCAN_TEXT.length,
+  }],
+});
+
+const ZONED_START = {
+  kind: 'zoned' as const,
+  date: { year: 2026, month: 6, day: 15 },
+  time: { hour: 10, minute: 30, second: 0 },
+  timeZone: 'America/New_York',
+  resolution: 'exact' as const,
+  possibleOffsets: [],
+  sourceOffset: null,
+  chosenOffset: null,
 };
 
-function sse(events: Record<string, unknown>[]): string {
-  return (
-    `data: ${JSON.stringify({ events, chunkIndex: 0, isComplete: false })}\n\n` +
-    `data: ${JSON.stringify({ events: [], chunkIndex: 1, isComplete: true })}\n\n`
-  );
-}
+const FLOATING_START = {
+  kind: 'floating' as const,
+  date: { year: 2026, month: 6, day: 15 },
+  time: { hour: 10, minute: 30, second: 0 },
+};
 
-async function mockParse(page: Page, events: Record<string, unknown>[]) {
-  await page.route('**/api/parse', (route: Route) =>
-    route.fulfill({ status: 200, headers: PARSE_HEADERS, body: sse(events) })
-  );
-}
-
-async function mockResolveTimezone(
-  page: Page,
-  payload: { timezone: string; confidence: number },
-  delayMs = 300
-) {
-  await page.route('**/api/resolve-timezone', async (route: Route) => {
-    // A small delay makes the 'resolving' spinner observable — the exact spinner the user saw.
-    if (delayMs) await new Promise((r) => setTimeout(r, delayMs));
-    await route.fulfill({
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-  });
-}
-
-async function createTimezoneResponseGate(
-  page: Page,
-  payload: { timezone: string; confidence: number }
-) {
-  let releaseResponse!: () => void;
-  let requestStarted!: () => void;
-  const responseReleased = new Promise<void>((resolve) => (releaseResponse = resolve));
-  const requestReceived = new Promise<void>((resolve) => (requestStarted = resolve));
-
-  await page.route('**/api/resolve-timezone', async (route: Route) => {
-    requestStarted();
-    await responseReleased;
-    await route.fulfill({
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-  });
-
+async function timezoneResponse(
+  candidateId: string,
+  title: string,
+  start: typeof ZONED_START | typeof FLOATING_START,
+): Promise<ScanResponse> {
+  const { EventCandidateSchema } = await loadScannerModule();
   return {
-    release: releaseResponse,
-    waitForRequest: () => requestReceived,
+    source: { sourceId: SOURCE_ID, kind: 'text', contentHandle: 'opaque-timezone-source-1' },
+    candidates: [EventCandidateSchema.parse({
+      candidateId,
+      sourceUid: null,
+      title: claim(title),
+      description: claim('Scanner temporal-authority fixture'),
+      location: claim('Remote'),
+      url: claim('https://example.test/timezone-authority'),
+      temporal: claim({ start, end: null, duration: 'PT30M', allDay: false }),
+      recurrence: claim(null),
+      issues: [],
+    })],
+    issues: [],
   };
 }
 
-function jsonRoute(body: unknown) {
-  return (route: Route) =>
-    route.fulfill({
+async function floatingAndZonedResponse(): Promise<ScanResponse> {
+  const { EventCandidateSchema } = await loadScannerModule();
+  const candidate = (
+    candidateId: string,
+    title: string,
+    start: typeof ZONED_START | typeof FLOATING_START,
+  ) => EventCandidateSchema.parse({
+    candidateId,
+    sourceUid: null,
+    title: claim(title),
+    description: claim('Scanner temporal-authority fixture'),
+    location: claim('Remote'),
+    url: claim('https://example.test/timezone-authority'),
+    temporal: claim({ start, end: null, duration: 'PT30M', allDay: false }),
+    recurrence: claim(null),
+    issues: [],
+  });
+  return {
+    source: { sourceId: SOURCE_ID, kind: 'text', contentHandle: 'opaque-timezone-source-1' },
+    candidates: [
+      candidate('timezone-floating-provider-1', 'Floating provider interview', FLOATING_START),
+      candidate('timezone-zoned-control-1', 'Zoned provider control', ZONED_START),
+    ],
+    issues: [],
+  };
+}
+
+async function mockTimezoneScan(page: Page, response: ScanResponse) {
+  let requestCount = 0;
+  await page.route('**/api/scan', async (route: Route) => {
+    requestCount += 1;
+    const request = ScanRequestSchema.parse(route.request().postDataJSON());
+    expect(request).toEqual({ kind: 'text', text: SCAN_TEXT });
+    await route.fulfill({
       status: 200,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
+      contentType: 'application/json',
+      body: JSON.stringify(response),
     });
+  });
+  return () => requestCount;
 }
 
-async function setupPage(page: Page) {
-  await page.route('**/api/auth/check', jsonRoute({ authenticated: true }));
-  await page.route('**/api/detect-urls', jsonRoute({ hasUrls: false, urls: [], remainingText: '' }));
-  await page.route('**/api/summarize', jsonRoute({ summary: 'Test Summary' }));
-  await page.addInitScript(() => localStorage.clear());
-  await page.goto('/');
-  await page.waitForSelector('[data-testid="smart-input-textarea"]', { state: 'visible', timeout: 15_000 });
+async function storedStart(page: Page): Promise<unknown> {
+  return page.evaluate(() => {
+    const serialized = localStorage.getItem('event-every:review-drafts:v1');
+    if (serialized === null) throw new Error('Scanner review draft was not persisted');
+    const [draft] = JSON.parse(serialized) as Array<{
+      candidate: { temporal: { value: { start: unknown } } };
+    }>;
+    return draft.candidate.temporal.value.start;
+  });
 }
 
-async function submitText(page: Page, text: string) {
-  const ta = page.locator('[data-testid="smart-input-textarea"]');
-  await ta.fill(text);
-  await ta.press('Meta+Enter');
+async function storedStarts(page: Page): Promise<unknown[]> {
+  return page.evaluate(() => {
+    const serialized = localStorage.getItem('event-every:review-drafts:v1');
+    if (serialized === null) throw new Error('Scanner review drafts were not persisted');
+    return (JSON.parse(serialized) as Array<{
+      candidate: { temporal: { value: { start: unknown } } };
+    }>).map((draft) => draft.candidate.temporal.value.start);
+  });
 }
 
-// The reporter's event: "Jun 15, 2026 10:30am-11:00am (GMT-04:00) Eastern Time (US & Canada)".
-const INTERVIEW_EVENT = {
-  title: 'Sr. Software Engineer Frontend - Virtual Phone Screen Interview',
-  startDate: '2026-06-15T10:30:00',
-  endDate: '2026-06-15T11:00:00',
-  location: 'Microsoft Teams',
-  confidence: 0.9,
-  allDay: false,
-  // A human LABEL, not an IANA id — this is what makes the client mark the zone 'unknown' and fire
-  // the async resolver, which is the path where the corruption used to happen.
-  timezone: 'Eastern Time (US & Canada)',
-};
-const INTERVIEW_TEXT =
-  'Sr. Software Engineer Frontend phone screen — Jun 15, 2026 10:30am-11:00am (GMT-04:00) Eastern Time (US & Canada) via Microsoft Teams.';
+async function downloadCalendar(page: Page, review: Locator): Promise<string> {
+  const downloadPromise = page.waitForEvent('download');
+  await review.getByRole('button', { name: 'Export selected review drafts' }).click();
+  const download = await downloadPromise;
+  const downloadPath = await download.path();
+  if (downloadPath === null) throw new Error('Scanner export did not create a download');
+  return readFile(downloadPath, 'utf8');
+}
 
-test.describe("interview email in the reporter's zone (America/New_York)", () => {
-  test.use({ timezoneId: 'America/New_York' });
+function calendarEventForSummary(calendarText: string, summary: string): string {
+  const event = (calendarText.match(/BEGIN:VEVENT\r\n[\s\S]*?END:VEVENT\r\n/g) ?? [])
+    .find((value) => value.includes(`SUMMARY:${summary}\r\n`));
+  if (event === undefined) throw new Error(`Missing Scanner VEVENT for ${summary}`);
+  return event;
+}
 
-  test('stays 10:30 AM when the resolver returns a non-IANA zone (the reported bug)', async ({ page }) => {
-    await setupPage(page);
-    await mockParse(page, [INTERVIEW_EVENT]);
-    // deepseek sometimes returns a non-IANA string like "EDT" with high confidence — the exact
-    // trigger. The client must NOT apply it and must NOT shift the time.
-    await mockResolveTimezone(page, { timezone: 'EDT', confidence: 0.95 });
-
-    const resolved = page.waitForResponse('**/api/resolve-timezone');
-    await submitText(page, INTERVIEW_TEXT);
-    await expect(page.getByTestId('event-card-title')).toHaveCount(1, { timeout: 15_000 });
-
-    const card = page.getByTestId('event-card').first();
-    await expect(card).toContainText('Jun 15');
-    await expect(card).toContainText('10:30 AM'); // correct initial render, before resolution
-
-    await resolved; // the async resolution (the spinner) has now run
-    await expect(card.locator('.animate-spin')).toHaveCount(0, { timeout: 10_000 }); // spinner settled
-
-    // The crux: the time must still be 10:30 AM, never the 6:30 AM the bug produced.
-    await expect(card).toContainText('10:30 AM');
-    await expect(card).not.toContainText('6:30');
-  });
-
-  test('stays 10:30 AM when the resolver returns a valid IANA zone', async ({ page }) => {
-    await setupPage(page);
-    await mockParse(page, [INTERVIEW_EVENT]);
-    await mockResolveTimezone(page, { timezone: 'America/New_York', confidence: 0.95 });
-
-    const resolved = page.waitForResponse('**/api/resolve-timezone');
-    await submitText(page, INTERVIEW_TEXT);
-    await expect(page.getByTestId('event-card-title')).toHaveCount(1, { timeout: 15_000 });
-    const card = page.getByTestId('event-card').first();
-
-    await resolved;
-    await expect(card.locator('.animate-spin')).toHaveCount(0, { timeout: 10_000 });
-
-    await expect(card).toContainText('10:30 AM');
-    await expect(card).not.toContainText('6:30');
-  });
-
-  test('low-confidence resolution leaves the time alone and the spinner terminates', async ({ page }) => {
-    await setupPage(page);
-    await mockParse(page, [INTERVIEW_EVENT]);
-    // confidence ≤ 0.8 → the client skips applying. Before the fix this left the spinner spinning
-    // forever; it must now settle to a terminal (non-resolving) state.
-    await mockResolveTimezone(page, { timezone: 'Eastern Time', confidence: 0.3 });
-
-    const resolved = page.waitForResponse('**/api/resolve-timezone');
-    await submitText(page, INTERVIEW_TEXT);
-    await expect(page.getByTestId('event-card-title')).toHaveCount(1, { timeout: 15_000 });
-    const card = page.getByTestId('event-card').first();
-
-    await resolved;
-    await expect(card.locator('.animate-spin')).toHaveCount(0, { timeout: 10_000 }); // no infinite spinner
-    await expect(card).toContainText('10:30 AM');
-    await expect(card).not.toContainText('6:30');
-  });
-});
-
-test.describe('cross-zone apply (viewer in America/Los_Angeles)', () => {
+test.describe('Scanner temporal authority (viewer in America/Los_Angeles)', () => {
   test.use({ timezoneId: 'America/Los_Angeles' });
 
-  test('a valid resolved zone re-converts: 10:30 ET renders as 7:30 AM PT', async ({ page }) => {
-    await setupPage(page);
-    await mockParse(page, [INTERVIEW_EVENT]);
-    const timezoneResponse = await createTimezoneResponseGate(page, {
-      timezone: 'America/New_York',
-      confidence: 0.95,
-    });
+  test('zoned provider point stays zoned in review and exports its explicit TZID', async ({ page }) => {
+    const candidateId = 'timezone-zoned-provider-1';
+    const requestCount = await mockTimezoneScan(
+      page,
+      await timezoneResponse(candidateId, 'Zoned provider interview', ZONED_START),
+    );
+    await setupLocal(page);
 
-    const resolved = page.waitForResponse('**/api/resolve-timezone');
-    await submitText(page, INTERVIEW_TEXT);
-    await expect(page.getByTestId('event-card-title')).toHaveCount(1, { timeout: 15_000 });
-    const card = page.getByTestId('event-card').first();
+    await submitText(page, SCAN_TEXT);
 
-    // Before resolution, the unknown-zone fallback assumes the viewer's own zone (PT) → 10:30 AM.
-    await expect(card).toContainText('10:30 AM');
+    const review = page.getByRole('region', { name: 'Scanner review drafts' });
+    await expect(review.getByRole('textbox', { name: 'Start date' })).toHaveValue('2026-06-15');
+    // The reviewer is in Los Angeles, but Scanner preserves the provider's New York wall time.
+    await expect(review.getByRole('textbox', { name: 'Start time' })).toHaveValue('10:30');
+    await expect(review.getByRole('textbox', { name: 'Timezone' })).toHaveValue('America/New_York');
+    await expect(review.getByText('temporal · floating_time', { exact: false })).toHaveCount(0);
+    await expect(review.getByRole('button', { name: 'Export selected review drafts' })).toBeEnabled();
+    await expect.poll(() => storedStart(page)).toEqual(ZONED_START);
+    expect(requestCount()).toBe(1);
 
-    await timezoneResponse.waitForRequest();
-    timezoneResponse.release();
-    await resolved;
-    await expect(card.locator('.animate-spin')).toHaveCount(0, { timeout: 10_000 });
+    const calendarText = await downloadCalendar(page, review);
+    expect(calendarText).toContain('DTSTART;TZID=America/New_York:20260615T103000');
+    expect(calendarText).not.toContain('DTSTART:20260615T103000');
+    expect(calendarText).not.toContain('DTSTART:20260615T103000Z');
+  });
 
-    // After applying America/New_York, 10:30 ET correctly re-renders as 7:30 AM PT.
-    await expect(card).toContainText('7:30 AM');
-    await expect(card).not.toContainText('10:30 AM');
+  test('floating provider point remains a truthful floating-time warning without TZID', async ({ page }) => {
+    const requestCount = await mockTimezoneScan(
+      page,
+      await floatingAndZonedResponse(),
+    );
+    await setupLocal(page);
+
+    await submitText(page, SCAN_TEXT);
+
+    const review = page.getByRole('region', { name: 'Scanner review drafts' });
+    const floatingCard = review.getByRole('article').filter({ hasText: 'Floating provider interview' });
+    const zonedControlCard = review.getByRole('article').filter({ hasText: 'Zoned provider control' });
+    await expect(floatingCard.getByRole('textbox', { name: 'Start date' })).toHaveValue('2026-06-15');
+    await expect(floatingCard.getByRole('textbox', { name: 'Start time' })).toHaveValue('10:30');
+    await expect(floatingCard.getByRole('textbox', { name: 'Timezone' })).toHaveValue('');
+    await expect(floatingCard.getByText('temporal · floating_time', { exact: false })).toHaveCount(1);
+    await expect(zonedControlCard.getByRole('textbox', { name: 'Start date' })).toHaveValue('2026-06-15');
+    await expect(zonedControlCard.getByRole('textbox', { name: 'Start time' })).toHaveValue('10:30');
+    await expect(zonedControlCard.getByRole('textbox', { name: 'Timezone' })).toHaveValue('America/New_York');
+    await expect(zonedControlCard.getByText('temporal · floating_time', { exact: false })).toHaveCount(0);
+    await expect(review.getByRole('button', { name: 'Export selected review drafts' })).toBeEnabled();
+    await expect.poll(() => storedStarts(page)).toEqual([FLOATING_START, ZONED_START]);
+    expect(requestCount()).toBe(1);
+
+    const calendarText = await downloadCalendar(page, review);
+    const floatingEvent = calendarEventForSummary(calendarText, 'Floating provider interview');
+    const zonedControlEvent = calendarEventForSummary(calendarText, 'Zoned provider control');
+    expect(floatingEvent).toContain('DTSTART:20260615T103000');
+    expect(floatingEvent).not.toContain('TZID=');
+    expect(floatingEvent).not.toContain('DTSTART:20260615T103000Z');
+    expect(zonedControlEvent).toContain('DTSTART;TZID=America/New_York:20260615T103000');
+    expect(zonedControlEvent).not.toContain('DTSTART:20260615T103000');
+    expect(zonedControlEvent).not.toContain('DTSTART:20260615T103000Z');
   });
 });
