@@ -3833,3 +3833,50 @@ repaired and the same reviewer was resumed against the new fixed point. Rereview
 No credential, provider request, external network, deployment, publication, staging, or commit was
 used for this proof. Task 8 is ready for its exact-path commit; Task 9 removal-assertion RED remains
 the next dependency-ready gate.
+
+## E1-T9-LEGACY-PARSE-REMOVAL-RED (2026-08-02)
+
+At clean accepted baseline `ab872d0`, the terminal path guard was extended before production
+deletion. Its first run is rejected because it falsely classified `e2e/helpers.ts` as a browser
+production `/api/scan` call site. After restricting that check to production `src/**`, the guard
+failed only on the intended legacy state:
+
+- `/api/parse` remains in `src/services/__tests__/parser.test.ts`;
+- `parseEventsBatch` remains in `src/app/api/parse/route.ts` and `src/services/parser.ts`;
+- executable `ParsedEvent` use remains in `src/services/parser.ts` and its test; and
+- `src/app/api/parse/route.ts`, `src/services/parser.ts`, and
+  `src/services/__tests__/parser.test.ts` all still exist.
+
+The ReviewDraft exporter/`ics`, browser OpenRouter, single production `/api/scan`, `buildSSE`, and
+`mockParseAPI` assertions produced no violation. Typecheck, targeted lint, and whitespace checks
+passed. Only the guard/plan/ledger are modified alongside the protected untracked paths; no
+production deletion, browser, server, network, provider, credential, staging, commit, publication,
+or deployment occurred. This is the accepting RED for Task 9 GREEN.
+
+## E1-T9-LEGACY-PARSE-REMOVAL-GREEN (2026-08-02)
+
+The accepted RED became green by deleting exactly the parse route, parser service, and parser unit
+test. The README/environment boundary now records Scanner commit/package provenance, fixed
+DeepSeek text-link and Mistral vision roles, host versus package ownership, request-lifetime raw
+source handling, raw-free Scanner review storage, the separate unchanged Recent-input IndexedDB
+feature, offline verification, and deferred Cloudflare/E1 exclusions. `OPENROUTER_MODEL` remains
+for host URL detection. `ics` stays because `src/services/exporter.ts` still imports it for the
+untouched saved-history CalendarEvent path.
+
+The first post-deletion guard errored on the ignored stale Next validator rather than the product
+boundary. Removing only `.next/types/validator.ts` allowed normal regeneration and typecheck; no
+tracked byte or guard condition was weakened. The terminal guard passed with 203 changed paths,
+units passed **241/241 / 943 expectations**, typecheck and targeted lint passed, protected
+inventory remained 53,300, and whitespace was clean. This is focused GREEN only; terminal offline
+matrix, commit, committed replay, and independent Sol/high acceptance remain required.
+
+## E1-T9-TERMINAL-LOCAL-PROOF (2026-08-02)
+
+Frozen installation passed without dependency or lockfile change. The fresh offline gate passed
+**241 units / 943 expectations**, zero lint errors (18 existing warnings), typecheck, production
+build with no `/api/parse` route, and **120/120** Chromium/WebKit scenarios. The terminal path guard
+accepted 203 cumulative paths; protected inventory verified 53,300; whitespace and closed-port
+checks passed. Status contains only `.env.example`, README, plan/ledger, the terminal guard, the
+three parser deletions, and protected `.claude/`/task files. Exact-path commit and independent
+post-commit acceptance remain blocking. No provider, credential, external network, staging,
+publication, or deployment action occurred.

@@ -1327,3 +1327,51 @@ no Critical, Important, or Minor findings. Verified route metadata is
 `/Users/manblack/Documents/codex-agent-routing/.routed-runs/20260802T153028Z-66377-e1-t8-post-disposition-acceptance-rereview/report.json`.
 No provider credential, external network, staging, publication, deployment, or production action
 was used. Task 9's removal-assertion RED gate is next.
+
+## Task 9 removal assertions RED — E1-T9-LEGACY-PARSE-REMOVAL-RED (2026-08-02)
+
+Starting from accepted Task 8 commit `ab872d0`, `scripts/assert-e1-paths.ts` now expresses the
+terminal Task 9 boundary before any production deletion. It rejects `/api/parse`,
+`parseEventsBatch`, legacy scan-path `ParsedEvent`, `buildSSE`, and `mockParseAPI`; forbids review
+components from importing the legacy exporter or `ics`; forbids browser-reachable Scanner
+OpenRouter imports; requires exactly one production `/api/scan` literal in
+`src/services/scanClient.ts`; and requires all three parser paths to be absent.
+
+The first attempted RED also counted an E2E route fixture as a browser production call site and is
+rejected as a false positive. After narrowing that assertion to production `src/**`, the exact
+cumulative guard failed for the intended remaining legacy boundary: `/api/parse` in the parser
+test, `parseEventsBatch` in the route/service, `ParsedEvent` in the service/test, and all three
+legacy paths still present. Incremental-disabled typecheck, targeted lint, and `git diff --check`
+passed. No production file was deleted or changed; no browser, server, network, provider,
+credential, staging, commit, publication, or deployment action occurred. The minimal Task 9 GREEN
+deletion/documentation step is next.
+
+## Task 9 removal GREEN — E1-T9-LEGACY-PARSE-REMOVAL-GREEN (2026-08-02)
+
+The minimal GREEN deletes only `src/app/api/parse/route.ts`, `src/services/parser.ts`, and
+`src/services/__tests__/parser.test.ts`. README and `.env.example` now document exact Scanner
+provenance/refresh, fixed text-link and vision model roles, Event Every versus Scanner ownership,
+server-only raw-source lifetime, raw-free review storage, the separate unchanged Recent-input
+IndexedDB feature, offline guarantees, and deferred E1/Cloudflare work. `OPENROUTER_MODEL` remains
+documented for host URL detection only. The `ics` dependency and lockfile remain unchanged because
+the untouched saved-history exporter still imports `ics`; Scanner review export does not.
+
+The first GREEN guard attempt exposed an ignored stale `.next/types/validator.ts` import of the
+deleted route. Only that generated validator was removed; no source/config assertion was weakened,
+and Next build will regenerate it. The terminal guard then passed with **203 changed paths**.
+Focused proof passed **241 unit tests / 943 expectations**, incremental-disabled typecheck,
+targeted lint with zero errors (13 existing warnings), protected inventory 53,300, and whitespace
+checks. Full offline/browser proof, exact Task 9 commit, post-commit replay, and independent
+acceptance remain blocking and are next.
+
+## Task 9 terminal local proof — E1-T9-TERMINAL-LOCAL-PROOF (2026-08-02)
+
+`bun install --frozen-lockfile` passed without lockfile change. Fresh
+`bun run verify:e1:offline` passed **241/241 unit tests / 943 expectations**, lint with **0
+errors** (18 existing warnings), typecheck, and the production build; the generated route table has
+16 pages and no `/api/parse`. The complete browser matrix passed **120/120** across Chromium and
+WebKit. Terminal path guard accepted 203 cumulative paths, protected inventory verified 53,300
+records, whitespace passed, ports 3777/3794 were closed, and status contained only the exact Task 9
+candidate plus protected untracked paths. Exact-path commit and independent post-commit acceptance
+remain next; no provider, credential, external network, staging, publication, or deployment was
+used.
