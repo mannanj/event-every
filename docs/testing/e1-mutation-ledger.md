@@ -3880,3 +3880,17 @@ checks passed. Status contains only `.env.example`, README, plan/ledger, the ter
 three parser deletions, and protected `.claude/`/task files. Exact-path commit and independent
 post-commit acceptance remain blocking. No provider, credential, external network, staging,
 publication, or deployment action occurred.
+
+## E1-T9-PLAN-PIN-RECONCILIATION (2026-08-02)
+
+The first terminal Sol/high review accepted every inspected runtime and proof boundary but
+returned `VERIFIED:false` on one Important documentation-authority mismatch. The original E1 plan
+still described historical Scanner baseline `98aec60` as the final package pin, while accepted
+RPKG-1 through RPKG-4 evidence and all live vendor/provenance seams bind Scanner `c03cf1a`. The
+implementation plan now explicitly records that accepted supersession, including provenance
+schema 2, the 138-entry canonical pack digest, and the projected artifact digest. No production,
+test, dependency, lockfile, browser, provider, network, credential, or protected-path byte changed
+in this repair. Report:
+`/Users/manblack/Documents/codex-agent-routing/.routed-runs/20260802T155801Z-83291-e1-terminal-acceptance-review/report.json`.
+Static proof, docs-only commit, and independent rereview remain blocking; no mutation row changes
+because this is an authority-document correction rather than a product behavior change.

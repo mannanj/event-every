@@ -6,7 +6,7 @@
 
 **Architecture:** Event Every remains the host: it owns request validation, rate/budget policy, provider credentials and transport, opaque source resolution, browser state, and downloads. `@event-every/scanner` owns provider request/response validation, null-bearing `EventCandidate` truth, readiness diagnostics, and ICS bytes. The browser stores a `ReviewDraft` whose scanner candidate is the single source of truth; edits update that candidate and every export runs fresh readiness validation and generation.
 
-**Stack:** Next.js 15 App Router, React 19, TypeScript 5, Bun test, Playwright, Zod 4, vendored `@event-every/scanner` package pinned to Scanner commit `98aec60cf9d87544196bfd0fa702c8170453bfd8`.
+**Stack:** Next.js 15 App Router, React 19, TypeScript 5, Bun test, Playwright, Zod 4, vendored `@event-every/scanner` package pinned to the accepted reusable-package commit `c03cf1a79d0d1f2151ee602d67aa0a2eede673e4`.
 
 ---
 
@@ -15,6 +15,16 @@
 - Event Every begins at `main@4cc32012ca510006ab672e8699f3e07c7c7b11a6`.
 - This plan file is committed as the E1 planning artifact before Task 1. It is an allowed pre-implementation path in every `4cc32012..HEAD` audit; implementation commits do not modify it unless an accepted review finding first requires a plan revision.
 - Event Scanner begins at clean `main@98aec60cf9d87544196bfd0fa702c8170453bfd8`.
+- Accepted reusable-package revision: the program's independently reviewed RPKG-1 through RPKG-4
+  gates advanced Scanner from that historical E1 baseline to clean
+  `main@c03cf1a79d0d1f2151ee602d67aa0a2eede673e4`. That commit is the authoritative E1 vendor pin
+  and supersedes `98aec60cf9d87544196bfd0fa702c8170453bfd8` wherever this plan specifies the packaged
+  snapshot, provenance assertion, refresh command, or final reproducibility check. Provenance
+  schema 2 binds its canonical 138-entry pack SHA-256
+  `1f3d909e17c71706fd6c41a4e16a094dd4ef577a933ca58b9219cc38e60a27e8` and projected artifact
+  digest `f5b7af00b5d0bdd938c9392057b8f43b50876ca833da5084f24e5c3fdbb9d4f8`. The terminal RPKG
+  acceptance and independent-review evidence are recorded in Calendar Casa work-plan Revisions
+  79–84 and the active reusable-package tracker; this revision changes no other E1 boundary.
 - Preserve the existing untracked `.claude/`, `tasks/task-192.md`, and `tasks/task-193.md`; no task may stage, edit, or delete them.
 - Scanner has no configured Git remote or published registry package. E1 therefore commits the exact built package under `vendor/event-every-scanner/` and declares `"@event-every/scanner": "file:vendor/event-every-scanner"`. A SHA-pinned script and provenance manifest make the snapshot reproducible. Publication may replace this seam later, but is not part of E1.
 - Automated tests are offline. They use fixture transports or intercepted HTTP; they never read provider keys, call OpenRouter, spend money, deploy, or touch production data.
@@ -94,7 +104,8 @@
 `src/services/__tests__/scannerVendor.test.ts` must:
 
 1. load `vendor/event-every-scanner/PROVENANCE.json`;
-2. assert `sourceCommit` equals `98aec60cf9d87544196bfd0fa702c8170453bfd8`;
+2. assert `sourceCommit` equals the accepted superseding pin
+   `c03cf1a79d0d1f2151ee602d67aa0a2eede673e4`;
 3. assert `packageName` equals `@event-every/scanner`;
 4. recompute SHA-256 for every sorted `files[]` entry, including staged `package.json`, `README.md`, and every `dist/**` file, and require exact matches;
 5. reject every vendor-root entry outside the exact allowlist `PROVENANCE.json`, `package.json`, `README.md`, and `dist/**`; and
@@ -1286,7 +1297,8 @@ Run the same terminal proof against the resulting commit. Obtain an independent 
 
 ## Final acceptance checklist
 
-- Scanner snapshot is reproducible from exact clean commit `98aec60cf9d87544196bfd0fa702c8170453bfd8`.
+- Scanner snapshot is reproducible from exact clean accepted reusable-package commit
+  `c03cf1a79d0d1f2151ee602d67aa0a2eede673e4`.
 - Text/image requests use the correct fixed Scanner adapters through Event Every’s single metered transport.
 - The client/API boundary is strict and returns opaque source metadata, candidates, and issues—never raw sources.
 - Missing claims remain missing; edits are explicit, evidence-free human claims.
@@ -1375,3 +1387,21 @@ records, whitespace passed, ports 3777/3794 were closed, and status contained on
 candidate plus protected untracked paths. Exact-path commit and independent post-commit acceptance
 remain next; no provider, credential, external network, staging, publication, or deployment was
 used.
+
+## Task 9 first terminal review disposition — E1-T9-PLAN-PIN-RECONCILIATION (2026-08-02)
+
+Post-commit proof against `195e9b4` reproduced the frozen install, **241/241 unit tests / 943
+expectations**, zero lint errors (18 existing warnings), typecheck, production build without
+`/api/parse`, **120/120** Chromium/WebKit scenarios, the 203-path guard, and the 53,300-record
+protected inventory. The independent controlled Sol/high review found no implementation,
+privacy, provider-boundary, storage, export, network, deletion, or protected-path defect, but
+returned **`VERIFIED:false`** for one Important authority inconsistency: this plan still called
+the historical Scanner baseline `98aec60` the final vendor pin even though the accepted RPKG
+program, vendor command, provenance, tests, and README all bind `c03cf1a`.
+
+This revision explicitly records the independently accepted RPKG supersession and makes
+`c03cf1a79d0d1f2151ee602d67aa0a2eede673e4` authoritative for packaged provenance and final E1
+reproducibility while preserving `98aec60` as the historical starting baseline. Review report:
+`/Users/manblack/Documents/codex-agent-routing/.routed-runs/20260802T155801Z-83291-e1-terminal-acceptance-review/report.json`.
+The corrected plan requires focused static proof, an exact docs-only commit, and independent
+rereview before E1 can become proven; Cloudflare remains blocked.
