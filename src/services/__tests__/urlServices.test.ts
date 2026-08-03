@@ -1,8 +1,81 @@
 import { describe, expect, mock, test } from 'bun:test';
-import { buildEnrichedUrlText, detectURLs } from '@/services/urlDetector';
+import { buildEnrichedUrlText, detectURLs, detectUrlsDeterministically } from '@/services/urlDetector';
 import { scrapeURLsBatch } from '@/services/webScraper';
+import { POST as detectUrlsPost } from '@/app/api/detect-urls/route';
+import { NextRequest } from 'next/server';
 
 describe('URL enrichment cancellation', () => {
+  test('deterministic detector preserves source order, punctuation, canonicalization, and maximum ten', () => {
+    const input = 'See (one.test), then https://two.test/path?x=1. ' + Array.from({ length: 10 }, (_, index) => `https://e${index}.test/x`).join(' ');
+    const result = detectUrlsDeterministically(input);
+    expect(result.urls).toEqual(['https://one.test/', 'https://two.test/path?x=1', ...Array.from({ length: 8 }, (_, index) => `https://e${index}.test/x`)]);
+    expect(result.remainingText).toContain('See (), then .');
+    expect(result.hasUrls).toBe(true);
+  });
+
+  test('deterministic detector performs no provider call', () => {
+    const originalFetch = globalThis.fetch;
+    let calls = 0;
+    globalThis.fetch = mock(async () => { calls++; return new Response('{}'); }) as unknown as typeof fetch;
+    try {
+      expect(detectUrlsDeterministically('Details at https://one.test/event.').urls).toEqual(['https://one.test/event']);
+      expect(calls).toBe(0);
+    } finally { globalThis.fetch = originalFetch; }
+  });
+
+  test('deterministic detector performs no provider call through the route and issues a capability', async () => {
+    const originalFetch = globalThis.fetch;
+    const originalCapabilityKey = process.env.RESOLVER_CAPABILITY_HMAC;
+    let calls = 0;
+    globalThis.fetch = mock(async () => { calls++; return new Response('{}'); }) as unknown as typeof fetch;
+    process.env.RESOLVER_CAPABILITY_HMAC = 'synthetic-route-capability-key';
+    try {
+      const response = await detectUrlsPost(new NextRequest('https://event-every.test/api/detect-urls', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-event-every-identity': 'unknown' },
+        body: JSON.stringify({ text: 'Details at https://one.test/event.' }),
+      }));
+      expect(response.status).toBe(200);
+      const body = await response.json();
+      expect(body.urls).toEqual(['https://one.test/event']);
+      expect(body.resolverCapability).toMatch(/^[A-Za-z0-9_-]+\.[0-9a-f]{64}$/);
+      expect(calls).toBe(0);
+    } finally {
+      globalThis.fetch = originalFetch;
+      if (originalCapabilityKey === undefined) delete process.env.RESOLVER_CAPABILITY_HMAC;
+      else process.env.RESOLVER_CAPABILITY_HMAC = originalCapabilityKey;
+    }
+  });
+
+  test('resolver concurrency is bounded at two and each attempt carries one stable UUID and capability', async () => {
+    const originalFetch = globalThis.fetch;
+    let active = 0;
+    let maximum = 0;
+    const release: Array<() => void> = [];
+    const calls: Array<{ requestId: string; capability: string }> = [];
+    globalThis.fetch = mock(async (_input, init) => {
+      active++; maximum = Math.max(maximum, active);
+      const body = JSON.parse(String(init?.body));
+      calls.push({ requestId: body.requestId, capability: body.resolverCapability });
+      await new Promise<void>((resolve) => release.push(resolve));
+      active--;
+      return Response.json({ url: body.url, text: 'ok', status: 'success' });
+    }) as unknown as typeof fetch;
+    try {
+      const pending = scrapeURLsBatch(['https://one.test', 'https://two.test', 'https://three.test'], undefined, 'capability-value');
+      await Bun.sleep(0);
+      expect(maximum).toBe(2);
+      expect(calls).toHaveLength(2);
+      release.splice(0).forEach((resolve) => resolve());
+      await Bun.sleep(0);
+      expect(calls).toHaveLength(3);
+      release.splice(0).forEach((resolve) => resolve());
+      await pending;
+      expect(calls.every((call) => /^[0-9a-f-]{36}$/.test(call.requestId))).toBe(true);
+      expect(new Set(calls.map((call) => call.requestId)).size).toBe(3);
+      expect(calls.every((call) => call.capability === 'capability-value')).toBe(true);
+    } finally { release.splice(0).forEach((resolve) => resolve()); globalThis.fetch = originalFetch; }
+  });
   test('forwards the active signal to URL detection and scraping', async () => {
     const originalFetch = globalThis.fetch;
     const fetchMock = mock(async (input: RequestInfo | URL) => {

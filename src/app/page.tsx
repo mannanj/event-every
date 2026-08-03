@@ -255,7 +255,7 @@ export default function Home() {
             message: `Fetching ${detection.urls.length} event page${detection.urls.length === 1 ? '' : 's'}...`,
           });
           updateProgress(queueItem.id, 30);
-          const scraped = await scrapeURLsBatch(detection.urls, controller.signal);
+          const scraped = await scrapeURLsBatch(detection.urls, controller.signal, detection.resolverCapability);
           if (controller.signal.aborted || activeSubmissionRef.current !== batchId) return [];
           combinedText = buildEnrichedUrlText(inputText, detection.urls, detection.remainingText, scraped.results);
           if (!combinedText.trim()) {

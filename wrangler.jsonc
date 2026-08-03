@@ -18,6 +18,19 @@
       "database_id": "11111111-1111-4111-8111-111111111111"
     }
   ],
+  "durable_objects": {
+    "bindings": [
+      { "name": "IDENTITY_DAY_POLICY", "class_name": "IdentityDayPolicy" },
+      { "name": "RESOLVER_REQUEST_AUTHORITY", "class_name": "ResolverRequestAuthority" },
+      { "name": "RESOLVER_DAILY_COUNTER", "class_name": "DailyCounter" }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "c1-a-v1",
+      "new_sqlite_classes": ["IdentityDayPolicy", "ResolverRequestAuthority", "DailyCounter"]
+    }
+  ],
   "vars": {
     // This guard deliberately keeps the local scaffold nondeployable.
     "C1_DEPLOYMENT_DISABLED": "1",

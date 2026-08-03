@@ -1,5 +1,25 @@
 import type { EdgeIdentity } from './contracts';
 
+export type IdentitySchedule = Readonly<{
+  currentVersion: string;
+  nextVersion: string | null;
+  activatesAtMs: number | null;
+  digest: string;
+}>;
+
+export function proposedIdentityVersion(schedule: IdentitySchedule, nowMs: number): string {
+  const currentValid = KEY_VERSION.test(schedule.currentVersion);
+  const nextValid = schedule.nextVersion === null || KEY_VERSION.test(schedule.nextVersion);
+  const rotationShape = schedule.nextVersion === null
+    ? schedule.activatesAtMs === null
+    : schedule.activatesAtMs !== null && schedule.nextVersion !== schedule.currentVersion;
+  if (!currentValid || !nextValid || !rotationShape || schedule.digest.length === 0) {
+    throw new Error('invalid identity schedule');
+  }
+  if (schedule.nextVersion === null || schedule.activatesAtMs === null) return schedule.currentVersion;
+return nowMs < schedule.activatesAtMs ? schedule.currentVersion : schedule.nextVersion;
+}
+
 export const IDENTITY_HMAC_DOMAIN = 'event-every/edge-identity/v1\0';
 export const INTERNAL_IDENTITY_HEADER = 'x-event-every-identity';
 

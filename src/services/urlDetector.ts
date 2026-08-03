@@ -6,6 +6,25 @@ export interface URLDetectionResult {
   urls: string[];
   remainingText: string;
   hasUrls: boolean;
+  resolverCapability?: string;
+}
+
+export function detectUrlsDeterministically(text: string): URLDetectionResult {
+  const urls: string[] = [];
+  const parts: string[] = [];
+  let cursor = 0;
+  for (const match of text.matchAll(rawUrlPattern)) {
+    if (urls.length >= 10) break;
+    const index = match.index ?? 0;
+    const source = sourceUrlToken(match[0]);
+    const normalized = normalizeUrl(source);
+    if (!normalized) continue;
+    urls.push(normalized);
+    parts.push(text.slice(cursor, index));
+    cursor = index + source.length;
+  }
+  parts.push(text.slice(cursor));
+  return { urls, remainingText: parts.join(''), hasUrls: urls.length > 0 };
 }
 
 const rawUrlPattern = /(?:https?:\/\/|www\.)[^\s<>]+|\b(?:[a-z0-9-]+\.)+[a-z]{2,}(?:\/[^\s<>]*)?/gi;

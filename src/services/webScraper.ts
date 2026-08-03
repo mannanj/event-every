@@ -16,14 +16,25 @@ function isAbort(error: unknown): boolean {
   return error instanceof DOMException && error.name === 'AbortError';
 }
 
-async function scrapeURL(url: string, signal?: AbortSignal): Promise<ScrapedContent> {
+async function scrapeURL(url: string, signal?: AbortSignal, resolverCapability?: string): Promise<ScrapedContent> {
+  const requestId = crypto.randomUUID();
   try {
-    const response = await fetch('/api/scrape-url', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url }),
-      signal,
-    });
+    let response!: Response;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      response = await fetch('/api/scrape-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url, requestId, resolverCapability }),
+        signal,
+      });
+      if (response.status !== 429 || attempt === 2) break;
+      const retry = await response.clone().json().catch(() => null) as { code?: string; retryAfterSeconds?: number } | null;
+      if (retry?.code !== 'resolver_busy' || !Number.isInteger(retry.retryAfterSeconds)) break;
+      await new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(resolve, Math.max(1, Math.min(10, retry.retryAfterSeconds!)) * 1_000);
+        signal?.addEventListener('abort', () => { clearTimeout(timer); reject(signal.reason); }, { once: true });
+      });
+    }
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({ error: 'Failed to scrape URL' }));
@@ -59,10 +70,9 @@ async function scrapeURL(url: string, signal?: AbortSignal): Promise<ScrapedCont
   }
 }
 
-export async function scrapeURLsBatch(urls: string[], signal?: AbortSignal): Promise<BatchScrapedContent> {
-  const results = await Promise.all(
-    urls.map(url => scrapeURL(url, signal))
-  );
+export async function scrapeURLsBatch(urls: string[], signal?: AbortSignal, _resolverCapability?: string): Promise<BatchScrapedContent> {
+  const resolveOne = (url: string) => scrapeURL(url, signal, _resolverCapability);
+const results = await mapWithConcurrency(urls, 2, resolveOne);
 
   const successCount = results.filter(r => r.status === 'success').length;
   const errorCount = results.filter(r => r.status === 'error').length;
@@ -76,4 +86,18 @@ export async function scrapeURLsBatch(urls: string[], signal?: AbortSignal): Pro
 
 export async function scrapeSingleURL(url: string, signal?: AbortSignal): Promise<ScrapedContent> {
   return scrapeURL(url, signal);
+}
+
+async function mapWithConcurrency<T, R>(items: readonly T[], concurrency: number, worker: (item: T) => Promise<R>): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let cursor = 0;
+  const run = async () => {
+    while (true) {
+      const index = cursor++;
+      if (index >= items.length) return;
+      results[index] = await worker(items[index]);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, run));
+  return results;
 }

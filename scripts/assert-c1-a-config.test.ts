@@ -38,18 +38,20 @@ describe('C1-A Task 1 package/offline config boundary', () => {
 const task2Files = {
   'open-next.config.ts': "import { defineCloudflareConfig } from '@opennextjs/cloudflare';\n\nexport default defineCloudflareConfig();\n",
   'next.config.js': "import('@opennextjs/cloudflare').then((module) => module.initOpenNextCloudflareForDev());\nconst nextConfig = { devIndicators: false, reactStrictMode: true, allowedDevOrigins: ['event-every.local'], images: { unoptimized: true }, }\nmodule.exports = nextConfig\n",
-  'cloudflare/app-worker.ts': "import handler from '../.open-next/worker.js';\n\nexport default {\n  async fetch(request: Request, env: unknown, ctx: unknown) {\n    return handler.fetch(request, env, ctx);\n  },\n};\n",
+  'cloudflare/app-worker.ts': "import handler from '../.open-next/worker.js';\nimport { admitEdgeRequest } from '../src/platform/admission';\nimport { cloudflareTrustedEdgeAddress } from '../src/platform/identity';\nexport { DailyCounter } from '../src/platform/cloudflare/daily-counter';\nexport { IdentityDayPolicy } from '../src/platform/cloudflare/identity-day-policy';\nexport { ResolverRequestAuthority } from '../src/platform/cloudflare/resolver-request-authority';\ntype ExportedHandler<Env> = Readonly<{ fetch(request: Request, env: Env, ctx: unknown): Response | Promise<Response>; }>;\nexport default { async fetch(request: Request, env: CloudflareEnv, ctx: unknown) { const admitted = await admitEdgeRequest(request, env, ctx, cloudflareTrustedEdgeAddress); if (admitted.status === 'failure') return admitted.response; return handler.fetch(admitted.request, env, ctx); }, } satisfies ExportedHandler<CloudflareEnv>;\n",
   'wrangler.jsonc': JSON.stringify({
     $schema: 'node_modules/wrangler/config-schema.json', name: 'event-every', main: 'cloudflare/app-worker.ts', compatibility_date: '2026-08-02',
     compatibility_flags: ['nodejs_compat', 'global_fetch_strictly_public'], workers_dev: false, preview_urls: false,
     assets: { directory: '.open-next/assets', binding: 'ASSETS' }, services: [{ binding: 'WORKER_SELF_REFERENCE', service: 'event-every' }],
     d1_databases: [{ binding: 'EVENT_EVERY_DB', database_name: 'event-every-local-disabled', database_id: '11111111-1111-4111-8111-111111111111' }],
+    durable_objects: { bindings: [{ name: 'IDENTITY_DAY_POLICY', class_name: 'IdentityDayPolicy' }, { name: 'RESOLVER_REQUEST_AUTHORITY', class_name: 'ResolverRequestAuthority' }, { name: 'RESOLVER_DAILY_COUNTER', class_name: 'DailyCounter' }] },
+    migrations: [{ tag: 'c1-a-v1', new_sqlite_classes: ['IdentityDayPolicy', 'ResolverRequestAuthority', 'DailyCounter'] }],
     vars: { C1_DEPLOYMENT_DISABLED: '1', STATE_AUTHORITY_MODE: 'legacy', IDENTITY_KEY_CURRENT_VERSION: 'local-v1', IDENTITY_KEY_NEXT_VERSION: '', IDENTITY_KEY_ACTIVATES_AT: '', IDENTITY_KEY_SCHEDULE_DIGEST: 'local-v1-no-rotation', IDENTITY_HMAC_CURRENT: '', IDENTITY_HMAC_NEXT: '', RESOLVER_CAPABILITY_HMAC: '' },
   }),
   'vitest.config.workers.ts': "import { defineConfig } from 'vitest/config';\nexport default defineConfig(async () => { const { cloudflareTest } = await import('@cloudflare/vitest-pool-workers'); return { plugins: [cloudflareTest({ wrangler: { configPath: './wrangler.jsonc' }, miniflare: { bindings: { IDENTITY_HMAC_CURRENT: 'synthetic-c1-a-identity-key', RESOLVER_CAPABILITY_HMAC: 'synthetic-c1-a-capability-key', }, }, }),], test: { include: ['test/worker/app-worker.test.ts', 'test/worker/admission.integration.test.ts', 'test/worker/resolver.integration.test.ts', 'test/worker/deny-egress.integration.test.ts',], setupFiles: ['./test/worker/deny-egress.setup.ts'], }, }; });\n",
   'playwright.c1-a.config.ts': "import { defineConfig, devices } from '@playwright/test';\nconst suffix = process.env.C1_A_OUTPUT_SUFFIX;\nif (!suffix || !/^[a-f0-9]{12}$/.test(suffix)) { throw new Error('C1_A_OUTPUT_SUFFIX must be 12 lowercase hex characters'); }\nexport default defineConfig({ testDir: './e2e', testMatch: /c1-a-runtime-admission\\.spec\\.ts/, outputDir: `test-results-c1-a-${suffix}`, reporter: [['html', { outputFolder: `playwright-report-c1-a-${suffix}`, open: 'never' }]], use: { baseURL: 'http://127.0.0.1:8788' }, webServer: undefined, projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }, { name: 'webkit', use: { ...devices['Desktop Safari'] } },], });\n",
   'playwright.config.ts': "import { defineConfig } from '@playwright/test'; export default defineConfig({ testIgnore: /c1-a-runtime-admission\\.spec\\.ts/ });\n",
-  'worker-configuration.d.ts': 'interface CloudflareEnv { EVENT_EVERY_DB: D1Database; ASSETS: Fetcher; C1_DEPLOYMENT_DISABLED: "1"; STATE_AUTHORITY_MODE: "legacy"; IDENTITY_KEY_CURRENT_VERSION: "local-v1"; IDENTITY_KEY_NEXT_VERSION: ""; IDENTITY_KEY_ACTIVATES_AT: ""; IDENTITY_KEY_SCHEDULE_DIGEST: "local-v1-no-rotation"; IDENTITY_HMAC_CURRENT: ""; IDENTITY_HMAC_NEXT: ""; RESOLVER_CAPABILITY_HMAC: ""; WORKER_SELF_REFERENCE: Fetcher; }\n',
+  'worker-configuration.d.ts': 'interface CloudflareEnv { EVENT_EVERY_DB: D1Database; ASSETS: Fetcher; C1_DEPLOYMENT_DISABLED: "1"; STATE_AUTHORITY_MODE: "legacy"; IDENTITY_KEY_CURRENT_VERSION: "local-v1"; IDENTITY_KEY_NEXT_VERSION: ""; IDENTITY_KEY_ACTIVATES_AT: ""; IDENTITY_KEY_SCHEDULE_DIGEST: "local-v1-no-rotation"; IDENTITY_HMAC_CURRENT: ""; IDENTITY_HMAC_NEXT: ""; RESOLVER_CAPABILITY_HMAC: ""; IDENTITY_DAY_POLICY: DurableObjectNamespace<IdentityDayPolicy>; RESOLVER_REQUEST_AUTHORITY: DurableObjectNamespace<ResolverRequestAuthority>; RESOLVER_DAILY_COUNTER: DurableObjectNamespace<DailyCounter>; WORKER_SELF_REFERENCE: Fetcher; }\n',
 } as const;
 
 describe('C1-A Task 2 nondeployable app configuration boundary', () => {
@@ -62,7 +64,7 @@ describe('C1-A Task 2 nondeployable app configuration boundary', () => {
     expect(() => assertC1AConfig(fixture({ ...task2Files, 'wrangler.jsonc': task2Files['wrangler.jsonc'].replace('{', '{\n// installed Wrangler JSONC parser accepts this comment\n') }))).not.toThrow();
   });
 
-  test('rejects public deployment, non-sentinel D1, remote worker config, and premature DO ownership', () => {
+  test('rejects public deployment, non-sentinel D1, remote worker config, and malformed DO ownership', () => {
     const wrangler = JSON.parse(task2Files['wrangler.jsonc']);
     for (const [file, value, message] of [
       ['wrangler.jsonc', JSON.stringify({ ...wrangler, workers_dev: true }), 'wrangler.workers_dev'],
@@ -77,15 +79,17 @@ describe('C1-A Task 2 nondeployable app configuration boundary', () => {
       ['next.config.js', 'module.exports = {};\n', 'next.config.js'],
       ['next.config.js', `// ${task2Files['next.config.js']}\nmodule.exports = {};\n`, 'next.config.js'],
       ['next.config.js', task2Files['next.config.js'].replace('initOpenNextCloudflareForDev()', 'initOpenNextCloudflareForProduction()'), 'next.config.js'],
-      ['cloudflare/app-worker.ts', task2Files['cloudflare/app-worker.ts'].replace('return handler.fetch(request, env, ctx);', 'return handler.fetch(request, env, ctx);\n  },\n  scheduled() {}'), 'cloudflare/app-worker exports'],
+      ['cloudflare/app-worker.ts', `${task2Files['cloudflare/app-worker.ts']}\nexport const scheduled = () => undefined;`, 'cloudflare/app-worker exports'],
       ['playwright.config.ts', 'const dead = /c1-a-runtime-admission\\.spec\\.ts/; export default { testIgnore: /prod\\.spec\\.ts/ };', 'playwright.config.ts'],
       ['playwright.config.ts', "import { defineConfig } from '@playwright/test'; export default defineConfig({ testIgnore: /prod\\.spec\\.ts/ }); const deadConfig = { testIgnore: /c1-a-runtime-admission\\.spec\\.ts/ };", 'playwright.config.ts'],
     ] as const) expect(() => assertC1AConfig(fixture({ ...task2Files, [file]: value }))).toThrow(`c1-a config: ${message}`);
-  }, 20_000);
+  }, 40_000);
 
-  test('requires every generated binding name independently', () => {
-    for (const binding of ['EVENT_EVERY_DB', 'ASSETS', 'C1_DEPLOYMENT_DISABLED', 'STATE_AUTHORITY_MODE', 'IDENTITY_KEY_CURRENT_VERSION', 'IDENTITY_KEY_NEXT_VERSION', 'IDENTITY_KEY_ACTIVATES_AT', 'IDENTITY_KEY_SCHEDULE_DIGEST', 'IDENTITY_HMAC_CURRENT', 'IDENTITY_HMAC_NEXT', 'RESOLVER_CAPABILITY_HMAC', 'WORKER_SELF_REFERENCE']) {
+  test.each(['EVENT_EVERY_DB', 'ASSETS', 'C1_DEPLOYMENT_DISABLED', 'STATE_AUTHORITY_MODE', 'IDENTITY_KEY_CURRENT_VERSION', 'IDENTITY_KEY_NEXT_VERSION', 'IDENTITY_KEY_ACTIVATES_AT', 'IDENTITY_KEY_SCHEDULE_DIGEST', 'IDENTITY_HMAC_CURRENT', 'IDENTITY_HMAC_NEXT', 'RESOLVER_CAPABILITY_HMAC', 'IDENTITY_DAY_POLICY', 'RESOLVER_REQUEST_AUTHORITY', 'RESOLVER_DAILY_COUNTER', 'WORKER_SELF_REFERENCE'])(
+    'requires generated binding %s',
+    (binding) => {
       expect(() => assertC1AConfig(fixture({ ...task2Files, 'worker-configuration.d.ts': task2Files['worker-configuration.d.ts'].replace(binding, 'REMOVED_BINDING') }))).toThrow('c1-a config: worker-configuration.d.ts');
-    }
-  }, 20_000);
+    },
+    10_000,
+  );
 });

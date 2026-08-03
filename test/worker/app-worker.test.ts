@@ -7,7 +7,7 @@ vi.mock('../../.open-next/worker.js', () => ({
   default: { fetch: delegated },
 }));
 
-import worker from '../../cloudflare/app-worker';
+import worker, { DailyCounter, IdentityDayPolicy, ResolverRequestAuthority } from '../../cloudflare/app-worker';
 import { INTERNAL_IDENTITY_HEADER } from '../../src/platform/admission';
 import { settleLegacyDispatch, startLegacyDispatch } from '../../src/platform/legacy/dispatch';
 
@@ -30,6 +30,7 @@ describe('C1-A app Worker admission wrapper', () => {
   beforeEach(() => delegated.mockReset());
 
   it('wrapper forwards only rebuilt admitted request', async () => {
+    expect([DailyCounter, IdentityDayPolicy, ResolverRequestAuthority].every((value) => typeof value === 'function')).toBe(true);
     const request = new Request('https://event-every.test/api/scan', {
       method: 'POST',
       headers: {

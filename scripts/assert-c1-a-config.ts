@@ -98,11 +98,21 @@ module.exports = nextConfig
 `;
 const EXACT_APP_WORKER = `
 import handler from '../.open-next/worker.js';
+import { admitEdgeRequest } from '../src/platform/admission';
+import { cloudflareTrustedEdgeAddress } from '../src/platform/identity';
+export { DailyCounter } from '../src/platform/cloudflare/daily-counter';
+export { IdentityDayPolicy } from '../src/platform/cloudflare/identity-day-policy';
+export { ResolverRequestAuthority } from '../src/platform/cloudflare/resolver-request-authority';
+type ExportedHandler<Env> = Readonly<{
+  fetch(request: Request, env: Env, ctx: unknown): Response | Promise<Response>;
+}>;
 export default {
-  async fetch(request: Request, env: unknown, ctx: unknown) {
-    return handler.fetch(request, env, ctx);
+  async fetch(request: Request, env: CloudflareEnv, ctx: unknown) {
+    const admitted = await admitEdgeRequest(request, env, ctx, cloudflareTrustedEdgeAddress);
+    if (admitted.status === 'failure') return admitted.response;
+    return handler.fetch(admitted.request, env, ctx);
   },
-};
+} satisfies ExportedHandler<CloudflareEnv>;
 `;
 const EXACT_WORKERS_CONFIG = `
 import { defineConfig } from 'vitest/config';
@@ -186,7 +196,7 @@ export function assertC1AConfig(root = process.cwd()): void {
   exactExecutable(root, 'next.config.js', EXACT_NEXT_CONFIG);
 
   const worker = read(root, 'cloudflare/app-worker.ts');
-  if (/\b(?:scheduled|durable_objects|IdentityDayPolicy|ResolverRequestAuthority|DailyCounter)\b/.test(worker)) fail('cloudflare/app-worker exports');
+  if (/\b(?:scheduled|durable_objects)\b/.test(worker)) fail('cloudflare/app-worker exports');
   exactExecutable(root, 'cloudflare/app-worker.ts', EXACT_APP_WORKER, 'cloudflare/app-worker');
 
   const wrangler = readWranglerConfig(root);
@@ -200,7 +210,12 @@ export function assertC1AConfig(root = process.cwd()): void {
   exact(wrangler.assets, { directory: '.open-next/assets', binding: 'ASSETS' }, 'wrangler.assets');
   exact(wrangler.services, [{ binding: 'WORKER_SELF_REFERENCE', service: 'event-every' }], 'wrangler.services');
   exact(wrangler.d1_databases, [{ binding: 'EVENT_EVERY_DB', database_name: 'event-every-local-disabled', database_id: '11111111-1111-4111-8111-111111111111' }], 'wrangler.d1_databases');
-  if ('durable_objects' in wrangler || 'migrations' in wrangler) fail('wrangler.durable_objects');
+  exact(wrangler.durable_objects, { bindings: [
+    { name: 'IDENTITY_DAY_POLICY', class_name: 'IdentityDayPolicy' },
+    { name: 'RESOLVER_REQUEST_AUTHORITY', class_name: 'ResolverRequestAuthority' },
+    { name: 'RESOLVER_DAILY_COUNTER', class_name: 'DailyCounter' },
+  ] }, 'wrangler.durable_objects');
+  exact(wrangler.migrations, [{ tag: 'c1-a-v1', new_sqlite_classes: ['IdentityDayPolicy', 'ResolverRequestAuthority', 'DailyCounter'] }], 'wrangler.migrations');
   if ('routes' in wrangler || 'triggers' in wrangler || wrangler.remote === true) fail('wrangler deployment');
   exact(wrangler.vars, {
     C1_DEPLOYMENT_DISABLED: '1', STATE_AUTHORITY_MODE: 'legacy', IDENTITY_KEY_CURRENT_VERSION: 'local-v1', IDENTITY_KEY_NEXT_VERSION: '', IDENTITY_KEY_ACTIVATES_AT: '', IDENTITY_KEY_SCHEDULE_DIGEST: 'local-v1-no-rotation', IDENTITY_HMAC_CURRENT: '', IDENTITY_HMAC_NEXT: '', RESOLVER_CAPABILITY_HMAC: '',
@@ -208,7 +223,7 @@ export function assertC1AConfig(root = process.cwd()): void {
 
   exactExecutable(root, 'vitest.config.workers.ts', EXACT_WORKERS_CONFIG, 'vitest.config.workers remote');
   const generatedTypes = read(root, 'worker-configuration.d.ts');
-  for (const binding of ['EVENT_EVERY_DB', 'ASSETS', 'C1_DEPLOYMENT_DISABLED', 'STATE_AUTHORITY_MODE', 'IDENTITY_KEY_CURRENT_VERSION', 'IDENTITY_KEY_NEXT_VERSION', 'IDENTITY_KEY_ACTIVATES_AT', 'IDENTITY_KEY_SCHEDULE_DIGEST', 'IDENTITY_HMAC_CURRENT', 'IDENTITY_HMAC_NEXT', 'RESOLVER_CAPABILITY_HMAC', 'WORKER_SELF_REFERENCE']) if (!generatedTypes.includes(binding)) fail('worker-configuration.d.ts');
+  for (const binding of ['EVENT_EVERY_DB', 'ASSETS', 'C1_DEPLOYMENT_DISABLED', 'STATE_AUTHORITY_MODE', 'IDENTITY_KEY_CURRENT_VERSION', 'IDENTITY_KEY_NEXT_VERSION', 'IDENTITY_KEY_ACTIVATES_AT', 'IDENTITY_KEY_SCHEDULE_DIGEST', 'IDENTITY_HMAC_CURRENT', 'IDENTITY_HMAC_NEXT', 'RESOLVER_CAPABILITY_HMAC', 'IDENTITY_DAY_POLICY', 'RESOLVER_REQUEST_AUTHORITY', 'RESOLVER_DAILY_COUNTER', 'WORKER_SELF_REFERENCE']) if (!generatedTypes.includes(binding)) fail('worker-configuration.d.ts');
   exactExecutable(root, 'playwright.c1-a.config.ts', EXACT_C1_PLAYWRIGHT);
   const ordinaryPlaywright = ts.createSourceFile('playwright.config.ts', read(root, 'playwright.config.ts'), ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
   let ignoresC1A = false;
@@ -231,5 +246,5 @@ export function assertC1AConfig(root = process.cwd()): void {
 
 if (import.meta.main) {
   assertC1AConfig();
-  console.log('c1-a config: Task 2 app boundary accepted');
+  console.log('c1-a config: Task 6 resolver boundary accepted');
 }

@@ -4,6 +4,10 @@ import handler from '../.open-next/worker.js';
 import { admitEdgeRequest } from '../src/platform/admission';
 import { cloudflareTrustedEdgeAddress } from '../src/platform/identity';
 
+export { DailyCounter } from '../src/platform/cloudflare/daily-counter';
+export { IdentityDayPolicy } from '../src/platform/cloudflare/identity-day-policy';
+export { ResolverRequestAuthority } from '../src/platform/cloudflare/resolver-request-authority';
+
 type ExportedHandler<Env> = Readonly<{
   fetch(request: Request, env: Env, ctx: unknown): Response | Promise<Response>;
 }>;

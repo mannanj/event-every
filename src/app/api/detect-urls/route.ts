@@ -1,152 +1,36 @@
 import { NextRequest, NextResponse } from 'next/server';
-import {
-  CommunityLimitError,
-  communityLimitResponse,
-  getLlmKey,
-  getLlmMode,
-  openRouterChat,
-  ToolDefinition,
-} from '@/lib/llm';
-import { evaluateLimits, chargeIpRate } from '@/lib/limits';
-import { DAILY_LIMIT } from '@/lib/ratelimit';
-import { normalizeUrl } from '@/utils/url';
+import { z } from 'zod';
+import { issueResolverCapability } from '@/platform/resolver/capability';
+import { detectUrlsDeterministically } from '@/services/urlDetector';
 
-const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || 'mistralai/mistral-large-2512';
-
-const URL_DETECTION_PROMPT = `You are a URL detection assistant. Analyze the provided text and extract ALL URLs.
-
-IMPORTANT:
-- Extract all URLs from the text (http://, https://, www., etc.)
-- Return the URLs as an array
-- Return the remaining text with URLs removed
-- Preserve the structure and formatting of non-URL content
-
-If no URLs are found, return an empty array for urls and set hasUrls to false.`;
-
-interface URLDetectionResult {
-  urls: string[];
-  remainingText: string;
-  hasUrls: boolean;
-}
+const inputSchema = z.object({ text: z.string().min(1) }).strict();
+const MAX_TEXT_BYTES = 128 * 1024;
 
 export async function POST(request: NextRequest) {
-  try {
-    const mode = getLlmMode(request);
-    const apiKey = getLlmKey(mode);
-    if (!apiKey) {
-      throw new Error('OPENROUTER_API_KEY environment variable is not set');
-    }
-
-    const limits = await evaluateLimits(request);
-    if (!limits.allowed) {
-      if (limits.reason === 'community-budget') {
-        return communityLimitResponse(new CommunityLimitError(limits.resetAt));
-      }
-      return NextResponse.json(
-        { error: 'Daily request limit reached', reset: limits.resetAt },
-        {
-          status: 429,
-          headers: {
-            'X-RateLimit-Limit': DAILY_LIMIT.toString(),
-            'X-RateLimit-Remaining': '0',
-            'X-RateLimit-Reset': Date.parse(limits.resetAt).toString(),
-          },
-        }
-      );
-    }
-
-    const body = await request.json();
-    const { text } = body;
-
-    if (!text) {
-      return NextResponse.json(
-        { error: 'Text is required' },
-        { status: 400 }
-      );
-    }
-
-    const tools: ToolDefinition[] = [
-      {
-        type: 'function',
-        function: {
-          name: 'extract_urls',
-          description: 'Extract URLs from text and return structured result',
-          parameters: {
-            type: 'object',
-            properties: {
-              urls: {
-                type: 'array',
-                items: { type: 'string' },
-                description: 'Array of extracted URLs',
-              },
-              remainingText: {
-                type: 'string',
-                description: 'Text with URLs removed',
-              },
-              hasUrls: {
-                type: 'boolean',
-                description: 'Whether any URLs were found',
-              },
-            },
-            required: ['urls', 'remainingText', 'hasUrls'],
-          },
-        },
-      },
-    ];
-
-    let data;
-    try {
-      data = await openRouterChat(
-        {
-          model: OPENROUTER_MODEL,
-          messages: [
-            {
-              role: 'user',
-              content: `${URL_DETECTION_PROMPT}\n\nExtract URLs from this text:\n${text}`,
-            },
-          ],
-          tools,
-          tool_choice: { type: 'function', function: { name: 'extract_urls' } },
-        },
-        { key: apiKey, mode }
-      );
-    } catch (error) {
-      if (error instanceof CommunityLimitError) return communityLimitResponse(error);
-      throw error;
-    }
-
-    // Charge the per-IP counter only on an accepted (successful) request, so an
-    // upstream failure doesn't consume the user's daily quota.
-    await chargeIpRate(request);
-
-    const toolCalls = data.choices?.[0]?.message?.tool_calls;
-    if (!toolCalls || toolCalls.length === 0) {
-      throw new Error('No tool calls found in OpenRouter response');
-    }
-
-    const result = JSON.parse(toolCalls[0].function.arguments) as URLDetectionResult;
-
-    // utils/url is the single normalization gate: salvage bare hosts, drop junk before scraping.
-    const normalizedUrls = result.urls
-      .map((u) => normalizeUrl(u))
-      .filter((u): u is string => Boolean(u));
-
-    return NextResponse.json({
-      ...result,
-      urls: normalizedUrls,
-      hasUrls: normalizedUrls.length > 0,
-    });
-  } catch (error) {
-    console.error('URL detection API error:', error);
-
-    const errorMessage =
-      error instanceof Error
-        ? error.message
-        : 'An unexpected error occurred while detecting URLs';
-
-    return NextResponse.json(
-      { error: errorMessage },
-      { status: 500 }
-    );
+  const parsed = inputSchema.safeParse(await request.json().catch(() => null));
+  if (!parsed.success || new TextEncoder().encode(parsed.data.text).byteLength > MAX_TEXT_BYTES) {
+    return NextResponse.json({ error: 'Invalid text.', code: 'invalid_body' }, { status: 400 });
   }
+
+  const input = parsed.data;
+const result = detectUrlsDeterministically(input.text);
+  const capability = await issueResolverCapability({
+    identity: trustedIdentity(request.headers.get('x-event-every-identity')),
+    urls: result.urls,
+    nowMs: Date.now(),
+    key: process.env.RESOLVER_CAPABILITY_HMAC ?? '',
+  });
+  if (capability.status === 'day-rollover') {
+    return NextResponse.json({ code: 'resolver_day_rollover' }, { status: 409 });
+  }
+  return NextResponse.json({
+    ...result,
+    urls: capability.urls,
+    resolverCapability: capability.capability,
+  });
+}
+
+function trustedIdentity(value: string | null): string {
+  if (value === 'unknown') return value;
+  return value?.match(/^known:[A-Za-z0-9._-]{1,64}:[0-9a-f]{64}$/)?.[0] ?? 'unknown';
 }

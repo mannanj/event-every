@@ -4,6 +4,7 @@ import {
   deriveEdgeIdentity,
   headerBackedTrustedEdgeAddressForTests,
   identityHeaderValue,
+  proposedIdentityVersion,
 } from '@/platform/identity';
 
 const bindings = {
@@ -16,6 +17,19 @@ const trustedEdge = headerBackedTrustedEdgeAddressForTests;
 const edgeRequest = (headers: HeadersInit = {}) => new Request('https://event-every.test/api/scan', { headers });
 
 describe('trusted edge identity', () => {
+  test('identity switches exactly at activation and validates rotation shape', () => {
+    const staged = {
+      currentVersion: 'v1',
+      nextVersion: 'v2',
+      activatesAtMs: 2_000,
+      digest: 'schedule-v2',
+    } as const;
+    expect(proposedIdentityVersion(staged, 1_999)).toBe('v1');
+    expect(proposedIdentityVersion(staged, 2_000)).toBe('v2');
+    expect(proposedIdentityVersion({ ...staged, nextVersion: null, activatesAtMs: null }, 9_999)).toBe('v1');
+    expect(() => proposedIdentityVersion({ ...staged, nextVersion: null }, 1_000)).toThrow('invalid identity schedule');
+    expect(() => proposedIdentityVersion({ ...staged, nextVersion: 'v1' }, 1_000)).toThrow('invalid identity schedule');
+  });
   test('forged forwarding header is ignored', async () => {
     const forged = await deriveEdgeIdentity(edgeRequest({
       'x-forwarded-for': '203.0.113.77',
