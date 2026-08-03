@@ -81,10 +81,8 @@ function delay(milliseconds: number): Promise<void> {
 }
 
 export function parseOpenNextChild(argv: readonly string[]): readonly string[] {
-  if (argv.length < 2 || argv[0] !== '--' || argv.slice(1).some((part) => !part)) {
-    fail('expected -- followed by one child argv');
-  }
-  const child = argv.slice(1);
+  const child = argv[0] === '--' ? argv.slice(1) : argv;
+  if (child.length === 0 || child.some((part) => !part)) fail('expected one child argv');
   const text = child.join(' ');
   if (/\b(?:deploy|upload|publish|preview)\b/i.test(text) || child.includes('scripts/run-with-open-next.ts')) {
     fail('forbidden child');

@@ -50,8 +50,14 @@ async function rejection(action: () => Promise<unknown>): Promise<string[]> {
 }
 
 describe('OpenNext output owner', () => {
+  test('accepts the post-separator argv forwarded by bun run', () => {
+    expect(parseOpenNextChild(['node'])).toEqual(['node']);
+    expect(parseOpenNextChild(['node', 'child'])).toEqual(['node', 'child']);
+    expect(parseOpenNextChild(['--', 'node', 'child'])).toEqual(['node', 'child']);
+  });
+
   test('rejects malformed, deploy/upload/preview, and recursive commands before a build', () => {
-    for (const argv of [['node'], ['--', 'wrangler', 'deploy'], ['--', 'x', 'preview'], ['--', 'bun', 'scripts/run-with-open-next.ts']]) {
+    for (const argv of [[], ['--'], [''], ['--', 'wrangler', 'deploy'], ['--', 'x', 'preview'], ['--', 'bun', 'scripts/run-with-open-next.ts']]) {
       expect(() => parseOpenNextChild(argv)).toThrow('c1-a OpenNext owner:');
     }
   });

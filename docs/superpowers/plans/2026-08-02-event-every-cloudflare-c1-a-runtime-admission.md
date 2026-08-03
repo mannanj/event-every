@@ -230,11 +230,25 @@ open-next.config.ts is exactly:
 
 Task 2's buildable, nondeployable scaffold uses the same final config minus `durable_objects` and `migrations`, and its Worker imports OpenNext and delegates directly. Task 4 replaces only the Worker fetch with the admission wrapper, still without DO exports. Task 6 adds the three exports plus the exact DO binding/migration blocks above and regenerates types. At no intermediate commit may `C1_DEPLOYMENT_DISABLED` be absent or empty. The three empty secret-shaped values exist only so generated types contain the bindings. `assert-c1-a-config` evolves with these stages, requires them empty, and rejects deploy/upload commands, remote bindings, active triggers, real-looking database UUIDs, or a missing disable flag.
 
-vitest.config.workers.ts is exactly:
+The installed `@cloudflare/vitest-pool-workers@0.20.1` exposes the Vitest 4 plugin API at its
+package root; it does not export the former `/config` entrypoint. vitest.config.workers.ts is
+therefore exactly:
 
-    import { defineWorkersConfig } from '@cloudflare/vitest-pool-workers/config';
+    import { cloudflareTest } from '@cloudflare/vitest-pool-workers';
+    import { defineConfig } from 'vitest/config';
 
-    export default defineWorkersConfig({
+    export default defineConfig({
+      plugins: [
+        cloudflareTest({
+          wrangler: { configPath: './wrangler.jsonc' },
+          miniflare: {
+            bindings: {
+              IDENTITY_HMAC_CURRENT: 'synthetic-c1-a-identity-key',
+              RESOLVER_CAPABILITY_HMAC: 'synthetic-c1-a-capability-key'
+            }
+          }
+        })
+      ],
       test: {
         include: [
           'test/worker/app-worker.test.ts',
@@ -242,18 +256,7 @@ vitest.config.workers.ts is exactly:
           'test/worker/resolver.integration.test.ts',
           'test/worker/deny-egress.integration.test.ts'
         ],
-        setupFiles: ['./test/worker/deny-egress.setup.ts'],
-        poolOptions: {
-          workers: {
-            wrangler: { configPath: './wrangler.jsonc' },
-            miniflare: {
-              bindings: {
-                IDENTITY_HMAC_CURRENT: 'synthetic-c1-a-identity-key',
-                RESOLVER_CAPABILITY_HMAC: 'synthetic-c1-a-capability-key'
-              }
-            }
-          }
-        }
+        setupFiles: ['./test/worker/deny-egress.setup.ts']
       }
     });
 
@@ -672,28 +675,29 @@ It deliberately has no routes or triggers. The empty KV values exist only for ge
       }
     } satisfies ExportedHandler<LegacyKeepAliveEnv>;
 
-`vitest.config.keepalive-workers.ts` is exactly:
+`vitest.config.keepalive-workers.ts` uses the same installed Vitest 4 plugin API and is exactly:
 
-    import { defineWorkersConfig } from '@cloudflare/vitest-pool-workers/config';
+    import { cloudflareTest } from '@cloudflare/vitest-pool-workers';
+    import { defineConfig } from 'vitest/config';
 
-    export default defineWorkersConfig({
+    export default defineConfig({
+      plugins: [
+        cloudflareTest({
+          wrangler: { configPath: './cloudflare/legacy-keepalive-wrangler.jsonc' },
+          miniflare: {
+            bindings: {
+              KV_REST_API_URL: 'http://127.0.0.1:8799',
+              KV_REST_API_TOKEN: 'synthetic-c1-a-token'
+            }
+          }
+        })
+      ],
       test: {
         include: [
           'test/worker/legacy-keepalive.integration.test.ts',
           'test/worker/deny-egress.integration.test.ts'
         ],
-        setupFiles: ['./test/worker/deny-egress.setup.ts'],
-        poolOptions: {
-          workers: {
-            wrangler: { configPath: './cloudflare/legacy-keepalive-wrangler.jsonc' },
-            miniflare: {
-              bindings: {
-                KV_REST_API_URL: 'http://127.0.0.1:8799',
-                KV_REST_API_TOKEN: 'synthetic-c1-a-token'
-              }
-            }
-          }
-        }
+        setupFiles: ['./test/worker/deny-egress.setup.ts']
       }
     });
 
@@ -897,7 +901,7 @@ Algorithm: reject argument count other than one and either unknown mode with `c1
 
 `scripts/c1-a-offline-preload.cjs` exports no data. On load it replaces global `fetch`, `http.request/get`, `https.request/get`, `net.connect/createConnection`, `tls.connect`, `dns.lookup/resolve/resolve4/resolve6`, and `Bun.connect` when present. It parses the destination before dispatch and permits only literal `127.0.0.1`, `[::1]`, `::1`, or `localhost`; any other hostname, Unix socket, proxy, malformed target, or missing hostname throws `C1_A_EGRESS_BLOCKED`. It blanks every matching environment name without logging names or values, then deliberately assigns the two non-secret Wrangler controls `CLOUDFLARE_LOAD_DEV_VARS_FROM_DOT_ENV=false` and `CLOUDFLARE_INCLUDE_PROCESS_ENV=false`; these fixed control values are the only `CLOUDFLARE`-matching exception. `scripts/run-c1-a-offline.ts` derives the absolute repository root from `import.meta.dir`, requires the preload there, calls the shared four-file Next-production dotenv-name collector, blanks the process/all-four-file union before every child, reapplies those two fixed controls after the scrub, and runs the terminal command arrays in the exact listed order with `shell:false`; it stops at the first nonzero with `c1-a offline step N failed` and forwards only child exit code plus bounded stdout/stderr. Tests start a loopback server (allowed), attempt one request through every patched API to a documentation-only non-loopback address (blocked before socket creation), and assert the two controls remain exactly false through preload while distinct parent and four-dotenv credential canaries are absent from every child and bounded output.
 
-`scripts/run-with-open-next.ts` is the sole owner of generated `.open-next` and `.wrangler` for source/type/Worker commands outside the browser runner. It accepts `--` followed by one nonempty child argv, requires both paths absent, hashes the authored wrapper/config, calls `assertNoWranglerLocalFiles(root)`, and builds one child environment through `createCloudflareChildEnvironment`; every matching process/all-four-dotenv name is present with the empty string, the three literal Bun/Cloudflare loading controls are fixed, `NODE_OPTIONS=--require=<repository-local preload>`, and no value or name is logged. It runs the local OpenNext build under that environment and preload, requires `.open-next/worker.js`, runs the child with the same environment and `shell:false`, then removes both fixed outputs and compares hashes in `finally`. Empty values are deliberately present before Next/OpenNext loads, so its production loader cannot replace them from any of the four candidates; the preload blanks matching process variables again before application modules load. It refuses a deploy/upload/preview child or nested `run-with-open-next`, and exact failures begin `c1-a OpenNext owner:`. Its test uses distinct credential canaries in parent environment and each of `.env.production.local`, `.env.local`, `.env.production`, and `.env`, plus synthetic `.dev.vars*` unread rejection, proves no canary reaches the fake build/child or bounded output, and also proves build-before-child, missing bundle, child failure, collision, signal, cleanup aggregation, and no child starts after failed build. Every task command containing TypeScript source-checking or the app Worker Vitest pool is executed through this owner. The browser runner is the only alternative owner and has the same absent/build/scrub/preload/Cloudflare-controls/finally contract.
+`scripts/run-with-open-next.ts` is the sole owner of generated `.open-next` and `.wrangler` for source/type/Worker commands outside the browser runner. Its CLI is written as `--` followed by a nonempty child argv vector; Bun consumes that launcher separator, so the parser accepts the resulting nonempty post-separator vector and also tolerates one leading separator for direct invocation compatibility. It requires both paths absent, hashes the authored wrapper/config, calls `assertNoWranglerLocalFiles(root)`, and builds one child environment through `createCloudflareChildEnvironment`; every matching process/all-four-dotenv name is present with the empty string, the three literal Bun/Cloudflare loading controls are fixed, `NODE_OPTIONS=--require=<repository-local preload>`, and no value or name is logged. It runs the local OpenNext build under that environment and preload, requires `.open-next/worker.js`, runs the child with the same environment and `shell:false`, then removes both fixed outputs and compares hashes in `finally`. Empty values are deliberately present before Next/OpenNext loads, so its production loader cannot replace them from any of the four candidates; the preload blanks matching process variables again before application modules load. It refuses a deploy/upload/preview child or nested `run-with-open-next`, and exact failures begin `c1-a OpenNext owner:`. Its test uses distinct credential canaries in parent environment and each of `.env.production.local`, `.env.local`, `.env.production`, and `.env`, plus synthetic `.dev.vars*` unread rejection, proves no canary reaches the fake build/child or bounded output, and also proves single-token, Bun-forwarded, and direct-invocation argv forms, build-before-child, missing bundle, child failure, collision, signal, cleanup aggregation, and no child starts after failed build. Every task command containing TypeScript source-checking or the app Worker Vitest pool is executed through this owner. The browser runner is the only alternative owner and has the same absent/build/scrub/preload/Cloudflare-controls/finally contract.
 
 `scripts/assert-c1-a-paths.ts` exports:
 
@@ -1375,9 +1379,10 @@ Immediately before Task-1 staging, reassign `c1a_review_report` to that same lit
 
 - [ ] Write app-worker and static config RED first: missing OpenNext config, buildable direct OpenNext scaffold, generated env types, flags, local D1 sentinel, self-reference, and disabled public endpoints. DO bindings/exports are intentionally absent until Task 6.
 - [ ] open-next.config.ts imports defineCloudflareConfig from @opennextjs/cloudflare and exports defineCloudflareConfig() with no cache override.
+- [ ] next.config.js invokes `import('@opennextjs/cloudflare').then(m => m.initOpenNextCloudflareForDev());`, matching the installed OpenNext migration contract, while preserving the existing exported Next config.
 - [ ] `cloudflare/app-worker.ts` imports handler from `../.open-next/worker.js` and exposes one explicit fetch that delegates to `handler.fetch(request, env, ctx)`; deployment remains impossible. Task 4 replaces this line with admission, and Task 6 adds DO exports.
 - [ ] `wrangler.jsonc` pins main/name/date/flags/assets/self-reference, disables public endpoints, uses the local D1 sentinel, empty generated-type bindings, `C1_DEPLOYMENT_DISABLED=1`, and `STATE_AUTHORITY_MODE=legacy`; it omits DO bindings/migrations until Task 6. Config proof rejects deployment while sentinel/disable remains.
-- [ ] vitest.config.workers.ts uses defineWorkersConfig and local bindings only. No remote:true.
+- [ ] vitest.config.workers.ts uses the installed Vitest 4 `cloudflareTest` plugin and local bindings only. No remote:true.
 - [ ] Generate the app type surface and require byte-identical repeat output. The fixed temporary path must be absent first and is removed in `finally`:
 
     bun run cf:types
