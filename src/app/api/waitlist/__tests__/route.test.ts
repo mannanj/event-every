@@ -28,10 +28,10 @@ mock.module('@/platform/cloudflare-context', () => ({ deferPlatformWork: deferre
 const { POST } = await import('@/app/api/waitlist/route');
 const originalFetch = globalThis.fetch;
 
-function request(email: string, ip = '203.0.113.10'): NextRequest {
+function request(email: string, identity = 'known:test-v1:' + '10'.repeat(32)): NextRequest {
   return new NextRequest('http://localhost/api/waitlist', {
     method: 'POST',
-    headers: { 'content-type': 'application/json', 'x-forwarded-for': ip, 'user-agent': 'waitlist-test' },
+    headers: { 'content-type': 'application/json', 'x-event-every-identity': identity, 'x-forwarded-for': '198.51.100.99', 'user-agent': 'waitlist-test' },
     body: JSON.stringify({ email }),
   });
 }
@@ -62,23 +62,26 @@ afterEach(() => {
 });
 
 test('legacy waitlist preserves distinct IP-equivalent rate-limit shards without exposing them to the port input', async () => {
-  expect((await POST(request('one@example.com', '203.0.113.11'))).status).toBe(200);
-  expect((await POST(request('two@example.com', '203.0.113.12'))).status).toBe(200);
+  const firstIdentity = 'known:test-v1:' + '11'.repeat(32);
+  const secondIdentity = 'known:test-v1:' + '12'.repeat(32);
+  expect((await POST(request('one@example.com', firstIdentity))).status).toBe(200);
+  expect((await POST(request('two@example.com', secondIdentity))).status).toBe(200);
   expect(redisCalls.incr).toHaveLength(2);
-  expect(redisCalls.incr[0]).toContain('203.0.113.11');
-  expect(redisCalls.incr[1]).toContain('203.0.113.12');
+  expect(redisCalls.incr[0]).toContain(firstIdentity);
+  expect(redisCalls.incr[1]).toContain(secondIdentity);
   expect(redisCalls.incr[0]).not.toBe(redisCalls.incr[1]);
+  expect(JSON.stringify(redisCalls.incr)).not.toContain('198.51.100.99');
 
   const submit = mock(async () => ({ status: 'accepted' as const, alreadyJoined: false, emailSent: false }));
   setPlatformRuntimeForTests({ mode: 'legacy', waitlist: { submit } });
-  await POST(request('three@example.com', '203.0.113.99'));
+  await POST(request('three@example.com', 'known:test-v1:' + '13'.repeat(32)));
   expect(submit).toHaveBeenCalledWith({
     identity: { kind: 'unknown', keyVersion: '', hmac: '' },
     email: 'three@example.com',
     honeypot: '',
     userAgent: 'waitlist-test',
   });
-  expect(JSON.stringify(submit.mock.calls)).not.toContain('203.0.113.99');
+  expect(JSON.stringify(submit.mock.calls)).not.toContain('known:test-v1');
 });
 
 test('normalizes email and falls back from D1 to idempotent Redis persistence', async () => {
