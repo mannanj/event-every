@@ -203,8 +203,7 @@ describe('C1-A Worker E2E runner', () => {
   });
 
   test('a signal received during cleanup is terminal and a late cleanup failure is aggregated', async () => {
-    let cleanupSignal!: ReturnType<typeof fixture>;
-    cleanupSignal = fixture({ startBridge: async () => ({ close: async () => cleanupSignal.sendSignal('SIGHUP') }) });
+    const cleanupSignal = fixture({ startBridge: async () => ({ close: async () => cleanupSignal.sendSignal('SIGHUP') }) });
     await expect(runC1AWorkerE2E([], root, cleanupSignal.seams)).rejects.toThrow('c1-a worker e2e: aborted (SIGHUP)');
 
     let entered!: () => void;
