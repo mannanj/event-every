@@ -45,6 +45,8 @@ function scrub(sourceEnv: C1AEnvironment, root: string): C1AEnvironment {
   env.CLOUDFLARE_LOAD_DEV_VARS_FROM_DOT_ENV = 'false';
   env.CLOUDFLARE_INCLUDE_PROCESS_ENV = 'false';
   env.BUN_CONFIG_NO_LOAD_DOTENV = '1';
+  env.WRANGLER_WRITE_LOGS = 'false';
+  env.WRANGLER_SEND_METRICS = 'false';
   return env;
 }
 
@@ -60,14 +62,14 @@ export function installCloudflareProcessBoundary(root: string): void {
   for (const name of Object.keys(process.env)) if (injectionControl(name)) delete process.env[name];
   for (const name of CHILD_INJECTION_CONTROLS) { delete process.env[name]; delete process.env[name.toLowerCase()]; }
   for (const [name, value] of Object.entries(clean)) {
-    if (CREDENTIAL_NAME.test(name) || name === 'CLOUDFLARE_LOAD_DEV_VARS_FROM_DOT_ENV' || name === 'CLOUDFLARE_INCLUDE_PROCESS_ENV' || name === 'BUN_CONFIG_NO_LOAD_DOTENV') process.env[name] = value;
+    if (CREDENTIAL_NAME.test(name) || name === 'CLOUDFLARE_LOAD_DEV_VARS_FROM_DOT_ENV' || name === 'CLOUDFLARE_INCLUDE_PROCESS_ENV' || name === 'BUN_CONFIG_NO_LOAD_DOTENV' || name === 'WRANGLER_WRITE_LOGS' || name === 'WRANGLER_SEND_METRICS') process.env[name] = value;
   }
 }
 
 export type CloudflareMode = 'app-types' | 'keepalive-types' | 'keepalive-tests';
 export function cloudflareInvocation(mode: CloudflareMode): readonly string[] {
-  if (mode === 'app-types') return ['node', 'node_modules/wrangler/bin/wrangler.js', 'types', '--env-interface', 'CloudflareEnv'];
-  if (mode === 'keepalive-types') return ['node', 'node_modules/wrangler/bin/wrangler.js', 'types', 'cloudflare/legacy-keepalive-configuration.d.ts', '--config', 'cloudflare/legacy-keepalive-wrangler.jsonc', '--env-interface', 'LegacyKeepAliveEnv'];
+  if (mode === 'app-types') return ['node', 'node_modules/wrangler/bin/wrangler.js', 'types', '--include-runtime=false', '--env-interface', 'CloudflareEnv'];
+  if (mode === 'keepalive-types') return ['node', 'node_modules/wrangler/bin/wrangler.js', 'types', 'cloudflare/legacy-keepalive-configuration.d.ts', '--config', 'cloudflare/legacy-keepalive-wrangler.jsonc', '--include-runtime=false', '--env-interface', 'LegacyKeepAliveEnv'];
   if (mode === 'keepalive-tests') return ['node', 'node_modules/vitest/vitest.mjs', 'run', '--config', 'vitest.config.keepalive-workers.ts', 'test/worker/legacy-keepalive.integration.test.ts', 'test/worker/deny-egress.integration.test.ts'];
   throw new Error('c1-a Cloudflare boundary: expected app-types|keepalive-types|keepalive-tests');
 }

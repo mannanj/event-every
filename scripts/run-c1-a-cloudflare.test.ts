@@ -21,8 +21,8 @@ describe('C1-A Cloudflare process boundary', () => {
     const directory = root();
     try {
       writeFileSync(path.join(directory, '.env.local'), 'RESEND_TOKEN=value\n');
-      const env = createCloudflareChildEnvironment({ ANTHROPIC_TOKEN: 'parent', CLOUDFLARE_INCLUDE_PROCESS_ENV: 'true', NODE_OPTIONS: '--require=/tmp/foreign', BUN_OPTIONS: '--preload=/tmp/foreign', NODE_PATH: '/tmp/foreign', HTTPS_PROXY: 'http://proxy.invalid', SAFE: 'yes' }, directory);
-      expect(env).toMatchObject({ ANTHROPIC_TOKEN: '', RESEND_TOKEN: '', SAFE: 'yes', CLOUDFLARE_LOAD_DEV_VARS_FROM_DOT_ENV: 'false', CLOUDFLARE_INCLUDE_PROCESS_ENV: 'false', BUN_CONFIG_NO_LOAD_DOTENV: '1' });
+      const env = createCloudflareChildEnvironment({ ANTHROPIC_TOKEN: 'parent', CLOUDFLARE_INCLUDE_PROCESS_ENV: 'true', WRANGLER_WRITE_LOGS: 'true', WRANGLER_SEND_METRICS: 'true', NODE_OPTIONS: '--require=/tmp/foreign', BUN_OPTIONS: '--preload=/tmp/foreign', NODE_PATH: '/tmp/foreign', HTTPS_PROXY: 'http://proxy.invalid', SAFE: 'yes' }, directory);
+      expect(env).toMatchObject({ ANTHROPIC_TOKEN: '', RESEND_TOKEN: '', SAFE: 'yes', CLOUDFLARE_LOAD_DEV_VARS_FROM_DOT_ENV: 'false', CLOUDFLARE_INCLUDE_PROCESS_ENV: 'false', BUN_CONFIG_NO_LOAD_DOTENV: '1', WRANGLER_WRITE_LOGS: 'false', WRANGLER_SEND_METRICS: 'false' });
       expect(env.NODE_OPTIONS).toBe(`--require=${path.join(directory, 'scripts', 'c1-a-offline-preload.cjs')}`);
       expect(env.BUN_OPTIONS).toBeUndefined(); expect(env.NODE_PATH).toBeUndefined(); expect(env.HTTPS_PROXY).toBeUndefined();
     } finally { rmSync(directory, { recursive: true, force: true }); }
@@ -34,16 +34,20 @@ describe('C1-A Cloudflare process boundary', () => {
       process.env.BUN_OPTIONS = '--preload=/tmp/foreign';
       process.env.NODE_PATH = '/tmp/foreign';
       process.env.HTTPS_PROXY = 'http://proxy.invalid';
+      process.env.WRANGLER_WRITE_LOGS = 'true';
+      process.env.WRANGLER_SEND_METRICS = 'true';
       installCloudflareProcessBoundary(directory);
       expect(process.env.BUN_OPTIONS).toBeUndefined();
       expect(process.env.NODE_PATH).toBeUndefined();
       expect(process.env.HTTPS_PROXY).toBeUndefined();
-    } finally { delete process.env.BUN_OPTIONS; delete process.env.NODE_PATH; delete process.env.HTTPS_PROXY; rmSync(directory, { recursive: true, force: true }); }
+      expect(process.env.WRANGLER_WRITE_LOGS).toBe('false');
+      expect(process.env.WRANGLER_SEND_METRICS).toBe('false');
+    } finally { delete process.env.BUN_OPTIONS; delete process.env.NODE_PATH; delete process.env.HTTPS_PROXY; delete process.env.WRANGLER_WRITE_LOGS; delete process.env.WRANGLER_SEND_METRICS; rmSync(directory, { recursive: true, force: true }); }
   });
 
   test('uses exact argv for every closed mode and returns bounded child output', () => {
-    expect(cloudflareInvocation('app-types')).toEqual(['node', 'node_modules/wrangler/bin/wrangler.js', 'types', '--env-interface', 'CloudflareEnv']);
-    expect(cloudflareInvocation('keepalive-types')).toEqual(['node', 'node_modules/wrangler/bin/wrangler.js', 'types', 'cloudflare/legacy-keepalive-configuration.d.ts', '--config', 'cloudflare/legacy-keepalive-wrangler.jsonc', '--env-interface', 'LegacyKeepAliveEnv']);
+    expect(cloudflareInvocation('app-types')).toEqual(['node', 'node_modules/wrangler/bin/wrangler.js', 'types', '--include-runtime=false', '--env-interface', 'CloudflareEnv']);
+    expect(cloudflareInvocation('keepalive-types')).toEqual(['node', 'node_modules/wrangler/bin/wrangler.js', 'types', 'cloudflare/legacy-keepalive-configuration.d.ts', '--config', 'cloudflare/legacy-keepalive-wrangler.jsonc', '--include-runtime=false', '--env-interface', 'LegacyKeepAliveEnv']);
     const directory = root();
     try {
       process.env.C1_A_TEST_TOKEN = 'synthetic-output-canary';
