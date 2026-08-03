@@ -100,6 +100,7 @@ mock.module('@/server/scanner/transport', () => ({
 
 const { POST } = await import('@/app/api/scan/route');
 const { createScanJob } = await import('@/server/scanner/job');
+const { getClientIP } = await import('@/lib/clientIp');
 
 const request = (body: unknown) => new NextRequest('http://localhost/api/scan', {
   method: 'POST', headers: { 'content-type': 'application/json', 'x-event-every-request-id': '018f47a0-7b5c-7cc4-9a34-123456789abc' }, body: JSON.stringify(body),
@@ -125,6 +126,28 @@ beforeEach(() => {
 afterEach(() => setPlatformRuntimeForTests(undefined));
 
 describe('/api/scan', () => {
+  test('forged forwarding header is ignored by the limiter shard', () => {
+    const forged = new NextRequest('http://localhost/api/scan', {
+      headers: {
+        'x-forwarded-for': '203.0.113.99',
+        'x-real-ip': '203.0.113.100',
+      },
+    });
+    expect(getClientIP(forged)).toBe('unknown');
+  });
+
+  test('the limiter shard consumes only the validated server-injected identity', () => {
+    const injected = 'known:test-v1:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+    const admitted = new NextRequest('http://localhost/api/scan', {
+      headers: {
+        'x-event-every-identity': injected,
+        'x-forwarded-for': '203.0.113.99',
+        'x-real-ip': '203.0.113.100',
+      },
+    });
+    expect(getClientIP(admitted)).toBe(injected);
+  });
+
   test.each(['', 'not-a-uuid', '00000000-0000-0000-0000-000000000000'])(
     'rejects strict request UUID %p before reading the body',
     async (requestId) => {

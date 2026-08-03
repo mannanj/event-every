@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { delegated } = vi.hoisted(() => ({ delegated: vi.fn() }));
 vi.mock('../../.open-next/worker.js', () => ({
@@ -6,18 +6,91 @@ vi.mock('../../.open-next/worker.js', () => ({
 }));
 
 import worker from '../../cloudflare/app-worker';
+import { INTERNAL_IDENTITY_HEADER } from '../../src/platform/admission';
 
-describe('C1-A app Worker scaffold', () => {
-  it('exposes only fetch and delegates the original request, environment, context, and exact response', async () => {
-    const request = new Request('https://event-every.test/c1-a-delegation', { headers: { 'x-c1-a': 'request' } });
-    const env = { C1_DEPLOYMENT_DISABLED: '1' };
+describe('C1-A app Worker admission wrapper', () => {
+  beforeEach(() => delegated.mockReset());
+
+  it('wrapper forwards only rebuilt admitted request', async () => {
+    const request = new Request('https://event-every.test/api/scan', {
+      method: 'POST',
+      headers: {
+        origin: 'https://event-every.test',
+        'content-type': 'application/json',
+        'cf-connecting-ip': '203.0.113.12',
+        'x-forwarded-for': '198.51.100.12',
+        [INTERNAL_IDENTITY_HEADER]: 'known:forged:deadbeef',
+        'x-c1-a': 'request',
+      },
+      body: '{}',
+    });
+    const env = {
+      C1_DEPLOYMENT_DISABLED: '1',
+      IDENTITY_KEY_CURRENT_VERSION: 'test-v1',
+      IDENTITY_HMAC_CURRENT: 'synthetic-worker-key',
+    } as unknown as CloudflareEnv;
     const ctx = { waitUntil: vi.fn() };
     const response = new Response('delegated exactly', { status: 209, headers: { 'x-c1-a': 'response' } });
     delegated.mockResolvedValueOnce(response);
 
     expect(Object.keys(worker)).toEqual(['fetch']);
-    await expect(worker.fetch(request, env, ctx)).resolves.toBe(response);
+    await expect(worker.fetch(request, env, ctx as never)).resolves.toBe(response);
     expect(delegated).toHaveBeenCalledTimes(1);
-    expect(delegated).toHaveBeenCalledWith(request, env, ctx);
+    const [admittedRequest, delegatedEnv, delegatedCtx] = delegated.mock.calls[0];
+    expect(admittedRequest).not.toBe(request);
+    expect(admittedRequest.headers.get('cf-connecting-ip')).toBeNull();
+    expect(admittedRequest.headers.get('x-forwarded-for')).toBeNull();
+    expect(admittedRequest.headers.get(INTERNAL_IDENTITY_HEADER)).toBe('unknown');
+    expect(admittedRequest.headers.get('x-c1-a')).toBe('request');
+    expect(await admittedRequest.text()).toBe('{}');
+    expect(delegatedEnv).toBe(env);
+    expect(delegatedCtx).toBe(ctx);
+  });
+
+  it('scrubs forged edge headers before delegating a non-API asset', async () => {
+    const request = new Request('https://event-every.test/_next/static/app.js', {
+      headers: {
+        'cf-connecting-ip': '203.0.113.99',
+        'x-forwarded-for': '198.51.100.99',
+        'x-real-ip': '192.0.2.99',
+        forwarded: 'for=203.0.113.99',
+        [INTERNAL_IDENTITY_HEADER]: 'known:forged:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        'x-preserved-asset': 'yes',
+      },
+    });
+    const env = {
+      IDENTITY_KEY_CURRENT_VERSION: 'test-v1',
+      IDENTITY_HMAC_CURRENT: 'synthetic-worker-key',
+    } as unknown as CloudflareEnv;
+    const ctx = { waitUntil: vi.fn() };
+    const response = new Response('asset');
+    delegated.mockResolvedValueOnce(response);
+
+    await expect(worker.fetch(request, env, ctx as never)).resolves.toBe(response);
+    expect(delegated).toHaveBeenCalledTimes(1);
+    const [scrubbedRequest] = delegated.mock.calls[0];
+    expect(scrubbedRequest.headers.get('cf-connecting-ip')).toBeNull();
+    expect(scrubbedRequest.headers.get('x-forwarded-for')).toBeNull();
+    expect(scrubbedRequest.headers.get('x-real-ip')).toBeNull();
+    expect(scrubbedRequest.headers.get('forwarded')).toBeNull();
+    expect(scrubbedRequest.headers.get(INTERNAL_IDENTITY_HEADER)).toBe('unknown');
+    expect(scrubbedRequest.headers.get('x-preserved-asset')).toBe('yes');
+  });
+
+  it('returns a fixed admission failure without delegating', async () => {
+    const request = new Request('https://event-every.test/api/scan', {
+      method: 'POST',
+      headers: { origin: 'https://cross-site.invalid', 'content-type': 'application/json' },
+      body: '{"private":"worker-canary"}',
+    });
+    const env = {
+      IDENTITY_KEY_CURRENT_VERSION: 'test-v1',
+      IDENTITY_HMAC_CURRENT: 'synthetic-worker-key',
+    } as unknown as CloudflareEnv;
+
+    const response = await worker.fetch(request, env, {} as never);
+    expect(response.status).toBe(403);
+    expect(await response.text()).not.toContain('worker-canary');
+    expect(delegated).not.toHaveBeenCalled();
   });
 });

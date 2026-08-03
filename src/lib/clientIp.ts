@@ -1,19 +1,9 @@
 import type { NextRequest } from 'next/server';
+import { INTERNAL_IDENTITY_HEADER } from '@/platform/identity';
 
-// Single source of truth for client-IP extraction across API routes. Trusts the
-// first hop of x-forwarded-for, then x-real-ip; both are spoofable without an
-// authenticated proxy in front, so this is best-effort (see findings table).
+const INJECTED_IDENTITY = /^known:[A-Za-z0-9._-]{1,64}:[0-9a-f]{64}$/;
+
 export function getClientIP(request: NextRequest): string {
-  const forwarded = request.headers.get('x-forwarded-for');
-  const realIP = request.headers.get('x-real-ip');
-
-  if (forwarded) {
-    return forwarded.split(',')[0].trim();
-  }
-
-  if (realIP) {
-    return realIP;
-  }
-
-  return 'unknown';
+  const identity = request.headers.get(INTERNAL_IDENTITY_HEADER);
+  return identity !== null && INJECTED_IDENTITY.test(identity) ? identity : 'unknown';
 }
