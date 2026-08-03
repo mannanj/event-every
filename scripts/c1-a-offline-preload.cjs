@@ -19,13 +19,39 @@ function blocked() {
   return error;
 }
 
-function hasOwn(value, key) {
-  return Boolean(value && typeof value === 'object' && Object.prototype.hasOwnProperty.call(value, key));
+function propertyValue(value, key) {
+  let current = value;
+  while (current && typeof current === 'object') {
+    const descriptor = Object.getOwnPropertyDescriptor(current, key);
+    if (descriptor) {
+      if (!Object.prototype.hasOwnProperty.call(descriptor, 'value')) throw blocked();
+      return { present: true, value: descriptor.value };
+    }
+    current = Object.getPrototypeOf(current);
+  }
+  return { present: false, value: undefined };
 }
 
-function rejectRoutingHooks(value, extra = []) {
+function snapshotOptions(value) {
+  const snapshot = {};
+  for (const [key, descriptor] of Object.entries(Object.getOwnPropertyDescriptors(value))) {
+    if (!Object.prototype.hasOwnProperty.call(descriptor, 'value')) throw blocked();
+    if (descriptor.enumerable) Object.defineProperty(snapshot, key, {
+      value: descriptor.value,
+      enumerable: true,
+      writable: true,
+      configurable: true,
+    });
+  }
+  return snapshot;
+}
+
+function rejectRoutingHooks(value, extra = [], allowed = []) {
   if (!value || typeof value !== 'object') return;
-  for (const key of [...ROUTING_HOOKS, ...extra]) if (hasOwn(value, key)) throw blocked();
+  for (const key of [...ROUTING_HOOKS, ...extra]) {
+    const property = propertyValue(value, key);
+    if (!allowed.includes(key) && property.present && property.value !== undefined && property.value !== null) throw blocked();
+  }
 }
 
 function exactHost(value) {
@@ -48,12 +74,36 @@ function urlHost(value) {
   }
 }
 
-function rejectProxyRequest(options) {
-  if (!options || typeof options !== 'object') return;
-  rejectRoutingHooks(options);
-  if (typeof options.path === 'string' && /^https?:\/\//i.test(options.path)) throw blocked();
-  if (String(options.method || '').toUpperCase() === 'CONNECT') throw blocked();
-  const headers = options.headers;
+function isWebSocketUpgrade(headers) {
+  if (!headers || typeof headers !== 'object') return false;
+  const normalized = new Map(Object.entries(headers).map(([name, value]) => [name.toLowerCase(), String(value).toLowerCase()]));
+  return normalized.get('upgrade') === 'websocket' && normalized.get('connection')?.split(/\s*,\s*/).includes('upgrade');
+}
+
+function guardedWebSocketSocketOptions(options, tlsMode) {
+  const host = exactHost(options && (options.hostname || options.host));
+  const port = Number(options && options.port);
+  if (!host || !Number.isInteger(port) || port < 1 || port > 65535) throw blocked();
+  return tlsMode
+    ? { host, port, servername: '', rejectUnauthorized: options.rejectUnauthorized !== false }
+    : { host, port };
+}
+
+function rejectProxyRequest(options, tlsMode = false) {
+  if (!options || typeof options !== 'object') return options;
+  const connectionHook = propertyValue(options, 'createConnection');
+  const hasConnectionHook = connectionHook.present && connectionHook.value !== undefined && connectionHook.value !== null;
+  rejectRoutingHooks(options, [], hasConnectionHook ? ['createConnection'] : []);
+  const sanitized = snapshotOptions(options);
+  if (hasConnectionHook) {
+    if (typeof connectionHook.value !== 'function' || !isWebSocketUpgrade(sanitized.headers)) throw blocked();
+    sanitized.createConnection = tlsMode
+      ? (socketOptions) => tls.connect(guardedWebSocketSocketOptions(socketOptions, true))
+      : (socketOptions) => net.connect(guardedWebSocketSocketOptions(socketOptions, false));
+  }
+  if (typeof sanitized.path === 'string' && /^https?:\/\//i.test(sanitized.path)) throw blocked();
+  if (String(sanitized.method || '').toUpperCase() === 'CONNECT') throw blocked();
+  const headers = sanitized.headers;
   if (headers && typeof headers === 'object') {
     for (const [name, value] of Object.entries(headers)) {
       const lower = name.toLowerCase();
@@ -61,20 +111,22 @@ function rejectProxyRequest(options) {
       if (lower === 'host' && !exactHost(String(value))) throw blocked();
     }
   }
+  return sanitized;
 }
 
-function requireHttpTarget(value, options) {
-  rejectProxyRequest(value);
-  rejectProxyRequest(options);
+function requireHttpTarget(value, options, tlsMode = false) {
+  if (value !== options) rejectProxyRequest(value);
+  const sanitizedOptions = rejectProxyRequest(options, tlsMode);
   let host = '';
-  if (options && typeof options === 'object' && (options.hostname !== undefined || options.host !== undefined)) {
-    host = exactHost(options.hostname || options.host);
+  if (sanitizedOptions && typeof sanitizedOptions === 'object' && (sanitizedOptions.hostname !== undefined || sanitizedOptions.host !== undefined)) {
+    host = exactHost(sanitizedOptions.hostname || sanitizedOptions.host);
   } else if (value && typeof value === 'object' && !(value instanceof URL) && (value.hostname !== undefined || value.host !== undefined)) {
     host = exactHost(value.hostname || value.host);
   } else {
     host = urlHost(value) || exactHost(value);
   }
   if (!host) throw blocked();
+  return sanitizedOptions;
 }
 
 function requireDns(value) {
@@ -113,9 +165,12 @@ for (const transport of [http, https]) {
   for (const method of ['request', 'get']) {
     const original = transport[method];
     transport[method] = function guardedRequest(...args) {
-      const options = args.find((arg, index) => index < 2 && arg && typeof arg === 'object' && !(arg instanceof URL));
-      requireHttpTarget(args[0], options);
-      return original.apply(this, args);
+      const optionIndex = args.findIndex((arg, index) => index < 2 && arg && typeof arg === 'object' && !(arg instanceof URL));
+      const options = optionIndex >= 0 ? args[optionIndex] : undefined;
+      const sanitized = requireHttpTarget(args[0], options, transport === https);
+      const guardedArgs = [...args];
+      if (optionIndex >= 0) guardedArgs[optionIndex] = sanitized;
+      return original.apply(this, guardedArgs);
     };
   }
 }

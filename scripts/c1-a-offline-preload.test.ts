@@ -56,6 +56,36 @@ function allowProbe(runtime: 'node' | 'bun'): number {
   }).exitCode ?? 1;
 }
 
+function websocketProbe(runtime: 'node' | 'bun'): number {
+  const program = `
+    const http=require('node:http'), net=require('node:net'); let dispatched=0; let bypassed=0; let received;
+    const underlying=(options)=>{received=options; dispatched++; return {on(){return this},end(){return this}}};
+    http.request=underlying; net.connect=net.createConnection=underlying;
+    const custom=()=>{bypassed++;};
+    require(${JSON.stringify(preload)});
+    http.request({hostname:'127.0.0.1',port:8788,path:'/',socketPath:undefined,agent:undefined,createConnection:null});
+    const locked={hostname:'127.0.0.1',port:8788,path:'/',socketPath:undefined,agent:undefined,headers:{Connection:'Upgrade',Upgrade:'websocket'}};
+    Object.defineProperty(locked,'createConnection',{value:custom,writable:false,enumerable:true});
+    http.request(locked);
+    const inherited=Object.create({createConnection:custom});
+    Object.assign(inherited,{hostname:'127.0.0.1',port:8788,path:'/',headers:{Connection:'Upgrade',Upgrade:'websocket'}});
+    http.request(inherited);
+    let reads=0;
+    const accessor={hostname:'127.0.0.1',port:8788,path:'/',headers:{Connection:'Upgrade',Upgrade:'websocket'}};
+    Object.defineProperty(accessor,'createConnection',{enumerable:true,get(){reads++; return reads <= 2 ? null : reads === 3 ? undefined : custom}});
+    try { http.request(accessor); process.exit(2); } catch (error) {
+      if (!error || error.code !== 'C1_A_EGRESS_BLOCKED') process.exit(3);
+    }
+    received.createConnection({host:'127.0.0.1',port:8788,createConnection:custom});
+    const polluted={hostname:'127.0.0.1',port:8788,path:'/'};
+    Object.defineProperty(polluted,'__proto__',{value:{createConnection:custom},enumerable:true});
+    http.request(polluted);
+    if (typeof received.createConnection === 'function') received.createConnection({host:'127.0.0.1',port:8788});
+    process.exit(dispatched===5 && bypassed===0 ? 0 : 1);
+  `;
+  return Bun.spawnSync([runtime, '--eval', program], { stdout: 'pipe', stderr: 'pipe' }).exitCode ?? 1;
+}
+
 describe('C1-A offline preload', () => {
   test('blocks all core non-loopback APIs before underlying dispatch in both Node and Bun', () => {
     const calls = [
@@ -109,5 +139,10 @@ describe('C1-A offline preload', () => {
   test('permits only literal loopback URL/options forms and keeps controls false in Node and Bun', () => {
     expect(allowProbe('node')).toBe(0);
     expect(allowProbe('bun')).toBe(0);
+  });
+
+  test('replaces the loopback WebSocket connection hook with the guarded transport', () => {
+    expect(websocketProbe('node')).toBe(0);
+    expect(websocketProbe('bun')).toBe(0);
   });
 });
