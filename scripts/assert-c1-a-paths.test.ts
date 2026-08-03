@@ -49,6 +49,19 @@ describe('C1-A task path authority', () => {
     }
   });
 
+  test('assigns the closed browser inventory guard to Task 8 without changing the terminal union', () => {
+    const inventoryPaths = ['scripts/assert-c1-a-e2e-inventory.ts', 'scripts/assert-c1-a-e2e-inventory.test.ts'];
+    const task8 = readTaskManifest(8);
+    const task11 = readTaskManifest(11);
+    for (const file of inventoryPaths) {
+      expect(task8).toContain(file);
+      expect(task11).not.toContain(file);
+    }
+    const terminal = new Set(Array.from({ length: 11 }, (_, index) => readTaskManifest(index + 1)).flat());
+    expect(terminal.size).toBe(149);
+    for (const file of inventoryPaths) expect(terminal.has(file)).toBeTrue();
+  });
+
   test('keeps .env.example exclusively Task 8 provenance and rejects all runtime dotenv names', () => {
     const task8 = readTaskManifest(8);
     expect(() => assertAuthorizedPaths('base', 'head', 8, task1, task8)).not.toThrow();

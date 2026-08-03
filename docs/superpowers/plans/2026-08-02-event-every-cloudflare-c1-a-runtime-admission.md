@@ -974,6 +974,16 @@ Commit with the literal message in the table. No free-form staging is permitted.
 
 The manifest file contents are literal below. Task 1 also creates all eleven manifests and owns this reviewed implementation-plan path, so its manifest owns those twelve coordination paths. The accepted plan remains untracked and byte-frozen from final review through Task 1 staging; there is no separate Event Every plan commit. Any byte change after the accepted review invalidates acceptance and requires rereview. Later tasks do not normally restage the already committed plan or manifest files. Task 7 has one bounded exception required by its busy-retry proof: before staging Task 7, independently rereview and commit exactly this plan path plus the prior Task 6-owned `src/platform/cloudflare/resolver-request-authority.ts` as a prerequisite repair. The Task 7 path gate then observes those two committed paths only as prior-manifest ownership and still requires the staged set to equal the unchanged nine-path Task 7 manifest; terminal mode still requires the unchanged eleven-manifest union. No manifest or accepted manifest hash changes.
 
+Task 8 has one bounded ownership prerequisite required by its first GREEN command: before any Task
+8 product edit, move `scripts/assert-c1-a-e2e-inventory.ts` and its test from `task-11.txt` to
+`task-08.txt`, update only those two accepted manifest hashes, the causal path-guard test, this
+plan's two literal manifests, and the Task 8/11 Files declarations. Independently rereview and
+commit exactly those five governance paths. The terminal union must remain the same 149 paths with
+sorted UTF-8 digest `86d9cafd0d18bd1c19126d19c9a7b3069322185c2625c762bba049b2a81d7131`.
+Task 8 then creates the guard/test under its own manifest and implements the already specified
+closed `57|58|59` contract; Task 11 reuses them without restaging. No Task 8 product path may change
+in the prerequisite commit.
+
 `task-01.txt`:
 
     .gitignore
@@ -1132,6 +1142,8 @@ The manifest file contents are literal below. Task 1 also creates all eleven man
     e2e/pattern-unlock.spec.ts
     e2e/prod.spec.ts
     playwright.config.ts
+    scripts/assert-c1-a-e2e-inventory.ts
+    scripts/assert-c1-a-e2e-inventory.test.ts
     scripts/run-e1-focused.test.ts
     scripts/run-e1-focused.ts
     src/app/api/auth/check/route.ts
@@ -1181,8 +1193,6 @@ The manifest file contents are literal below. Task 1 also creates all eleven man
     docs/testing/e1-mutation-ledger.md
     e2e/c1-a-runtime-admission.spec.ts
     e2e/url-scrape.spec.ts
-    scripts/assert-c1-a-e2e-inventory.ts
-    scripts/assert-c1-a-e2e-inventory.test.ts
     scripts/run-c1-a-mutations.ts
     scripts/run-c1-a-mutations.test.ts
     scripts/run-c1-a-offline.ts
@@ -1504,7 +1514,7 @@ Immediately before Task-1 staging, reassign `c1a_review_report` to that same lit
 
 ## Task 8: Retire pattern auth and all admin bypass
 
-**Files:** delete the five application pattern files plus obsolete `e2e/prod.spec.ts`; modify layout/auth/UI/LLM/limits/tests, `/spent`, ordinary Playwright config, E1 focused runner/tests, README, `.env.example`, and E2E discovery.
+**Files:** create the closed browser-inventory guard/test; delete the five application pattern files plus obsolete `e2e/prod.spec.ts`; modify layout/auth/UI/LLM/limits/tests, `/spent`, ordinary Playwright config, E1 focused runner/tests, README, `.env.example`, and E2E discovery.
 
 - [ ] RED source guard rejects VALID_L_PATTERNS, AUTH_COOKIE_NAME, AUTH_SECRET, generateAuthToken, verifyAuthToken, PatternLock, ?unlock, NEXT_PUBLIC_DISABLE_AUTH, and pattern mocks outside historical docs. Inventory the four retiring definitions by exact title before deletion.
 - [ ] Remove pattern UI/hook/shared secret and layout wrapper. Keep community-limit screen without “Enter pattern.” All LLM modes are community until C1-C; isAdmin is false.
@@ -1554,7 +1564,7 @@ Immediately before Task-1 staging, reassign `c1a_review_report` to that same lit
 
 ## Task 11: Causal mutation and terminal C1-A proof
 
-**Files:** create mutation runner/ledger/E2E; modify Playwright/offline runners, E1 ledger/docs.
+**Files:** create mutation runner/ledger/E2E; modify Playwright/offline runners and E1 ledger/docs; reuse the Task 8-owned browser-inventory guard/test without restaging them.
 
 - [ ] Ledger row per new unit/workerd/E2E: stable ID, owner task, production file, exact replacement/mutator, focused command, observed red assertion, inverse, restored SHA-256, restored green. No inferred coverage credit.
 - [ ] RED then GREEN the owned gates with `bun test scripts/run-c1-a-mutations.test.ts scripts/run-c1-a-offline.test.ts scripts/assert-c1-a-e2e-inventory.test.ts scripts/validate-c1-a-evidence.test.ts --isolate`.
