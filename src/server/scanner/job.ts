@@ -10,7 +10,11 @@ import { createEventEveryOpenRouterTransport } from '@/server/scanner/transport'
 import type { HostScanJob } from '@/server/scanner/scan';
 import type { ScanRequest } from '@/types/scannerHttp';
 
-type E1SourceHandle = Extract<SourceHandle, { kind: 'text' | 'image' }>;
+type E1SourceHandle = Readonly<{
+  sourceId: string;
+  kind: 'text' | 'image';
+  contentHandle: string;
+}>;
 
 function isMatchingHandle(actual: SourceHandle, expected: E1SourceHandle): boolean {
   return actual.sourceId === expected.sourceId

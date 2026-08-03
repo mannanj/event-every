@@ -59,6 +59,8 @@ describe('scanSource', () => {
     );
 
     try {
+      expect(job.kind).toBe('text');
+      if (job.kind !== 'text') throw new Error('expected text scan job');
       await expect(job.provider.scan([handle])).rejects.toThrow();
       expect(fetch).toHaveBeenCalledTimes(1);
       expect(fetch.mock.calls[0]?.[1]?.signal).toBe(controller.signal);
