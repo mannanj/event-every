@@ -4,6 +4,7 @@ src/app/api/detect-urls/route.ts
 src/platform/cloudflare/daily-counter.ts
 src/platform/cloudflare/identity-day-policy.ts
 src/platform/cloudflare/resolver-request-authority.ts
+src/platform/contracts.ts
 src/platform/__tests__/identity.test.ts
 src/platform/identity.ts
 src/platform/resolver/__tests__/capability.test.ts
