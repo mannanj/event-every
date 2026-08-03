@@ -33,6 +33,9 @@ yarn-error.log*
 # C1-A locally generated Cloudflare/OpenNext artifacts
 .open-next/
 .wrangler/
+dist-c1-a-*
+test-results-c1-a-*
+playwright-report-c1-a-*
 
 # vercel
 .vercel

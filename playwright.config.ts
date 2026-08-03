@@ -17,7 +17,7 @@ const devCommand = isOffline
 export default defineConfig({
   testDir: './e2e',
   testMatch: isProd ? /prod\.spec\.ts/ : undefined,
-  testIgnore: isProd ? undefined : /prod\.spec\.ts/,
+  testIgnore: isProd ? /c1-a-runtime-admission\.spec\.ts/ : [/prod\.spec\.ts/, /c1-a-runtime-admission\.spec\.ts/],
   fullyParallel: !isProd,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
