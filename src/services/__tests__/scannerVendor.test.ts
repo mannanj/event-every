@@ -1,9 +1,16 @@
 import { createHash } from 'node:crypto';
-import { cp, mkdtemp, mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { cp, mkdtemp, mkdir, readdir, readFile, rm, stat, symlink, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, test } from 'bun:test';
-import { createE1OfflineEnvironment } from '../../../scripts/run-e1-offline';
+import {
+  createE1OfflineEnvironment,
+  assertMatchingSrcBunInventories,
+  createE1BunUnitCommandPlan,
+  discoverGitSrcBunTestFiles,
+  discoverSrcBunTestFiles,
+  partitionE1BunTests,
+} from '../../../scripts/run-e1-offline';
 import {
   assertExactBuildInventory,
   credentialFreeEnvironment,
@@ -126,6 +133,125 @@ function runBunInstall(arguments_: string[], cwd: string, env: Record<string, st
 }
 
 describe('vendored Event Scanner package', () => {
+  test('discovers Git-backed tracked and untracked tests with NUL-safe exact suffix filtering', async () => {
+    const repositoryRoot = await mkdtemp(path.join(os.tmpdir(), 'event-every-git-inventory-'));
+    const runGit = (arguments_: string[]) => {
+      const result = Bun.spawnSync(['git', ...arguments_], {
+        cwd: repositoryRoot,
+        stdout: 'pipe',
+        stderr: 'pipe',
+      });
+      if (result.exitCode !== 0) throw new Error(`fixture git command failed: ${arguments_[0]}`);
+    };
+    try {
+      await mkdir(path.join(repositoryRoot, 'src', 'nested'), { recursive: true });
+      await writeFile(path.join(repositoryRoot, 'src', 'tracked.test.ts'), 'export {}\n');
+      await writeFile(path.join(repositoryRoot, 'src', 'tracked.test.tsx'), 'export {}\n');
+      await writeFile(path.join(repositoryRoot, 'src', 'nested', 'untracked.spec.ts'), 'export {}\n');
+      await writeFile(path.join(repositoryRoot, 'src', 'nested', 'line\nname.spec.tsx'), 'export {}\n');
+      await writeFile(path.join(repositoryRoot, 'src', 'ignored.test.ts'), 'export {}\n');
+      await writeFile(path.join(repositoryRoot, 'outside.test.ts'), 'export {}\n');
+      await writeFile(path.join(repositoryRoot, '.gitignore'), 'src/ignored.test.ts\noutside-ignored.test.ts\n');
+      await writeFile(path.join(repositoryRoot, 'outside-ignored.test.ts'), 'export {}\n');
+
+      runGit(['init', '--quiet']);
+      runGit(['add', '--', '.gitignore', 'src/tracked.test.ts', 'src/tracked.test.tsx']);
+
+      expect(discoverGitSrcBunTestFiles(repositoryRoot)).toEqual([
+        'src/nested/line\nname.spec.tsx',
+        'src/nested/untracked.spec.ts',
+        'src/tracked.test.ts',
+        'src/tracked.test.tsx',
+      ]);
+    } finally {
+      await rm(repositoryRoot, { recursive: true, force: true });
+    }
+  });
+
+  test('rejects a Git/filesystem inventory mismatch', () => {
+    expect(() => assertMatchingSrcBunInventories(
+      ['src/server/scanner/__tests__/image.test.ts'],
+      ['src/server/scanner/__tests__/image.test.ts', 'src/extra.test.ts'],
+    )).toThrow('do not match');
+  });
+
+  test('rejects an image-only or empty Bun partition and duplicate complete inventory', () => {
+    const image = 'src/server/scanner/__tests__/image.test.ts';
+    expect(() => partitionE1BunTests([image], [image])).toThrow('remaining');
+    expect(() => partitionE1BunTests([], [image])).toThrow('missing required image suite');
+    expect(() => partitionE1BunTests([image], [image, image])).toThrow('discovered test inventory contains duplicate');
+  });
+
+  test('rejects symbolic links encountered during recursive src discovery', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'event-every-src-inventory-'));
+    try {
+      await mkdir(path.join(root, 'src', 'nested'), { recursive: true });
+      await symlink(path.join(root, 'src', 'nested'), path.join(root, 'src', 'linked'));
+      expect(() => discoverSrcBunTestFiles(root)).toThrow('symbolic link');
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  test('partitions the complete src Bun test inventory into image and remaining suites', () => {
+    const inventory = discoverSrcBunTestFiles();
+    const partition = partitionE1BunTests(inventory, discoverSrcBunTestFiles());
+
+    expect(partition.image).toEqual(['src/server/scanner/__tests__/image.test.ts']);
+    const union = [...partition.image, ...partition.remaining];
+    expect([...union].sort()).toEqual(inventory);
+    expect(new Set(union).size).toBe(inventory.length);
+    expect(() => partitionE1BunTests(inventory.slice(1), inventory)).toThrow('does not exactly match');
+    expect(() => partitionE1BunTests([...inventory, inventory[0]], inventory)).toThrow('duplicate paths');
+    expect(() => partitionE1BunTests(inventory, [...inventory, inventory[0]])).toThrow('discovered test inventory contains duplicate');
+    expect(() => partitionE1BunTests(
+      inventory.filter((file) => file !== 'src/server/scanner/__tests__/image.test.ts'),
+      inventory,
+    )).toThrow('missing required image suite');
+  });
+
+  test('builds one isolated Bun unit command per test file, image first', () => {
+    const inventory = discoverSrcBunTestFiles();
+    const partition = partitionE1BunTests(inventory, discoverSrcBunTestFiles());
+    const plan = createE1BunUnitCommandPlan(partition, inventory);
+    const files = plan.map((command) => command[3]);
+    const preload = path.resolve(import.meta.dir, '../../../scripts/e1-offline-preload.cjs');
+
+    expect(plan).toHaveLength(inventory.length);
+    expect(plan).not.toHaveLength(2);
+    expect(files).toEqual([partition.image[0], ...partition.remaining]);
+    expect([...files].sort()).toEqual(inventory);
+    expect(new Set(files).size).toBe(inventory.length);
+    expect(plan.every((command) => (
+      command.length === 5
+      && command[0] === 'bun'
+      && command[1] === `--preload=${preload}`
+      && command[2] === 'test'
+      && command[4] === '--isolate'
+    ))).toBe(true);
+    expect(() => createE1BunUnitCommandPlan({ image: partition.image, remaining: [] }, inventory)).toThrow('remaining');
+    expect(() => createE1BunUnitCommandPlan({
+      image: ['src/server/scanner/__tests__/scan.test.ts'],
+      remaining: partition.remaining,
+    }, inventory)).toThrow('requires image path');
+    expect(() => createE1BunUnitCommandPlan({
+      image: partition.image,
+      remaining: [partition.image[0], ...partition.remaining],
+    }, inventory)).toThrow('image path');
+    expect(() => createE1BunUnitCommandPlan({
+      image: partition.image,
+      remaining: [...partition.remaining, partition.remaining[0]],
+    }, inventory)).toThrow('duplicate');
+    expect(() => createE1BunUnitCommandPlan({
+      image: partition.image,
+      remaining: partition.remaining.slice(1),
+    }, inventory)).toThrow('exact inventory');
+    expect(() => createE1BunUnitCommandPlan({
+      image: partition.image,
+      remaining: [partition.remaining[1], partition.remaining[0], ...partition.remaining.slice(2)],
+    }, inventory)).toThrow('lexical');
+  });
+
   test('scrubs credential-shaped values from nested Scanner installer children', () => {
     const childEnvironment = credentialFreeEnvironment({
       OPENROUTER_API_KEY: 'fake-openrouter-key',
