@@ -24,14 +24,19 @@ const request: OpenRouterChatRequest = {
 };
 
 describe('Event Every OpenRouter scanner transport', () => {
-  test('forwards the Scanner request and host auth exactly once', async () => {
+  test('exact signal reaches fetch with the Scanner request and host auth once', async () => {
     const body = { choices: [], usage: { cost: 0.01 } };
     const call = mock(async () => body) as unknown as typeof openRouterChat;
+    const controller = new AbortController();
 
-    const result = await createEventEveryOpenRouterTransport(auth, call).complete(request);
+    const result = await createEventEveryOpenRouterTransport({
+      auth,
+      signal: controller.signal,
+      call,
+    }).complete(request);
 
     expect(call).toHaveBeenCalledTimes(1);
-    expect(call).toHaveBeenCalledWith(request, auth);
+    expect(call).toHaveBeenCalledWith(request, auth, { signal: controller.signal });
     expect(result).toEqual({ ok: true, body });
     expect(JSON.stringify(result)).not.toContain(auth.key);
   });
@@ -41,7 +46,11 @@ describe('Event Every OpenRouter scanner transport', () => {
       throw new CommunityLimitError('2026-08-01T00:00:00.000Z');
     }) as unknown as typeof openRouterChat;
 
-    const result = await createEventEveryOpenRouterTransport(auth, call).complete(request);
+    const result = await createEventEveryOpenRouterTransport({
+      auth,
+      signal: new AbortController().signal,
+      call,
+    }).complete(request);
 
     expect(call).toHaveBeenCalledTimes(1);
     expect(result).toEqual({ ok: false, failure: 'http', status: 402, retryable: false });
@@ -50,10 +59,16 @@ describe('Event Every OpenRouter scanner transport', () => {
 
   test('maps a typed upstream 503 into Scanner HTTP failure without its message', async () => {
     const call: typeof openRouterChat = mock(async () => {
-      throw new OpenRouterUpstreamError(503, true, 'private upstream detail');
+      const error = new OpenRouterUpstreamError(503, true, 'upstream_unavailable');
+      Object.defineProperty(error, 'privateDetail', { value: 'private upstream detail' });
+      throw error;
     }) as unknown as typeof openRouterChat;
 
-    const result = await createEventEveryOpenRouterTransport(auth, call).complete(request);
+    const result = await createEventEveryOpenRouterTransport({
+      auth,
+      signal: new AbortController().signal,
+      call,
+    }).complete(request);
 
     expect(call).toHaveBeenCalledTimes(1);
     expect(result).toEqual({ ok: false, failure: 'http', status: 503, retryable: true });
@@ -63,7 +78,11 @@ describe('Event Every OpenRouter scanner transport', () => {
   test('sanitizes arbitrary thrown values into a non-retryable network failure', async () => {
     const call = mock(async () => { throw new Error('secret stack detail'); }) as unknown as typeof openRouterChat;
 
-    const result = await createEventEveryOpenRouterTransport(auth, call).complete(request);
+    const result = await createEventEveryOpenRouterTransport({
+      auth,
+      signal: new AbortController().signal,
+      call,
+    }).complete(request);
 
     expect(result).toEqual({ ok: false, failure: 'network', status: null, retryable: false });
     expect(JSON.stringify(result)).not.toContain('secret stack detail');

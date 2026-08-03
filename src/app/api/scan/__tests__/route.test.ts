@@ -8,6 +8,7 @@ import { ScanResponseSchema } from '@/types/scannerHttp';
 const calls = { evaluate: 0, key: 0, charge: 0, transport: 0 };
 const timeline: string[] = [];
 const transportRequests: unknown[] = [];
+const transportSignals: Array<AbortSignal | undefined> = [];
 const uuidValues = [
   '00000000-0000-4000-8000-000000000001',
   '00000000-0000-4000-8000-000000000002',
@@ -19,6 +20,10 @@ spyOn(crypto, 'randomUUID').mockImplementation(() => (
 ));
 const limits = { allowed: true, reason: null as 'community-budget' | 'ip-rate' | null };
 const transportState = { status: null as number | null };
+const abortTransportState = { waitForAbort: false, cancellations: 0 };
+let transportStarted: Promise<void>;
+let markTransportStarted: () => void;
+const VALID_PNG_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNgYAAAAAMAASsJTYQAAAAASUVORK5CYII=';
 
 const claim = <Value>(value: Value) => ({ value, confidence: null, evidence: [] });
 
@@ -57,11 +62,24 @@ mock.module('@/lib/limits', () => ({
 }));
 
 mock.module('@/server/scanner/transport', () => ({
-  createEventEveryOpenRouterTransport: () => ({
+  createEventEveryOpenRouterTransport: (input: { signal?: AbortSignal }) => ({
     complete: async (scannerRequest: unknown) => {
       calls.transport++;
       timeline.push('transport');
       transportRequests.push(scannerRequest);
+      transportSignals.push(input.signal);
+      markTransportStarted();
+      if (abortTransportState.waitForAbort && input.signal) {
+        await new Promise<void>((resolve) => {
+          const cancel = () => {
+            abortTransportState.cancellations++;
+            resolve();
+          };
+          if (input.signal?.aborted) cancel();
+          else input.signal?.addEventListener('abort', cancel, { once: true });
+        });
+        return { ok: false as const, failure: 'network' as const, status: null, retryable: false };
+      }
       if (transportState.status !== null) {
         return { ok: false as const, failure: 'http' as const, status: transportState.status, retryable: false };
       }
@@ -102,8 +120,8 @@ const { POST } = await import('@/app/api/scan/route');
 const { createScanJob } = await import('@/server/scanner/job');
 const { getClientIP } = await import('@/lib/clientIp');
 
-const request = (body: unknown) => new NextRequest('http://localhost/api/scan', {
-  method: 'POST', headers: { 'content-type': 'application/json', 'x-event-every-request-id': '018f47a0-7b5c-7cc4-9a34-123456789abc' }, body: JSON.stringify(body),
+const request = (body: unknown, signal?: AbortSignal) => new NextRequest('http://localhost/api/scan', {
+  method: 'POST', headers: { 'content-type': 'application/json', 'x-event-every-request-id': '018f47a0-7b5c-7cc4-9a34-123456789abc' }, body: JSON.stringify(body), signal,
 });
 
 const requestWithId = (body: unknown, requestId: string) => new NextRequest('http://localhost/api/scan', {
@@ -117,10 +135,14 @@ beforeEach(() => {
   calls.transport = 0;
   timeline.length = 0;
   transportRequests.length = 0;
+  transportSignals.length = 0;
   uuidIndex = 0;
   limits.allowed = true;
   limits.reason = null;
   transportState.status = null;
+  abortTransportState.waitForAbort = false;
+  abortTransportState.cancellations = 0;
+  transportStarted = new Promise<void>((resolve) => { markTransportStarted = resolve; });
 });
 
 afterEach(() => setPlatformRuntimeForTests(undefined));
@@ -171,7 +193,8 @@ describe('/api/scan', () => {
     };
     setPlatformRuntimeForTests({ mode: 'legacy', provider });
 
-    const response = await POST(requestWithId({ kind: 'text', text: 'Office hours' }, callerRequestId));
+    const req = requestWithId({ kind: 'text', text: 'Office hours' }, callerRequestId);
+    const response = await POST(req);
     expect(response.status).toBe(200);
     expect(received).toMatchObject({
       route: 'scan',
@@ -182,6 +205,7 @@ describe('/api/scan', () => {
     expect(typeof received?.charge).toBe('function');
     expect(typeof received?.provider).toBe('function');
     expect(calls).toEqual({ evaluate: 1, key: 1, charge: 0, transport: 1 });
+    expect(transportSignals).toEqual([req.signal]);
   });
 
   test.each(['shadow', 'cloudflare'] as const)('%s fails before body, limits, charging, or provider transport', async (mode) => {
@@ -216,6 +240,49 @@ describe('/api/scan', () => {
     const oversize = await POST(request({ kind: 'image', dataUrl: `data:image/png;base64,${Buffer.from(bytes).toString('base64')}` }));
     expect(oversize.status).toBe(400);
     expect(calls).toEqual({ evaluate: 0, key: 0, charge: 0, transport: 0 });
+  });
+
+  test('enforces the 100,000 UTF-8 text byte ceiling before any gate', async () => {
+    const exact = 'é'.repeat(50_000);
+    const exactResponse = await POST(request({ kind: 'text', text: exact }));
+    expect(exactResponse.status).toBe(200);
+    expect(calls).toEqual({ evaluate: 1, key: 1, charge: 1, transport: 1 });
+
+    const overflowResponse = await POST(request({ kind: 'text', text: `${exact}a` }));
+    expect(overflowResponse.status).toBe(400);
+    expect(await overflowResponse.json()).toEqual({ error: 'Invalid scan request.' });
+    expect(calls).toEqual({ evaluate: 1, key: 1, charge: 1, transport: 1 });
+  });
+
+  test('abort before dispatch returns fixed 408 with zero charge or transport', async () => {
+    const controller = new AbortController();
+    controller.abort();
+
+    const response = await POST(request({ kind: 'text', text: 'Office hours' }, controller.signal));
+
+    expect(response.status).toBe(408);
+    expect(await response.json()).toEqual({ error: 'Unable to scan this source.' });
+    expect(calls).toEqual({ evaluate: 1, key: 1, charge: 0, transport: 0 });
+  });
+
+  test('abort after dispatch cancels the exact transport and returns outcome_unknown without retry', async () => {
+    const controller = new AbortController();
+    abortTransportState.waitForAbort = true;
+    const req = request({ kind: 'text', text: 'Office hours' }, controller.signal);
+
+    const responsePromise = POST(req);
+    await transportStarted;
+    controller.abort();
+    const response = await responsePromise;
+
+    expect(response.status).toBe(502);
+    expect(await response.json()).toEqual({
+      error: 'The scan outcome is unknown.',
+      code: 'outcome_unknown',
+    });
+    expect(transportSignals).toEqual([req.signal]);
+    expect(abortTransportState.cancellations).toBe(1);
+    expect(calls).toEqual({ evaluate: 1, key: 1, charge: 1, transport: 1 });
   });
 
   test('creates UUID identities, charges before one scan, and returns only the validated response shape', async () => {
@@ -258,7 +325,7 @@ describe('/api/scan', () => {
   });
 
   test('uses the real vision adapter but never returns its image data URL', async () => {
-    const dataUrl = 'data:image/png;base64,iVBORw0KGgo=';
+    const dataUrl = VALID_PNG_DATA_URL;
     const response = await POST(request({ kind: 'image', dataUrl }));
     const body = await response.json();
     expect(response.status).toBe(200);
@@ -279,6 +346,8 @@ describe('/api/scan', () => {
 
   test.each([
     [402, 402, { code: 'community_limit' }],
+    [408, 504, { error: 'The provider timed out.', code: 'upstream_timeout' }],
+    [429, 502, { error: 'The provider could not scan this source.', code: 'scan_provider_failed' }],
     [503, 503, { error: 'No privacy-compatible model endpoint is available.', code: 'privacy_endpoint_unavailable' }],
     [500, 502, { error: 'The provider could not scan this source.', code: 'scan_provider_failed' }],
   ])('maps a provider HTTP %i without upstream details', async (upstreamStatus, expectedStatus, expectedBody) => {
@@ -319,7 +388,12 @@ describe('/api/scan', () => {
 
   test('makes resolver identity mismatch fail through the selected real adapter before transport', async () => {
     const source = { sourceId: 'source-1', kind: 'text' as const, contentHandle: 'handle-1' };
-    const job = createScanJob({ kind: 'text', text: 'secret' }, source, { key: 'test', mode: 'community' });
+    const job = createScanJob(
+      { kind: 'text', text: 'secret' },
+      source,
+      { key: 'test', mode: 'community' },
+      new AbortController().signal,
+    );
     if (job.kind !== 'text') throw new Error('expected text job');
     await expect(job.provider.scan([{ ...source, contentHandle: 'other-handle' }])).rejects.toMatchObject({ code: 'source_resolution_failed' });
     expect(calls.transport).toBe(0);
@@ -327,7 +401,12 @@ describe('/api/scan', () => {
 
   test('rejects a mismatched image handle before the real vision adapter transports it', async () => {
     const source = { sourceId: 'source-2', kind: 'image' as const, contentHandle: 'handle-2' };
-    const job = createScanJob({ kind: 'image', dataUrl: 'data:image/png;base64,iVBORw0KGgo=' }, source, { key: 'test', mode: 'community' });
+    const job = createScanJob(
+      { kind: 'image', dataUrl: 'data:image/png;base64,iVBORw0KGgo=' },
+      source,
+      { key: 'test', mode: 'community' },
+      new AbortController().signal,
+    );
     if (job.kind !== 'image') throw new Error('expected image job');
     await expect(job.provider.scan([{ ...source, contentHandle: 'other-handle' }])).rejects.toMatchObject({ code: 'source_resolution_failed' });
     expect(calls.transport).toBe(0);

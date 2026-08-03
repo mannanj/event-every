@@ -6,6 +6,7 @@ import {
   type TextLinkProviderPort,
   type VisionProviderPort,
 } from '@event-every/scanner';
+import { createScanJob } from '../job';
 import { scanSource } from '../scan';
 
 function claim<Value>(value: Value) {
@@ -46,6 +47,26 @@ function observation(): ProviderScanObservation {
 }
 
 describe('scanSource', () => {
+  test('createScanJob threads the exact abort signal to provider fetch', async () => {
+    const controller = new AbortController();
+    const fetch = spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null, { status: 503 }));
+    const handle = { sourceId: 'signal-source', kind: 'text' as const, contentHandle: 'opaque-signal' };
+    const job = createScanJob(
+      { kind: 'text', text: 'signal proof' },
+      handle,
+      { key: 'synthetic-scan-key', mode: 'community' },
+      controller.signal,
+    );
+
+    try {
+      await expect(job.provider.scan([handle])).rejects.toThrow();
+      expect(fetch).toHaveBeenCalledTimes(1);
+      expect(fetch.mock.calls[0]?.[1]?.signal).toBe(controller.signal);
+    } finally {
+      fetch.mockRestore();
+    }
+  });
+
   test('scans a text source once through only the text port and preserves null claims', async () => {
     const text = { scan: mock(async () => observation()) } satisfies TextLinkProviderPort;
     const image = { scan: mock(async () => observation()) } satisfies VisionProviderPort;

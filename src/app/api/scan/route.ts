@@ -10,6 +10,8 @@ import {
   legacyCommunityLimitResponse,
   legacyIpLimitResponse,
 } from '@/platform/legacy';
+import { deferPlatformWork } from '@/platform/cloudflare-context';
+import { settleLegacyDispatch } from '@/platform/legacy/dispatch';
 import { getProviderPort } from '@/platform/runtime';
 
 type E1SourceHandle = Extract<SourceHandle, { kind: 'text' | 'image' }>;
@@ -40,6 +42,10 @@ export async function POST(request: NextRequest): Promise<Response> {
     if (!parsed.success) return NextResponse.json({ error: 'Invalid scan request.' }, { status: 400 });
     const scanRequest = parsed.data;
 
+    if (scanRequest.kind === 'text' && new TextEncoder().encode(scanRequest.text).byteLength > 100_000) {
+      return NextResponse.json({ error: 'Invalid scan request.' }, { status: 400 });
+    }
+
     if (scanRequest.kind === 'image') {
       try {
         validateScannerImageDataUrl(scanRequest.dataUrl);
@@ -67,8 +73,8 @@ export async function POST(request: NextRequest): Promise<Response> {
       identity: { kind: 'unknown', keyVersion: '', hmac: '' },
       signal: request.signal,
       charge: legacy.charge,
-      provider: () => legacy.run(() => scanSource(
-        createScanJob(scanRequest, source, auth),
+      provider: (signal) => legacy.run(() => scanSource(
+        createScanJob(scanRequest, source, auth, signal),
         { candidateIdFactory: randomUUID },
       )),
     });
@@ -77,8 +83,24 @@ export async function POST(request: NextRequest): Promise<Response> {
       return NextResponse.json({ error: 'Unable to scan this source.' }, { status: 408 });
     }
 
-    const dispatched = await dispatch.provider;
+    const dispatched = await settleLegacyDispatch(
+      dispatch,
+      request.signal,
+      deferPlatformWork,
+    );
     if (dispatched.status !== 'success') {
+      if (dispatched.code === 'outcome_unknown') {
+        return NextResponse.json(
+          { error: 'The scan outcome is unknown.', code: 'outcome_unknown' },
+          { status: 502 },
+        );
+      }
+      if (dispatched.code === 'upstream_timeout') {
+        return NextResponse.json(
+          { error: 'The provider timed out.', code: 'upstream_timeout' },
+          { status: 504 },
+        );
+      }
       const failure = legacy.failure();
       if (failure?.kind === 'community-limit') return legacyCommunityLimitResponse(failure.resetAt);
       if (failure?.kind === 'privacy-endpoint-unavailable') {

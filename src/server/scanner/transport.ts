@@ -7,13 +7,19 @@ import {
 } from '@/lib/llm';
 
 export function createEventEveryOpenRouterTransport(
-  auth: LlmCallAuth,
-  call: typeof openRouterChat = openRouterChat,
+  input: Readonly<{
+    auth: LlmCallAuth;
+    signal: AbortSignal;
+    call?: typeof openRouterChat;
+  }>,
 ): OpenRouterTransport {
+  const call = input.call ?? openRouterChat;
   return {
     async complete(request) {
       try {
-        const body = await call(request, auth);
+        const body = await call(request, input.auth, {
+          signal: input.signal,
+        });
         return { ok: true, body };
       } catch (error) {
         if (error instanceof CommunityLimitError) {

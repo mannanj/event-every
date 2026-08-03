@@ -56,6 +56,20 @@ function responseFetch(response: Response) {
   return fetchMock;
 }
 
+function unreadErrorResponse(status: number) {
+  const cancel = mock(async () => {});
+  const json = mock(async () => { throw new Error('provider body was read as JSON'); });
+  const text = mock(async () => { throw new Error('provider body was read as text'); });
+  const response = {
+    body: { cancel },
+    json,
+    ok: false,
+    status,
+    text,
+  } as unknown as Response;
+  return { cancel, json, response, text };
+}
+
 beforeEach(() => {
   recordCommunitySpend.mockClear();
 });
@@ -123,7 +137,7 @@ describe('openRouterChat', () => {
     expect(recordCommunitySpend).toHaveBeenCalledTimes(0);
   });
 
-  test('admin 402 throws a plain Error (not CommunityLimitError) with the upstream message', async () => {
+  test('admin 402 throws a fixed typed error without the upstream message', async () => {
     mockFetch(402, { error: { message: 'nope' } });
     let caught: unknown;
     try {
@@ -131,14 +145,16 @@ describe('openRouterChat', () => {
     } catch (e) {
       caught = e;
     }
-    expect(caught).toBeInstanceOf(Error);
+    expect(caught).toBeInstanceOf(OpenRouterUpstreamError);
     expect(caught).not.toBeInstanceOf(CommunityLimitError);
-    expect((caught as Error).message).toBe('nope');
+    expect((caught as Error).message).toBe('OpenRouter API error');
+    expect((caught as Error).message).not.toContain('nope');
   });
 
-  test('non-402 upstream error throws an Error carrying the upstream message', async () => {
+  test('non-402 upstream error throws a fixed error without upstream text', async () => {
     mockFetch(500, { error: { message: 'boom' } });
-    await expect(openRouterChat(TOOL_OPTS, ADMIN)).rejects.toThrow('boom');
+    await expect(openRouterChat(TOOL_OPTS, ADMIN)).rejects.toThrow('OpenRouter API error');
+    await expect(openRouterChat(TOOL_OPTS, ADMIN)).rejects.not.toThrow('boom');
   });
 
   test('missing key throws before fetch and never calls fetch', async () => {
@@ -212,6 +228,15 @@ describe('openRouterChat', () => {
     expect('tools' in sent).toBe(false);
   });
 
+  test('forwards the exact abort signal to fetch', async () => {
+    const controller = new AbortController();
+    const fetchMock = captureFetch(200, { choices: [], usage: { cost: 0 } });
+
+    await openRouterChat(TOOL_OPTS, ADMIN, { signal: controller.signal });
+
+    expect((fetchMock.mock.calls[0][1] as RequestInit).signal).toBe(controller.signal);
+  });
+
   test('records Scanner request usage exactly once for community mode', async () => {
     mockFetch(200, { choices: [], usage: { cost: 0.25 } });
     const scannerRequest = {
@@ -266,11 +291,34 @@ describe('openRouterChat', () => {
     }
   });
 
-  test('uses only an error.message from valid upstream error JSON', async () => {
-    mockFetch(429, { error: { message: 'rate limited', detail: 'do not expose' } });
+  test.each([
+    [402, COMMUNITY, CommunityLimitError, 'community_limit'],
+    [402, ADMIN, OpenRouterUpstreamError, 'upstream_unavailable'],
+    [408, ADMIN, OpenRouterUpstreamError, 'upstream_timeout'],
+    [429, ADMIN, OpenRouterUpstreamError, 'upstream_unavailable'],
+    [503, ADMIN, OpenRouterUpstreamError, 'upstream_unavailable'],
+  ] as const)('provider error body remains unread and canceled for HTTP %i in %s mode', async (
+    status,
+    auth,
+    ErrorType,
+    expectedCode,
+  ) => {
+    const unread = unreadErrorResponse(status);
+    responseFetch(unread.response);
 
-    await expect(openRouterChat(TOOL_OPTS, ADMIN)).rejects.toThrow('rate limited');
-    await expect(openRouterChat(TOOL_OPTS, ADMIN)).rejects.not.toThrow('do not expose');
+    let caught: unknown;
+    try {
+      await openRouterChat(TOOL_OPTS, auth);
+    } catch (error) {
+      caught = error;
+    }
+
+    expect(caught).toBeInstanceOf(ErrorType);
+    expect(caught).toMatchObject({ code: expectedCode });
+    expect(unread.cancel).toHaveBeenCalledTimes(1);
+    expect(unread.json).not.toHaveBeenCalled();
+    expect(unread.text).not.toHaveBeenCalled();
+    expect(JSON.stringify(caught)).not.toContain('provider body');
   });
 
   test('sets retryability only for timeout, rate-limit, and server upstream statuses', async () => {
@@ -286,6 +334,9 @@ describe('openRouterChat', () => {
       expect((caught as { status: number }).status).toBe(status);
       expect((caught as { retryable: boolean }).retryable).toBe(retryable);
       expect((caught as Error).message).toBe('OpenRouter API error');
+      expect(caught).toMatchObject({
+        code: status === 408 ? 'upstream_timeout' : 'upstream_unavailable',
+      });
     }
   });
 });

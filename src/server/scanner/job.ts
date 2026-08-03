@@ -23,7 +23,8 @@ export function createScanJob(
   request: ScanRequest,
   source: E1SourceHandle,
   auth: LlmCallAuth,
-  transport: OpenRouterTransport = createEventEveryOpenRouterTransport(auth),
+  signal: AbortSignal,
+  transport: OpenRouterTransport = createEventEveryOpenRouterTransport({ auth, signal }),
 ): HostScanJob {
   if (request.kind === 'text') {
     return {

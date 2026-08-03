@@ -5,6 +5,7 @@ import { nextResetISO } from '@/lib/budget';
 import { chargeIpRate, evaluateLimits, type UnifiedLimitStatus } from '@/lib/limits';
 import {
   CommunityLimitError,
+  OpenRouterUpstreamError,
   communityLimitResponse,
   getLlmKey,
   getLlmMode,
@@ -52,6 +53,10 @@ export function bindLegacyProviderRequest(request: NextRequest): LegacyProviderR
       if (error instanceof CommunityLimitError || (error instanceof ProviderAdapterError && mode === 'community' && error.status === 402)) {
         failure = { kind: 'community-limit', resetAt: error instanceof CommunityLimitError ? error.resetAt : nextResetISO() };
         return { status: 'failed', code: 'community_limit' };
+      }
+      if ((error instanceof ProviderAdapterError || error instanceof OpenRouterUpstreamError) && error.status === 408) {
+        failure = { kind: 'upstream-unavailable' };
+        return { status: 'failed', code: 'upstream_timeout' };
       }
       if (error instanceof ProviderAdapterError && error.code === 'privacy_endpoint_unavailable') {
         failure = { kind: 'privacy-endpoint-unavailable' };

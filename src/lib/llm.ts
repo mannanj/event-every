@@ -125,13 +125,15 @@ export interface LlmCallAuth {
 
 export class OpenRouterUpstreamError extends Error {
   readonly name = 'OpenRouterUpstreamError';
+  readonly code: 'upstream_timeout' | 'upstream_unavailable';
 
   constructor(
     public readonly status: number,
     public readonly retryable: boolean,
-    message = 'OpenRouter API error'
+    code: 'upstream_timeout' | 'upstream_unavailable' = 'upstream_unavailable',
   ) {
-    super(message);
+    super('OpenRouter API error');
+    this.code = code;
   }
 }
 
@@ -141,12 +143,11 @@ function isScannerRequest(
   return 'response_format' in options;
 }
 
-async function safeErrorMessage(response: Response): Promise<string> {
+async function cancelResponseBody(response: Response): Promise<void> {
   try {
-    const body = await response.json() as { error?: { message?: unknown } };
-    return typeof body.error?.message === 'string' ? body.error.message : 'OpenRouter API error';
+    await response.body?.cancel();
   } catch {
-    return 'OpenRouter API error';
+    // A failed cancellation is still status-only; never fall back to reading.
   }
 }
 
@@ -157,7 +158,8 @@ async function safeErrorMessage(response: Response): Promise<string> {
 // resolve-timezone's 502) catch and remap.
 export async function openRouterChat(
   options: OpenRouterChatOptions | OpenRouterChatRequest,
-  auth: LlmCallAuth
+  auth: LlmCallAuth,
+  callOptions: Readonly<{ signal?: AbortSignal }> = {},
 ): Promise<OpenRouterResponse> {
   if (!auth.key) {
     throw new Error('OPENROUTER_API_KEY environment variable is not set');
@@ -180,16 +182,17 @@ export async function openRouterChat(
         ...(options.max_tokens !== undefined ? { max_tokens: options.max_tokens } : {}),
         ...(options.temperature !== undefined ? { temperature: options.temperature } : {}),
       }),
+    signal: callOptions.signal,
   });
 
   if (!response.ok) {
+    await cancelResponseBody(response);
     const limitError = upstreamCommunityLimit(auth.mode, response.status);
     if (limitError) throw limitError;
-    const message = await safeErrorMessage(response);
     throw new OpenRouterUpstreamError(
       response.status,
       response.status === 408 || response.status === 429 || response.status >= 500,
-      message
+      response.status === 408 ? 'upstream_timeout' : 'upstream_unavailable',
     );
   }
 
