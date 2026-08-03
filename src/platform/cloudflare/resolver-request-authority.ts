@@ -44,6 +44,14 @@ if (!isTrustedUtcDay(input.authorityDay, input.nowMs)) {
         const same = stored.authorityDay === input.authorityDay && stored.identityVersion === input.identityVersion
           && stored.identityHmac === input.identityHmac && stored.canonicalUrlHmac === input.canonicalUrlHmac
           && stored.capabilityDigest === input.capabilityDigest && stored.permitDeadlineMs === input.permitDeadlineMs;
+        if (same && stored.state === 'complete' && stored.outcome === 'failed' && stored.nonce === null) {
+          this.ctx.storage.sql.exec(
+            "UPDATE resolver_request SET state = 'begun', outcome = NULL, updated_at_ms = ? WHERE execution_id = ?",
+            input.nowMs,
+            stored.executionId,
+          );
+          return { status: 'begun' as const, executionId: stored.executionId };
+        }
         return same && stored.state === 'begun'
           ? { status: 'begun' as const, executionId: stored.executionId }
           : { status: 'conflict' as const };
