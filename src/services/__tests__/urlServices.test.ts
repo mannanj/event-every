@@ -52,11 +52,11 @@ describe('URL enrichment cancellation', () => {
     let active = 0;
     let maximum = 0;
     const release: Array<() => void> = [];
-    const calls: Array<{ requestId: string; capability: string }> = [];
+    const calls: Array<{ requestId: string; capability: string; urls: string[] }> = [];
     globalThis.fetch = mock(async (_input, init) => {
       active++; maximum = Math.max(maximum, active);
       const body = JSON.parse(String(init?.body));
-      calls.push({ requestId: body.requestId, capability: body.resolverCapability });
+      calls.push({ requestId: body.requestId, capability: body.resolverCapability, urls: body.urls });
       await new Promise<void>((resolve) => release.push(resolve));
       active--;
       return Response.json({ url: body.url, text: 'ok', status: 'success' });
@@ -74,7 +74,50 @@ describe('URL enrichment cancellation', () => {
       expect(calls.every((call) => /^[0-9a-f-]{36}$/.test(call.requestId))).toBe(true);
       expect(new Set(calls.map((call) => call.requestId)).size).toBe(3);
       expect(calls.every((call) => call.capability === 'capability-value')).toBe(true);
+      expect(calls.every((call) => JSON.stringify(call.urls) === JSON.stringify([
+        'https://one.test', 'https://two.test', 'https://three.test',
+      ]))).toBe(true);
     } finally { release.splice(0).forEach((resolve) => resolve()); globalThis.fetch = originalFetch; }
+  });
+
+  test('busy retry preserves one UUID and succeeds on the same authority record', async () => {
+    const originalFetch = globalThis.fetch;
+    const originalTimeout = globalThis.setTimeout;
+    const requestIds: string[] = [];
+    let calls = 0;
+    globalThis.setTimeout = ((callback: TimerHandler) => { queueMicrotask(callback as () => void); return 1; }) as typeof setTimeout;
+    globalThis.fetch = mock(async (_input, init) => {
+      const body = JSON.parse(String(init?.body));
+      requestIds.push(body.requestId);
+      calls++;
+      return calls === 1
+        ? Response.json({ code: 'resolver_busy', retryAfterSeconds: 1 }, { status: 429 })
+        : Response.json({ url: body.url, text: 'resolved', status: 'success' });
+    }) as unknown as typeof fetch;
+    try {
+      await expect(scrapeURLsBatch(['https://one.test'], undefined, 'capability-value')).resolves.toMatchObject({ successCount: 1 });
+      expect(requestIds).toHaveLength(2);
+      expect(new Set(requestIds).size).toBe(1);
+    } finally {
+      globalThis.fetch = originalFetch;
+      globalThis.setTimeout = originalTimeout;
+    }
+  });
+
+  test('already-aborted busy delay rejects immediately', async () => {
+    const originalFetch = globalThis.fetch;
+    const controller = new AbortController();
+    globalThis.fetch = mock(async () => {
+      controller.abort(new DOMException('cancelled before delay', 'AbortError'));
+      return Response.json({ code: 'resolver_busy', retryAfterSeconds: 10 }, { status: 429 });
+    }) as unknown as typeof fetch;
+    try {
+      const result = scrapeURLsBatch(['https://one.test'], controller.signal, 'capability-value');
+      await expect(Promise.race([
+        result,
+        Bun.sleep(50).then(() => { throw new Error('busy delay did not abort'); }),
+      ])).rejects.toMatchObject({ name: 'AbortError' });
+    } finally { globalThis.fetch = originalFetch; }
   });
   test('forwards the active signal to URL detection and scraping', async () => {
     const originalFetch = globalThis.fetch;

@@ -16,7 +16,7 @@ function isAbort(error: unknown): boolean {
   return error instanceof DOMException && error.name === 'AbortError';
 }
 
-async function scrapeURL(url: string, signal?: AbortSignal, resolverCapability?: string): Promise<ScrapedContent> {
+async function scrapeURL(url: string, urls: readonly string[], signal?: AbortSignal, resolverCapability?: string): Promise<ScrapedContent> {
   const requestId = crypto.randomUUID();
   try {
     let response!: Response;
@@ -24,16 +24,13 @@ async function scrapeURL(url: string, signal?: AbortSignal, resolverCapability?:
       response = await fetch('/api/scrape-url', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url, requestId, resolverCapability }),
+        body: JSON.stringify({ url, urls, requestId, resolverCapability }),
         signal,
       });
       if (response.status !== 429 || attempt === 2) break;
       const retry = await response.clone().json().catch(() => null) as { code?: string; retryAfterSeconds?: number } | null;
       if (retry?.code !== 'resolver_busy' || !Number.isInteger(retry.retryAfterSeconds)) break;
-      await new Promise<void>((resolve, reject) => {
-        const timer = setTimeout(resolve, Math.max(1, Math.min(10, retry.retryAfterSeconds!)) * 1_000);
-        signal?.addEventListener('abort', () => { clearTimeout(timer); reject(signal.reason); }, { once: true });
-      });
+      await waitForBusyRetry(Math.max(1, Math.min(10, retry.retryAfterSeconds!)) * 1_000, signal);
     }
 
     if (!response.ok) {
@@ -70,9 +67,26 @@ async function scrapeURL(url: string, signal?: AbortSignal, resolverCapability?:
   }
 }
 
+async function waitForBusyRetry(milliseconds: number, signal?: AbortSignal): Promise<void> {
+  if (signal?.aborted) throw signal.reason ?? new DOMException('Aborted', 'AbortError');
+  await new Promise<void>((resolve, reject) => {
+    const onAbort = () => {
+      clearTimeout(timer);
+      signal?.removeEventListener('abort', onAbort);
+      reject(signal?.reason ?? new DOMException('Aborted', 'AbortError'));
+    };
+    const timer = setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort);
+      resolve();
+    }, milliseconds);
+    signal?.addEventListener('abort', onAbort, { once: true });
+    if (signal?.aborted) onAbort();
+  });
+}
+
 export async function scrapeURLsBatch(urls: string[], signal?: AbortSignal, _resolverCapability?: string): Promise<BatchScrapedContent> {
-  const resolveOne = (url: string) => scrapeURL(url, signal, _resolverCapability);
-const results = await mapWithConcurrency(urls, 2, resolveOne);
+  const resolveOne = (url: string) => scrapeURL(url, urls, signal, _resolverCapability);
+  const results = await mapWithConcurrency(urls, 2, resolveOne);
 
   const successCount = results.filter(r => r.status === 'success').length;
   const errorCount = results.filter(r => r.status === 'error').length;
@@ -85,7 +99,7 @@ const results = await mapWithConcurrency(urls, 2, resolveOne);
 }
 
 export async function scrapeSingleURL(url: string, signal?: AbortSignal): Promise<ScrapedContent> {
-  return scrapeURL(url, signal);
+  return scrapeURL(url, [url], signal);
 }
 
 async function mapWithConcurrency<T, R>(items: readonly T[], concurrency: number, worker: (item: T) => Promise<R>): Promise<R[]> {
