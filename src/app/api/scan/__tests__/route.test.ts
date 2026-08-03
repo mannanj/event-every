@@ -1,9 +1,11 @@
-import { beforeEach, describe, expect, mock, spyOn, test } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from 'bun:test';
 import * as crypto from 'node:crypto';
 import { NextRequest } from 'next/server';
+import type { LegacyProviderInput, LegacyProviderPort } from '@/platform/contracts';
+import { setPlatformRuntimeForTests } from '@/platform/runtime';
 import { ScanResponseSchema } from '@/types/scannerHttp';
 
-const calls = { evaluate: 0, charge: 0, transport: 0 };
+const calls = { evaluate: 0, key: 0, charge: 0, transport: 0 };
 const timeline: string[] = [];
 const transportRequests: unknown[] = [];
 const uuidValues = [
@@ -19,6 +21,20 @@ const limits = { allowed: true, reason: null as 'community-budget' | 'ip-rate' |
 const transportState = { status: null as number | null };
 
 const claim = <Value>(value: Value) => ({ value, confidence: null, evidence: [] });
+
+class FakeCommunityLimitError extends Error {
+  constructor(readonly resetAt: string) {
+    super('This app is community sponsored. The usage limits have been hit today.');
+  }
+}
+
+mock.module('@/lib/llm', () => ({
+  getLlmMode: () => 'community',
+  getLlmKey: () => { calls.key++; return 'test-key'; },
+  CommunityLimitError: FakeCommunityLimitError,
+  communityLimitResponse: (error: FakeCommunityLimitError) => Response.json({ error: error.message, code: 'community_limit', resetAt: error.resetAt }, { status: 402 }),
+  openRouterChat: async () => { throw new Error('scan route must use its scanner transport'); },
+}));
 
 mock.module('@/lib/limits', () => ({
   evaluateLimits: async () => {
@@ -86,11 +102,16 @@ const { POST } = await import('@/app/api/scan/route');
 const { createScanJob } = await import('@/server/scanner/job');
 
 const request = (body: unknown) => new NextRequest('http://localhost/api/scan', {
-  method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
+  method: 'POST', headers: { 'content-type': 'application/json', 'x-event-every-request-id': '018f47a0-7b5c-7cc4-9a34-123456789abc' }, body: JSON.stringify(body),
+});
+
+const requestWithId = (body: unknown, requestId: string) => new NextRequest('http://localhost/api/scan', {
+  method: 'POST', headers: { 'content-type': 'application/json', 'x-event-every-request-id': requestId }, body: JSON.stringify(body),
 });
 
 beforeEach(() => {
   calls.evaluate = 0;
+  calls.key = 0;
   calls.charge = 0;
   calls.transport = 0;
   timeline.length = 0;
@@ -101,7 +122,56 @@ beforeEach(() => {
   transportState.status = null;
 });
 
+afterEach(() => setPlatformRuntimeForTests(undefined));
+
 describe('/api/scan', () => {
+  test.each(['', 'not-a-uuid', '00000000-0000-0000-0000-000000000000'])(
+    'rejects strict request UUID %p before reading the body',
+    async (requestId) => {
+      const req = requestWithId({ kind: 'text', text: 'Office hours' }, requestId);
+      const json = mock(async () => ({ kind: 'text', text: 'Office hours' }));
+      Object.defineProperty(req, 'json', { value: json });
+      expect((await POST(req)).status).toBe(400);
+      expect(json).not.toHaveBeenCalled();
+      expect(calls).toEqual({ evaluate: 0, key: 0, charge: 0, transport: 0 });
+    },
+  );
+
+  test('passes closed dispatch fields and the strict caller UUID unchanged', async () => {
+    const callerRequestId = '018F47A0-7B5C-7CC4-9A34-123456789ABC';
+    let received: LegacyProviderInput<unknown> | undefined;
+    const provider: LegacyProviderPort = {
+      dispatch<T>(input: LegacyProviderInput<T>) {
+        received = input as LegacyProviderInput<unknown>;
+        return { status: 'started', charge: Promise.resolve({ status: 'charged' }), provider: Promise.resolve(input.provider(input.signal)) };
+      },
+    };
+    setPlatformRuntimeForTests({ mode: 'legacy', provider });
+
+    const response = await POST(requestWithId({ kind: 'text', text: 'Office hours' }, callerRequestId));
+    expect(response.status).toBe(200);
+    expect(received).toMatchObject({
+      route: 'scan',
+      requestId: callerRequestId,
+      identity: { kind: 'unknown', keyVersion: '', hmac: '' },
+    });
+    expect(received?.signal).toBeInstanceOf(AbortSignal);
+    expect(typeof received?.charge).toBe('function');
+    expect(typeof received?.provider).toBe('function');
+    expect(calls).toEqual({ evaluate: 1, key: 1, charge: 0, transport: 1 });
+  });
+
+  test.each(['shadow', 'cloudflare'] as const)('%s fails before body, limits, charging, or provider transport', async (mode) => {
+    setPlatformRuntimeForTests({ mode });
+    const req = request({ kind: 'text', text: 'Office hours' });
+    const json = mock(async () => ({ kind: 'text', text: 'Office hours' }));
+    Object.defineProperty(req, 'json', { value: json });
+    const response = await POST(req);
+    expect(response.status).toBe(503);
+    expect(json).not.toHaveBeenCalled();
+    expect(calls).toEqual({ evaluate: 0, key: 0, charge: 0, transport: 0 });
+  });
+
   test.each([
     ['invalid JSON', new NextRequest('http://localhost/api/scan', { method: 'POST', body: '{' })],
     ['unknown request key', request({ kind: 'text', text: 'hello', extra: true })],
@@ -112,7 +182,7 @@ describe('/api/scan', () => {
   ])('rejects %s before limits, charging, or provider work', async (_name, req) => {
     const response = await POST(req);
     expect(response.status).toBe(400);
-    expect(calls).toEqual({ evaluate: 0, charge: 0, transport: 0 });
+    expect(calls).toEqual({ evaluate: 0, key: 0, charge: 0, transport: 0 });
   });
 
   test('rejects magic-byte spoofing and decoded oversize images before any gate', async () => {
@@ -122,7 +192,7 @@ describe('/api/scan', () => {
     bytes.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
     const oversize = await POST(request({ kind: 'image', dataUrl: `data:image/png;base64,${Buffer.from(bytes).toString('base64')}` }));
     expect(oversize.status).toBe(400);
-    expect(calls).toEqual({ evaluate: 0, charge: 0, transport: 0 });
+    expect(calls).toEqual({ evaluate: 0, key: 0, charge: 0, transport: 0 });
   });
 
   test('creates UUID identities, charges before one scan, and returns only the validated response shape', async () => {
@@ -130,7 +200,7 @@ describe('/api/scan', () => {
     const response = await POST(request({ kind: 'text', text: rawText }));
     const body = await response.json();
     expect(response.status).toBe(200);
-    expect(calls).toEqual({ evaluate: 1, charge: 1, transport: 1 });
+    expect(calls).toEqual({ evaluate: 1, key: 1, charge: 1, transport: 1 });
     expect(timeline).toEqual(['evaluate', 'charge', 'transport']);
     expect(ScanResponseSchema.parse(body)).toEqual(body);
     expect(body).toMatchObject({
@@ -169,7 +239,7 @@ describe('/api/scan', () => {
     const response = await POST(request({ kind: 'image', dataUrl }));
     const body = await response.json();
     expect(response.status).toBe(200);
-    expect(calls).toEqual({ evaluate: 1, charge: 1, transport: 1 });
+    expect(calls).toEqual({ evaluate: 1, key: 1, charge: 1, transport: 1 });
     expect(ScanResponseSchema.parse(body)).toEqual(body);
     expect(JSON.stringify(body)).not.toContain(dataUrl);
   });
@@ -181,6 +251,7 @@ describe('/api/scan', () => {
     limits.reason = 'ip-rate';
     expect((await POST(request({ kind: 'text', text: 'hello' }))).status).toBe(429);
     expect(calls.charge).toBe(0);
+    expect(calls.key).toBe(0);
   });
 
   test.each([
@@ -207,7 +278,7 @@ describe('/api/scan', () => {
     expect(serialized).not.toContain('stack');
     expect(serialized).not.toContain('provider prompt');
     expect(serialized).not.toContain('upstream response');
-    expect(calls).toEqual({ evaluate: 1, charge: 1, transport: 1 });
+    expect(calls).toEqual({ evaluate: 1, key: 1, charge: 1, transport: 1 });
   });
 
   test('returns a fixed response for unexpected internal failures', async () => {

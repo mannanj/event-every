@@ -1,4 +1,5 @@
 import { emitIfCommunityLimited } from '@/utils/communityLimit';
+import { createProviderRequestId } from '@/services/requestId';
 
 interface SummarizeResult {
   summary: string;
@@ -12,9 +13,10 @@ export async function summarizeInput(params: {
   eventTitles?: string[];
 }): Promise<string> {
   try {
+    const requestId = createProviderRequestId();
     const response = await fetch('/api/summarize', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-Event-Every-Request-Id': requestId },
       body: JSON.stringify({
         text: params.text ?? '',
         eventTitles: params.eventTitles ?? [],

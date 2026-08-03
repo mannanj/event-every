@@ -1,4 +1,5 @@
-import { describe, expect, mock, test } from 'bun:test';
+import { describe, expect, mock, spyOn, test } from 'bun:test';
+import * as requestId from '@/services/requestId';
 import { scan } from '@/services/scanClient';
 import type { ScanResponse } from '@/types/scannerHttp';
 
@@ -20,13 +21,33 @@ describe('scan client', () => {
       expect(fetchMock).toHaveBeenCalledTimes(1);
       expect(fetchMock).toHaveBeenCalledWith('/api/scan', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-Event-Every-Request-Id': expect.any(String) },
         body: JSON.stringify({ kind: 'text', text: 'Office hours' }),
         signal: controller.signal,
       });
     } finally {
       globalThis.fetch = originalFetch;
     }
+  });
+
+  test('scan retry preserves one request UUID', async () => {
+    const generatedId = '018f47a0-7b5c-7cc4-9a34-123456789abc';
+    const forbiddenReplacement = '018f47a0-7b5c-7cc4-9a34-abcdefabcdef';
+    const id = spyOn(requestId, 'createProviderRequestId')
+      .mockReturnValueOnce(generatedId)
+      .mockReturnValue(forbiddenReplacement);
+    const fetchMock = mock(async () => new Response(JSON.stringify(validResponse)));
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+    try {
+      await scan({ kind: 'text', text: 'Office hours' });
+      await scan({ kind: 'text', text: 'Office hours' }, undefined, { requestId: generatedId });
+      expect((fetchMock.mock.calls as unknown as Array<[string, RequestInit]>).map((call) => call[1].headers)).toEqual([
+        { 'Content-Type': 'application/json', 'X-Event-Every-Request-Id': generatedId },
+        { 'Content-Type': 'application/json', 'X-Event-Every-Request-Id': generatedId },
+      ]);
+      expect(id).toHaveBeenCalledTimes(1);
+    } finally { globalThis.fetch = originalFetch; id.mockRestore(); }
   });
 
   test('rejects a nominal success response that contains an invented field', async () => {

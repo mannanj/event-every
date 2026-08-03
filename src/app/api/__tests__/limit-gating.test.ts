@@ -64,7 +64,7 @@ const routes: Array<{ name: string; post: (req: NextRequest) => Promise<Response
 const makeRequest = (path: string, body: unknown) =>
   new NextRequest(`http://localhost${path}`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json', 'x-forwarded-for': '203.0.113.7' },
+    headers: { 'content-type': 'application/json', 'x-forwarded-for': '203.0.113.7', 'x-event-every-request-id': '018f47a0-7b5c-7cc4-9a34-123456789abc' },
     body: JSON.stringify(body),
   });
 

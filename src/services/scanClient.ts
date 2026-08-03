@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { ScanRequestSchema, ScanResponseSchema, type ScanRequest, type ScanResponse } from '@/types/scannerHttp';
+import { createProviderRequestId } from '@/services/requestId';
 
 const ScanErrorResponseSchema = z.object({
   error: z.string().optional(),
@@ -21,11 +22,12 @@ export class ScanClientError extends Error {
   }
 }
 
-export async function scan(request: ScanRequest, signal?: AbortSignal): Promise<ScanResponse> {
+export async function scan(request: ScanRequest, signal?: AbortSignal, options?: { requestId?: string }): Promise<ScanResponse> {
   const admittedRequest = ScanRequestSchema.parse(request);
+  const requestId = options?.requestId ?? createProviderRequestId();
   const response = await fetch('/api/scan', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'X-Event-Every-Request-Id': requestId },
     body: JSON.stringify(admittedRequest),
     signal,
   });
