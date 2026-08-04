@@ -848,7 +848,7 @@ After loopback readiness, the runner invokes local Playwright with `playwright.c
 | C1A-M37 | `src/platform/resolver/url-policy.ts` | `canonicalBytes > RESOLVER_URL_MAX_BYTES` → `canonicalBytes > Number.MAX_SAFE_INTEGER` | MUT-I | `canonical URL is capped at 2048 bytes` |
 | C1A-M38 | `src/platform/route-manifest.ts` | `'/api/scrape-url': SCRAPE_URL_POLICY,` → `'/api/not-scrape-url': SCRAPE_URL_POLICY,` | MUT-E | `every API route has one manifest entry` |
 | C1A-M39 | `src/app/api/resolve-timezone/route.ts` | `request.headers.get('x-event-every-request-id')` → `crypto.randomUUID()` | MUT-T | `timezone route forwards the caller request UUID` |
-| C1A-M40 | `src/lib/llm.ts` | `return process.env.OPENROUTER_COMMUNITY_KEY;` → `return process.env.OPENROUTER_COMMUNITY_KEY ?? process.env.OPENROUTER_API_KEY;` | MUT-J | `community request never falls back to admin key` |
+| C1A-M40 | `src/lib/llm.ts` | `if (!process.env.OPENROUTER_COMMUNITY_KEY) throw new Error('community_key_unavailable');` → `if (!process.env.OPENROUTER_COMMUNITY_KEY) return process.env.OPENROUTER_API_KEY!;` | MUT-J | `community request never falls back to admin key` |
 | C1A-M41 | `src/platform/resolver/html-to-text.ts` | `truncateUtf8(title, RESOLVER_TITLE_MAX_BYTES)` → `title` | MUT-S | `sanitized title is capped at 512 UTF-8 bytes` |
 | C1A-M42 | `src/platform/cloudflare/resolver-request-authority.ts` | `if (input.nowMs >= stored.permitDeadlineMs) {` → `if (false) {` | MUT-G | `claim in blackout tombstones without nonce` |
 | C1A-M43 | `src/platform/cloudflare/daily-counter.ts` | `moveExpiredLeaseToOutbox(lease);` → `void lease;` | MUT-G | `expired lease is durable before deletion` |
