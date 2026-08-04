@@ -60,6 +60,13 @@ describe('platform runtime', () => {
       expect(source).toContain("from '@/platform/legacy'");
     }
   });
+
+  test('app Worker has no Upstash or scheduled capability', () => {
+    const source = readFileSync('cloudflare/app-worker.ts', 'utf8');
+    const config = readFileSync('wrangler.jsonc', 'utf8');
+    expect(source).not.toMatch(/scheduled|KV_REST|upstash/i);
+    expect(config).not.toMatch(/KV_REST|upstash/i);
+  });
 });
 
 // This block is compile-time API proof. It is never executed, while direct tsc

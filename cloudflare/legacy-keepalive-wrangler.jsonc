@@ -1,0 +1,16 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "event-every-legacy-keepalive-private",
+  "main": "cloudflare/legacy-keepalive-worker.ts",
+  "compatibility_date": "2026-08-02",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  // Future P1 cron: 0 0 * * * (disabled until C1-A deployment controls are lifted).
+  "vars": {
+    "KEEPALIVE_DEPLOYMENT_DISABLED": "1",
+    "STATE_AUTHORITY_MODE": "legacy",
+    "KV_REST_API_URL": "",
+    "KV_REST_API_TOKEN": ""
+  }
+}

@@ -10,7 +10,17 @@ const scripts = {
   'test:workers': 'bun scripts/run-with-open-next.ts -- node node_modules/vitest/vitest.mjs run --config vitest.config.workers.ts', 'assert:c1:a-config': 'bun scripts/assert-c1-a-config.ts', 'assert:c1:a-paths': 'bun scripts/assert-c1-a-paths.ts', 'test:c1:a-mutations': 'bun scripts/run-c1-a-mutations.ts --verify-ledger --all', 'validate:c1:a-evidence': 'bun scripts/validate-c1-a-evidence.ts docs/testing/c1-a-terminal-evidence.json', 'test:e2e:c1:a': 'playwright test --config playwright.c1-a.config.ts', 'verify:c1:a': 'bun scripts/run-c1-a-offline.ts',
 } as const;
 const dependencies = { '@opennextjs/cloudflare': '1.20.2', wrangler: '4.118.0', vitest: '4.1.10', '@cloudflare/vitest-pool-workers': '0.20.1', msw: '2.15.0' } as const;
-function fixture(changes: Record<string, string> = {}): string { const root = mkdtempSync(path.join(tmpdir(), 'event-every-c1-a-config-')); roots.push(root); const files = { 'package.json': JSON.stringify({ name: 'fixture', scripts, devDependencies: dependencies }), '.gitignore': '.dev.vars\n.dev.vars.*\n.open-next/\n.wrangler/\ndist-c1-a-*\ntest-results-c1-a-*\nplaywright-report-c1-a-*\n', 'bun.lock': 'lock', ...changes }; for (const [file, content] of Object.entries(files)) { mkdirSync(path.dirname(path.join(root, file)), { recursive: true }); writeFileSync(path.join(root, file), content); } return root; }
+const task9Files = {
+  'cloudflare/legacy-keepalive-wrangler.jsonc': `{
+  "$schema": "node_modules/wrangler/config-schema.json", "name": "event-every-legacy-keepalive-private", "main": "cloudflare/legacy-keepalive-worker.ts", "compatibility_date": "2026-08-02", "compatibility_flags": ["nodejs_compat"], "workers_dev": false, "preview_urls": false,
+  // Future P1 cron: 0 0 * * * (disabled until C1-A deployment controls are lifted).
+  "vars": { "KEEPALIVE_DEPLOYMENT_DISABLED": "1", "STATE_AUTHORITY_MODE": "legacy", "KV_REST_API_URL": "", "KV_REST_API_TOKEN": "" }
+}`,
+  'cloudflare/legacy-keepalive-worker.ts': "type LegacyKeepAliveEnv = unknown; type ScheduledController = unknown; type ExecutionContext = unknown; type ExportedHandler<Env> = unknown; function mapKeepAliveFailure(_error: unknown): undefined { return undefined; } async function runLegacyKeepAlive(env: LegacyKeepAliveEnv, scheduledTime: number): Promise<void> { if (env.STATE_AUTHORITY_MODE === 'cloudflare') return; try { const response = await fetch(`${env.KV_REST_API_URL}/set/keep-alive/${scheduledTime}?EX=172800`, { method: 'POST', headers: { Authorization: `Bearer ${env.KV_REST_API_TOKEN}` } }); if (!response.ok) return mapKeepAliveFailure(undefined); } catch (error) { return mapKeepAliveFailure(error); } } export default { scheduled(controller, env, ctx) { ctx.waitUntil(runLegacyKeepAlive(env, controller.scheduledTime)); } } satisfies ExportedHandler<LegacyKeepAliveEnv>;\n",
+  'cloudflare/legacy-keepalive-configuration.d.ts': 'interface LegacyKeepAliveEnv { KEEPALIVE_DEPLOYMENT_DISABLED: "1"; STATE_AUTHORITY_MODE: "legacy"; KV_REST_API_URL: ""; KV_REST_API_TOKEN: ""; }\n',
+  'vitest.config.keepalive-workers.ts': "import { defineConfig } from 'vitest/config'; export default defineConfig(async () => { const { cloudflareTest } = await import('@cloudflare/vitest-pool-workers'); return { plugins: [cloudflareTest({ wrangler: { configPath: './cloudflare/legacy-keepalive-wrangler.jsonc' }, miniflare: { bindings: { KV_REST_API_URL: 'http://127.0.0.1:8799', KV_REST_API_TOKEN: 'synthetic-c1-a-token', }, }, }),], test: { include: ['test/worker/legacy-keepalive.integration.test.ts', 'test/worker/deny-egress.integration.test.ts',], setupFiles: ['./test/worker/deny-egress.setup.ts'], }, }; });\n",
+} as const;
+function fixture(changes: Record<string, string> = {}): string { const root = mkdtempSync(path.join(tmpdir(), 'event-every-c1-a-config-')); roots.push(root); const files = { 'package.json': JSON.stringify({ name: 'fixture', scripts, devDependencies: dependencies }), '.gitignore': '.dev.vars\n.dev.vars.*\n.open-next/\n.wrangler/\ndist-c1-a-*\ntest-results-c1-a-*\nplaywright-report-c1-a-*\n', 'bun.lock': 'lock', ...task9Files, ...changes }; for (const [file, content] of Object.entries(files)) { mkdirSync(path.dirname(path.join(root, file)), { recursive: true }); writeFileSync(path.join(root, file), content); } return root; }
 afterEach(() => { while (roots.length) rmSync(roots.pop()!, { recursive: true, force: true }); });
 
 describe('C1-A Task 1 package/offline config boundary', () => {
@@ -62,7 +72,7 @@ describe('C1-A Task 2 nondeployable app configuration boundary', () => {
   test('accepts the exact local app scaffold and generated type surface', () => {
     expect(() => assertC1AConfig(fixture(task2Files))).not.toThrow();
     expect(() => assertC1AConfig(fixture({ ...task2Files, 'wrangler.jsonc': task2Files['wrangler.jsonc'].replace('{', '{\n// installed Wrangler JSONC parser accepts this comment\n') }))).not.toThrow();
-  });
+  }, 10_000);
 
   test('rejects public deployment, non-sentinel D1, remote worker config, and malformed DO ownership', () => {
     const wrangler = JSON.parse(task2Files['wrangler.jsonc']);
@@ -92,4 +102,69 @@ describe('C1-A Task 2 nondeployable app configuration boundary', () => {
     },
     10_000,
   );
+});
+
+describe('C1-A Task 9 private keep-alive configuration boundary', () => {
+  test.each([
+    ['cloudflare/legacy-keepalive-wrangler.jsonc', JSON.stringify({ name: 'event-every-legacy-keepalive-private', triggers: { crons: ['* * * * *'] } }), 'legacy keepalive deployment'],
+    ['cloudflare/legacy-keepalive-wrangler.jsonc', task9Files['cloudflare/legacy-keepalive-wrangler.jsonc'].replace('"preview_urls": false', '"preview_urls": true'), 'legacy keepalive wrangler'],
+    ['cloudflare/legacy-keepalive-wrangler.jsonc', task9Files['cloudflare/legacy-keepalive-wrangler.jsonc'].replace('"workers_dev": false', '"workers_dev": true'), 'legacy keepalive wrangler'],
+    ['cloudflare/legacy-keepalive-wrangler.jsonc', task9Files['cloudflare/legacy-keepalive-wrangler.jsonc'].replace('"vars":', '"routes": ["example.invalid/*"], "vars":'), 'legacy keepalive deployment'],
+    ['cloudflare/legacy-keepalive-wrangler.jsonc', task9Files['cloudflare/legacy-keepalive-wrangler.jsonc'].replace('"vars":', '"services": [{ "binding": "PRIVATE", "service": "event-every" }], "vars":'), 'legacy keepalive deployment'],
+    ['cloudflare/legacy-keepalive-wrangler.jsonc', task9Files['cloudflare/legacy-keepalive-wrangler.jsonc'].replace('0 0 * * *', '0 0 */2 * *'), 'legacy keepalive cron comment'],
+    ['cloudflare/legacy-keepalive-worker.ts', task9Files['cloudflare/legacy-keepalive-worker.ts'].replace("if (env.STATE_AUTHORITY_MODE === 'cloudflare') return;", 'if (false) return;'), 'legacy keepalive cloudflare isolation'],
+    ['cloudflare/legacy-keepalive-worker.ts', task9Files['cloudflare/legacy-keepalive-worker.ts'].replace('return mapKeepAliveFailure(error);', 'throw error;'), 'legacy keepalive status-only'],
+    ['cloudflare/legacy-keepalive-worker.ts', `${task9Files['cloudflare/legacy-keepalive-worker.ts']}\nconst addedFetch = () => new Response(); export { addedFetch as fetch };`, 'legacy keepalive worker'],
+    ['cloudflare/legacy-keepalive-worker.ts', `${task9Files['cloudflare/legacy-keepalive-worker.ts']}\nexport { runLegacyKeepAlive };`, 'legacy keepalive worker'],
+    ['cloudflare/legacy-keepalive-worker.ts', `${task9Files['cloudflare/legacy-keepalive-worker.ts']}\nexport { addedFetch as fetch } from './added-fetch';`, 'legacy keepalive worker'],
+    ['cloudflare/legacy-keepalive-worker.ts', `${task9Files['cloudflare/legacy-keepalive-worker.ts']}\nexport * from './added-fetch';`, 'legacy keepalive worker'],
+    ['cloudflare/legacy-keepalive-worker.ts', `${task9Files['cloudflare/legacy-keepalive-worker.ts']}\nexport * as fetch from './added-fetch';`, 'legacy keepalive worker'],
+    ['cloudflare/legacy-keepalive-worker.ts', `${task9Files['cloudflare/legacy-keepalive-worker.ts']}\nexport = { fetch() { return new Response(); } };`, 'legacy keepalive worker'],
+    ['cloudflare/legacy-keepalive-worker.ts', task9Files['cloudflare/legacy-keepalive-worker.ts'].replace('return mapKeepAliveFailure(error);', 'console.error(error); return mapKeepAliveFailure(error);'), 'legacy keepalive status-only'],
+    ['cloudflare/legacy-keepalive-worker.ts', task9Files['cloudflare/legacy-keepalive-worker.ts'].replace('return mapKeepAliveFailure(error);', 'JSON.stringify(error); return mapKeepAliveFailure(error);'), 'legacy keepalive status-only'],
+    ['cloudflare/legacy-keepalive-worker.ts', task9Files['cloudflare/legacy-keepalive-worker.ts'].replace('return mapKeepAliveFailure(error);', 'throw error; return mapKeepAliveFailure(error);'), 'legacy keepalive status-only'],
+    ['cloudflare/legacy-keepalive-worker.ts', task9Files['cloudflare/legacy-keepalive-worker.ts'].replace('return mapKeepAliveFailure(error);', 'String(error); return mapKeepAliveFailure(error);'), 'legacy keepalive status-only'],
+    ['cloudflare/legacy-keepalive-worker.ts', task9Files['cloudflare/legacy-keepalive-worker.ts'].replace('return mapKeepAliveFailure(error);', 'const alias = error; return mapKeepAliveFailure(error);'), 'legacy keepalive status-only'],
+    ['cloudflare/legacy-keepalive-worker.ts', task9Files['cloudflare/legacy-keepalive-worker.ts'].replace('return mapKeepAliveFailure(error);', 'report(error); return mapKeepAliveFailure(error);'), 'legacy keepalive status-only'],
+    ['cloudflare/legacy-keepalive-worker.ts', task9Files['cloudflare/legacy-keepalive-worker.ts'].replace('return undefined;', 'console.error(_error); return undefined;'), 'legacy keepalive status-only'],
+    ['cloudflare/legacy-keepalive-worker.ts', task9Files['cloudflare/legacy-keepalive-worker.ts'].replace('return undefined;', '_error; return undefined;'), 'legacy keepalive status-only'],
+    ['cloudflare/legacy-keepalive-worker.ts', `${task9Files['cloudflare/legacy-keepalive-worker.ts']}\nfunction mapKeepAliveFailure(_error: unknown): undefined { return undefined; }`, 'legacy keepalive worker'],
+    ['cloudflare/legacy-keepalive-worker.ts', task9Files['cloudflare/legacy-keepalive-worker.ts'].replace('try { const', 'function mapKeepAliveFailure(_error: unknown): undefined { return undefined; } try { const'), 'legacy keepalive status-only'],
+    ['cloudflare/legacy-keepalive-worker.ts', task9Files['cloudflare/legacy-keepalive-worker.ts'].replace('try { const', 'function mapKeepAliveFailure(_error: unknown): undefined { console.error(_error); return undefined; } try { const'), 'legacy keepalive status-only'],
+    ['cloudflare/legacy-keepalive-worker.ts', task9Files['cloudflare/legacy-keepalive-worker.ts'].replace('try { const', 'const mapKeepAliveFailure = (_error: unknown): undefined => undefined; try { const'), 'legacy keepalive status-only'],
+    ['cloudflare/legacy-keepalive-worker.ts', task9Files['cloudflare/legacy-keepalive-worker.ts'].replace('try { const', 'const alias = mapKeepAliveFailure; try { const'), 'legacy keepalive status-only'],
+    ['cloudflare/legacy-keepalive-worker.ts', task9Files['cloudflare/legacy-keepalive-worker.ts'].replace('try { const', 'mapKeepAliveFailure = () => undefined; try { const'), 'legacy keepalive status-only'],
+    ['cloudflare/legacy-keepalive-worker.ts', task9Files['cloudflare/legacy-keepalive-worker.ts'].replace('if (!response.ok) return mapKeepAliveFailure(undefined);', 'if (!response.ok) return undefined;'), 'legacy keepalive status-only'],
+    ['cloudflare/legacy-keepalive-worker.ts', task9Files['cloudflare/legacy-keepalive-worker.ts'].replace('if (!response.ok) return mapKeepAliveFailure(undefined);', 'const decoy = { ok: false }; if (!decoy.ok) return mapKeepAliveFailure(undefined); if (!response.ok) return undefined;'), 'legacy keepalive status-only'],
+    ['cloudflare/legacy-keepalive-worker.ts', task9Files['cloudflare/legacy-keepalive-worker.ts'].replace('scheduled(controller, env, ctx) {', "scheduled(controller, env, ctx) { async function runLegacyKeepAlive() { console.error('leak'); }"), 'legacy keepalive worker'],
+    ['cloudflare/legacy-keepalive-worker.ts', `${task9Files['cloudflare/legacy-keepalive-worker.ts']}\nconst capturedError = console.error; const fetch = (...args: Parameters<typeof globalThis.fetch>) => { capturedError('leak'); return globalThis.fetch(...args); };`, 'legacy keepalive worker'],
+    ['cloudflare/legacy-keepalive-worker.ts', `${task9Files['cloudflare/legacy-keepalive-worker.ts']}\nconst capturedError = console.error; Object.prototype.toString = () => { capturedError('leak'); return ''; };`, 'legacy keepalive worker'],
+    ['cloudflare/legacy-keepalive-worker.ts', task9Files['cloudflare/legacy-keepalive-worker.ts'].replace('_error: unknown', "_error: unknown = console.error('leak')"), 'legacy keepalive status-only'],
+    ['cloudflare/legacy-keepalive-worker.ts', task9Files['cloudflare/legacy-keepalive-worker.ts'].replace('env: LegacyKeepAliveEnv', "env: LegacyKeepAliveEnv = (console.error('leak'), {} as LegacyKeepAliveEnv)"), 'legacy keepalive status-only'],
+    ['cloudflare/legacy-keepalive-worker.ts', task9Files['cloudflare/legacy-keepalive-worker.ts'].replace('scheduled(controller, env, ctx)', "scheduled(controller = console.error('leak'), env, ctx)"), 'legacy keepalive worker'],
+    ['cloudflare/legacy-keepalive-worker.ts', task9Files['cloudflare/legacy-keepalive-worker.ts'].replace('scheduled(controller, env, ctx)', 'scheduled(...controller, env, ctx)'), 'legacy keepalive worker'],
+    ['cloudflare/legacy-keepalive-worker.ts', task9Files['cloudflare/legacy-keepalive-worker.ts'].replace('env: LegacyKeepAliveEnv', 'env?: LegacyKeepAliveEnv'), 'legacy keepalive status-only'],
+    ['cloudflare/legacy-keepalive-worker.ts', task9Files['cloudflare/legacy-keepalive-worker.ts'].replace('fetch(`${env.KV_REST_API_URL}', "fetch((console.error('leak'), `${env.KV_REST_API_URL}"), 'legacy keepalive worker'],
+    ['cloudflare/legacy-keepalive-worker.ts', task9Files['cloudflare/legacy-keepalive-worker.ts'].replace("method: 'POST'", "method: (console.error('leak'), 'POST')"), 'legacy keepalive status-only'],
+    ['cloudflare/legacy-keepalive-worker.ts', task9Files['cloudflare/legacy-keepalive-worker.ts'].replace('headers: {', "headers: { ...{ X: console.error('leak') },"), 'legacy keepalive status-only'],
+    ['cloudflare/legacy-keepalive-worker.ts', task9Files['cloudflare/legacy-keepalive-worker.ts'].replace('fetch(`', 'fetch?.(`'), 'legacy keepalive status-only'],
+    ['cloudflare/legacy-keepalive-worker.ts', task9Files['cloudflare/legacy-keepalive-worker.ts'].replace('env.KV_REST_API_URL', 'env?.KV_REST_API_URL'), 'legacy keepalive status-only'],
+    ['cloudflare/legacy-keepalive-worker.ts', task9Files['cloudflare/legacy-keepalive-worker.ts'].replace('env.KV_REST_API_TOKEN', 'env?.KV_REST_API_TOKEN'), 'legacy keepalive status-only'],
+    ['cloudflare/legacy-keepalive-worker.ts', task9Files['cloudflare/legacy-keepalive-worker.ts'].replace('env.STATE_AUTHORITY_MODE', 'env?.STATE_AUTHORITY_MODE'), 'legacy keepalive cloudflare isolation'],
+    ['cloudflare/legacy-keepalive-worker.ts', task9Files['cloudflare/legacy-keepalive-worker.ts'].replace('ctx.waitUntil(', 'ctx?.waitUntil('), 'legacy keepalive worker'],
+    ['cloudflare/legacy-keepalive-worker.ts', task9Files['cloudflare/legacy-keepalive-worker.ts'].replace('ctx.waitUntil(', 'ctx.waitUntil?.('), 'legacy keepalive worker'],
+    ['cloudflare/legacy-keepalive-worker.ts', task9Files['cloudflare/legacy-keepalive-worker.ts'].replace('ctx.waitUntil(runLegacyKeepAlive(env', 'ctx.waitUntil(runLegacyKeepAlive?.(env'), 'legacy keepalive worker'],
+    ['cloudflare/legacy-keepalive-worker.ts', task9Files['cloudflare/legacy-keepalive-worker.ts'].replace('controller.scheduledTime', 'controller?.scheduledTime'), 'legacy keepalive worker'],
+    ['cloudflare/legacy-keepalive-worker.ts', task9Files['cloudflare/legacy-keepalive-worker.ts'].replace('export default {', 'export default { fetch() { return new Response(); },'), 'legacy keepalive worker'],
+    ['vitest.config.keepalive-workers.ts', task9Files['vitest.config.keepalive-workers.ts'].replace('cloudflareTest({', "cloudflareTest({ main: './cloudflare/legacy-keepalive-worker.ts',"), 'legacy keepalive vitest'],
+    ['vitest.config.keepalive-workers.ts', task9Files['vitest.config.keepalive-workers.ts'].replace("'test/worker/deny-egress.integration.test.ts',", ''), 'legacy keepalive vitest'],
+    ['vitest.config.keepalive-workers.ts', task9Files['vitest.config.keepalive-workers.ts'].replace("'test/worker/deny-egress.integration.test.ts',", "'test/worker/deny-egress.integration.test.ts', 'test/worker/extra.integration.test.ts',"), 'legacy keepalive vitest'],
+    ['vitest.config.keepalive-workers.ts', task9Files['vitest.config.keepalive-workers.ts'].replace("setupFiles: ['./test/worker/deny-egress.setup.ts'],", 'setupFiles: [],'), 'legacy keepalive vitest'],
+    ['wrangler.jsonc', task2Files['wrangler.jsonc'].replace('"migrations"', '"KV_REST_API_URL":"", "migrations"'), 'wrangler keepalive capability'],
+    ['wrangler.jsonc', task2Files['wrangler.jsonc'].replace('"services":[{"binding":"WORKER_SELF_REFERENCE","service":"event-every"}]', '"services":[{"binding":"WORKER_SELF_REFERENCE","service":"event-every"},{"binding":"PRIVATE_KEEPALIVE","service":"event-every-legacy-keepalive-private"}]'), 'wrangler private keepalive service'],
+    ['cloudflare/app-worker.ts', `${task2Files['cloudflare/app-worker.ts']}\nexport const scheduled = () => undefined;`, 'cloudflare/app-worker exports'],
+    ['cloudflare/app-worker.ts', `${task2Files['cloudflare/app-worker.ts']}\nconst KV_REST_API_URL = '';`, 'cloudflare/app-worker exports'],
+  ] as const)('rejects %s violation', (file, value, message) => {
+    expect(() => assertC1AConfig(fixture({ ...task2Files, [file]: value }))).toThrow(`c1-a config: ${message}`);
+  });
 });

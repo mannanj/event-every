@@ -30,6 +30,15 @@ const CREDENTIAL_ASSIGNMENT = /(?:OPENROUTER|ANTHROPIC|CLOUDFLARE|RESEND|KV_REST
 const DEPLOY_CAPABLE = /\b(?:deploy|publish|upload)\b/i;
 const ORDINARY_INSTALL = /\b(?:bun(?:\s+--[\w-]+(?:=\S+)?)*\s+(?:install|i|add|update)|npm\s+(?:install|i|ci)|pnpm\s+(?:install|i|add)|yarn\s+(?:install|add))\b/i;
 
+type SourceFileWithParseDiagnostics = ts.SourceFile & {
+  readonly parseDiagnostics?: readonly ts.Diagnostic[];
+};
+
+function hasParseDiagnostics(source: ts.SourceFile): boolean {
+  const diagnostics = (source as SourceFileWithParseDiagnostics).parseDiagnostics;
+  return !diagnostics || diagnostics.length > 0;
+}
+
 function fail(field: string): never {
   throw new Error(`c1-a config: ${field}`);
 }
@@ -40,9 +49,9 @@ function read(root: string, file: string): string {
   return readFileSync(target, 'utf8');
 }
 
-function readWranglerConfig(root: string): Record<string, unknown> {
-  const target = path.join(root, 'wrangler.jsonc');
-  if (!existsSync(target)) fail('missing wrangler.jsonc');
+function readWranglerConfig(root: string, file = 'wrangler.jsonc'): Record<string, unknown> {
+  const target = path.join(root, file);
+  if (!existsSync(target)) fail(`missing ${file}`);
   const source = [
     "import { cloudflareTest } from '@cloudflare/vitest-pool-workers';",
     "import { experimental_readRawConfig } from 'wrangler';",
@@ -56,11 +65,11 @@ function readWranglerConfig(root: string): Record<string, unknown> {
     stdout: 'pipe',
     stderr: 'ignore',
   });
-  if (result.exitCode !== 0 || result.stdout.byteLength > 64 * 1024) fail('wrangler.jsonc');
+  if (result.exitCode !== 0 || result.stdout.byteLength > 64 * 1024) fail(file);
   try {
     return JSON.parse(new TextDecoder().decode(result.stdout)) as Record<string, unknown>;
   } catch {
-    fail('wrangler.jsonc');
+    fail(file);
   }
 }
 
@@ -84,6 +93,152 @@ function executable(value: string, file: string): string {
 
 function exactExecutable(root: string, file: string, expected: string, field = file): void {
   if (executable(read(root, file), file) !== executable(expected, file)) fail(field);
+}
+
+function hasExactParameters(parameters: readonly ts.ParameterDeclaration[], names: readonly string[]): boolean {
+  return parameters.length === names.length && parameters.every((parameter, index) => ts.isIdentifier(parameter.name) && parameter.name.text === names[index]
+    && !parameter.initializer && !parameter.dotDotDotToken && !parameter.questionToken && !(parameter.modifiers?.length));
+}
+
+function isScheduledOnlyDefaultWorker(value: string): boolean {
+  const source = ts.createSourceFile('legacy-keepalive-worker.ts', value, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+  if (hasParseDiagnostics(source)) return false;
+  const expectedTypes = ['LegacyKeepAliveEnv', 'ScheduledController', 'ExecutionContext', 'ExportedHandler'];
+  if (source.statements.length !== 7 || !source.statements.slice(0, 4).every((statement, index) => ts.isTypeAliasDeclaration(statement) && statement.name.text === expectedTypes[index])
+    || !ts.isFunctionDeclaration(source.statements[4]) || source.statements[4].name?.text !== 'mapKeepAliveFailure'
+    || !ts.isFunctionDeclaration(source.statements[5]) || source.statements[5].name?.text !== 'runLegacyKeepAlive'
+    || !ts.isExportAssignment(source.statements[6])) return false;
+  if (source.statements.some(ts.isExportDeclaration)) return false;
+  const assignments = source.statements.filter(ts.isExportAssignment);
+  if (assignments.length !== 1 || assignments[0].isExportEquals) return false;
+  let expression = assignments[0].expression;
+  while (ts.isSatisfiesExpression(expression) || ts.isParenthesizedExpression(expression)) expression = expression.expression;
+  if (!ts.isObjectLiteralExpression(expression)) return false;
+  for (const statement of source.statements) {
+    if (ts.isExportAssignment(statement)) continue;
+    if (ts.canHaveModifiers(statement) && ts.getModifiers(statement)?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword)) return false;
+  }
+  const properties = expression.properties;
+  if (properties.length !== 1 || !ts.isMethodDeclaration(properties[0]) || !ts.isIdentifier(properties[0].name) || properties[0].name.text !== 'scheduled') return false;
+  const scheduled = properties[0];
+  if (!scheduled.body || !hasExactParameters(scheduled.parameters, ['controller', 'env', 'ctx']) || scheduled.body.statements.length !== 1) return false;
+  const [waitUntil] = scheduled.body.statements;
+  if (!ts.isExpressionStatement(waitUntil) || !ts.isCallExpression(waitUntil.expression) || waitUntil.expression.questionDotToken || !ts.isPropertyAccessExpression(waitUntil.expression.expression) || waitUntil.expression.expression.questionDotToken
+    || !ts.isIdentifier(waitUntil.expression.expression.expression) || waitUntil.expression.expression.expression.text !== 'ctx'
+    || waitUntil.expression.expression.name.text !== 'waitUntil' || waitUntil.expression.arguments.length !== 1 || !ts.isCallExpression(waitUntil.expression.arguments[0])) return false;
+  const runnerCall = waitUntil.expression.arguments[0];
+  if (runnerCall.questionDotToken || !ts.isIdentifier(runnerCall.expression) || runnerCall.expression.text !== 'runLegacyKeepAlive' || runnerCall.arguments.length !== 2
+    || !ts.isIdentifier(runnerCall.arguments[0]) || runnerCall.arguments[0].text !== 'env' || !ts.isPropertyAccessExpression(runnerCall.arguments[1])
+    || runnerCall.arguments[1].questionDotToken || !ts.isIdentifier(runnerCall.arguments[1].expression) || runnerCall.arguments[1].expression.text !== 'controller' || runnerCall.arguments[1].name.text !== 'scheduledTime') return false;
+  const runners = source.statements.filter((statement): statement is ts.FunctionDeclaration => ts.isFunctionDeclaration(statement) && statement.name?.text === 'runLegacyKeepAlive');
+  if (runners.length !== 1 || !runners[0].name) return false;
+  let exactRunnerUses = true;
+  const inspectRunnerUse = (node: ts.Node): void => {
+    if (ts.isIdentifier(node) && node.text === 'runLegacyKeepAlive') exactRunnerUses &&= node === runners[0].name || node === runnerCall.expression;
+    ts.forEachChild(node, inspectRunnerUse);
+  };
+  inspectRunnerUse(source);
+  return exactRunnerUses;
+}
+
+function contentFreeKeepAliveMapper(source: ts.SourceFile): ts.FunctionDeclaration | undefined {
+  const mappers = source.statements.filter((statement): statement is ts.FunctionDeclaration => ts.isFunctionDeclaration(statement)
+    && statement.name?.text === 'mapKeepAliveFailure');
+  if (mappers.length !== 1) return undefined;
+  const [mapper] = mappers;
+  if (!mapper.body || !hasExactParameters(mapper.parameters, ['_error']) || mapper.body.statements.length !== 1) return undefined;
+  const [returned] = mapper.body.statements;
+  if (!ts.isReturnStatement(returned) || !returned.expression || !ts.isIdentifier(returned.expression) || returned.expression.text !== 'undefined') return undefined;
+  const [parameter] = mapper.parameters;
+  if (!ts.isIdentifier(parameter.name)) return undefined;
+  const parameterName = parameter.name.text;
+  let contentFree = true;
+  const inspect = (node: ts.Node): void => {
+    if (ts.isIdentifier(node) && node.text === parameterName) contentFree = false;
+    ts.forEachChild(node, inspect);
+  };
+  mapper.body.forEachChild(inspect);
+  return contentFree ? mapper : undefined;
+}
+
+function isStatusOnlyKeepAliveFailure(value: string): boolean {
+  const source = ts.createSourceFile('legacy-keepalive-worker.ts', value, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+  const mapper = contentFreeKeepAliveMapper(source);
+  if (hasParseDiagnostics(source) || !mapper?.name) return false;
+  const catches: ts.CatchClause[] = [];
+  const visit = (node: ts.Node): void => {
+    if (ts.isCatchClause(node)) catches.push(node);
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+  if (catches.length !== 1) return false;
+  const runners = source.statements.filter((statement): statement is ts.FunctionDeclaration => ts.isFunctionDeclaration(statement) && statement.name?.text === 'runLegacyKeepAlive');
+  if (runners.length !== 1 || !runners[0].body || !hasExactParameters(runners[0].parameters, ['env', 'scheduledTime']) || runners[0].body.statements.length !== 2) return false;
+  const [earlyReturn, guardedFetch] = runners[0].body.statements;
+  if (!ts.isIfStatement(earlyReturn) || earlyReturn.elseStatement || !ts.isReturnStatement(earlyReturn.thenStatement) || earlyReturn.thenStatement.expression
+    || !ts.isBinaryExpression(earlyReturn.expression) || earlyReturn.expression.operatorToken.kind !== ts.SyntaxKind.EqualsEqualsEqualsToken
+    || !ts.isPropertyAccessExpression(earlyReturn.expression.left) || earlyReturn.expression.left.questionDotToken || !ts.isIdentifier(earlyReturn.expression.left.expression) || earlyReturn.expression.left.expression.text !== 'env'
+    || earlyReturn.expression.left.name.text !== 'STATE_AUTHORITY_MODE' || !ts.isStringLiteral(earlyReturn.expression.right) || earlyReturn.expression.right.text !== 'cloudflare') return false;
+  if (!ts.isTryStatement(guardedFetch) || guardedFetch.finallyBlock || !guardedFetch.catchClause || guardedFetch.catchClause !== catches[0] || guardedFetch.tryBlock.statements.length !== 2) return false;
+  const [responseDeclaration, nonOkBranch] = guardedFetch.tryBlock.statements;
+  if (!ts.isVariableStatement(responseDeclaration) || responseDeclaration.declarationList.declarations.length !== 1) return false;
+  const response = responseDeclaration.declarationList.declarations[0];
+  if (!ts.isIdentifier(response.name) || !response.initializer || !ts.isAwaitExpression(response.initializer) || !ts.isCallExpression(response.initializer.expression)
+    || !ts.isIdentifier(response.initializer.expression.expression) || response.initializer.expression.expression.text !== 'fetch') return false;
+  const fetchCallee = response.initializer.expression.expression;
+  let exactFetchUse = true;
+  const inspectFetchUse = (node: ts.Node): void => {
+    if (ts.isIdentifier(node) && node.text === 'fetch') exactFetchUse &&= node === fetchCallee;
+    ts.forEachChild(node, inspectFetchUse);
+  };
+  inspectFetchUse(source);
+  if (!exactFetchUse) return false;
+  const isEnvProperty = (node: ts.Expression, name: string): boolean => ts.isPropertyAccessExpression(node) && !node.questionDotToken
+    && ts.isIdentifier(node.expression) && node.expression.text === 'env' && node.name.text === name;
+  const fetchCall = response.initializer.expression;
+  if (fetchCall.questionDotToken || fetchCall.arguments.length !== 2 || !ts.isTemplateExpression(fetchCall.arguments[0])) return false;
+  const url = fetchCall.arguments[0];
+  if (url.head.text !== '' || url.templateSpans.length !== 2 || !isEnvProperty(url.templateSpans[0].expression, 'KV_REST_API_URL')
+    || url.templateSpans[0].literal.text !== '/set/keep-alive/' || !ts.isIdentifier(url.templateSpans[1].expression) || url.templateSpans[1].expression.text !== 'scheduledTime'
+    || url.templateSpans[1].literal.text !== '?EX=172800' || !ts.isObjectLiteralExpression(fetchCall.arguments[1]) || fetchCall.arguments[1].properties.length !== 2) return false;
+  const [method, headers] = fetchCall.arguments[1].properties;
+  if (!ts.isPropertyAssignment(method) || !ts.isIdentifier(method.name) || method.name.text !== 'method' || !ts.isStringLiteral(method.initializer) || method.initializer.text !== 'POST'
+    || !ts.isPropertyAssignment(headers) || !ts.isIdentifier(headers.name) || headers.name.text !== 'headers' || !ts.isObjectLiteralExpression(headers.initializer) || headers.initializer.properties.length !== 1) return false;
+  const [authorization] = headers.initializer.properties;
+  if (!ts.isPropertyAssignment(authorization) || !ts.isIdentifier(authorization.name) || authorization.name.text !== 'Authorization' || !ts.isTemplateExpression(authorization.initializer)
+    || authorization.initializer.head.text !== 'Bearer ' || authorization.initializer.templateSpans.length !== 1 || !isEnvProperty(authorization.initializer.templateSpans[0].expression, 'KV_REST_API_TOKEN')
+    || authorization.initializer.templateSpans[0].literal.text !== '') return false;
+  if (!ts.isIfStatement(nonOkBranch) || nonOkBranch.elseStatement || !ts.isPrefixUnaryExpression(nonOkBranch.expression)
+    || nonOkBranch.expression.operator !== ts.SyntaxKind.ExclamationToken || !ts.isPropertyAccessExpression(nonOkBranch.expression.operand)
+    || nonOkBranch.expression.operand.questionDotToken || !ts.isIdentifier(nonOkBranch.expression.operand.expression) || nonOkBranch.expression.operand.expression.text !== response.name.text
+    || nonOkBranch.expression.operand.name.text !== 'ok' || !ts.isReturnStatement(nonOkBranch.thenStatement) || !nonOkBranch.thenStatement.expression
+    || !ts.isCallExpression(nonOkBranch.thenStatement.expression)) return false;
+  const nonOkCall = nonOkBranch.thenStatement.expression;
+  if (nonOkCall.questionDotToken || !ts.isIdentifier(nonOkCall.expression) || nonOkCall.expression.text !== 'mapKeepAliveFailure' || nonOkCall.arguments.length !== 1
+    || !ts.isIdentifier(nonOkCall.arguments[0]) || nonOkCall.arguments[0].text !== 'undefined') return false;
+  const [caught] = catches;
+  if (!caught.variableDeclaration || !ts.isIdentifier(caught.variableDeclaration.name) || caught.block.statements.length !== 1) return false;
+  const returned = caught.block.statements[0];
+  if (!ts.isReturnStatement(returned) || !returned.expression || !ts.isCallExpression(returned.expression)) return false;
+  const call = returned.expression;
+  if (call.questionDotToken || !ts.isIdentifier(call.expression) || call.expression.text !== 'mapKeepAliveFailure' || call.arguments.length !== 1) return false;
+  const [argument] = call.arguments;
+  if (!ts.isIdentifier(argument) || argument.text !== caught.variableDeclaration.name.text) return false;
+  let validUses = true;
+  const inspectUse = (node: ts.Node): void => {
+    if (ts.isIdentifier(node) && node.text === caught.variableDeclaration!.name.getText(source)) {
+      validUses &&= node === argument && node.parent === call && call.parent === returned;
+    }
+    ts.forEachChild(node, inspectUse);
+  };
+  inspectUse(caught.block);
+  let exactMapperUses = true;
+  const inspectMapperUse = (node: ts.Node): void => {
+    if (ts.isIdentifier(node) && node.text === 'mapKeepAliveFailure') exactMapperUses &&= node === mapper.name || node === nonOkCall.expression || node === call.expression;
+    ts.forEachChild(node, inspectMapperUse);
+  };
+  inspectMapperUse(source);
+  return validUses && exactMapperUses;
 }
 
 const EXACT_NEXT_CONFIG = `
@@ -161,6 +316,47 @@ export default defineConfig({
   ],
 });
 `;
+const EXACT_KEEPALIVE_CONFIG = {
+  $schema: 'node_modules/wrangler/config-schema.json',
+  name: 'event-every-legacy-keepalive-private',
+  main: 'cloudflare/legacy-keepalive-worker.ts',
+  compatibility_date: '2026-08-02',
+  compatibility_flags: ['nodejs_compat'],
+  workers_dev: false,
+  preview_urls: false,
+  vars: {
+    KEEPALIVE_DEPLOYMENT_DISABLED: '1',
+    STATE_AUTHORITY_MODE: 'legacy',
+    KV_REST_API_URL: '',
+    KV_REST_API_TOKEN: '',
+  },
+};
+const EXACT_KEEPALIVE_VITEST = `
+import { defineConfig } from 'vitest/config';
+export default defineConfig(async () => {
+  const { cloudflareTest } = await import('@cloudflare/vitest-pool-workers');
+  return {
+    plugins: [
+      cloudflareTest({
+        wrangler: { configPath: './cloudflare/legacy-keepalive-wrangler.jsonc' },
+        miniflare: {
+          bindings: {
+            KV_REST_API_URL: 'http://127.0.0.1:8799',
+            KV_REST_API_TOKEN: 'synthetic-c1-a-token',
+          },
+        },
+      }),
+    ],
+    test: {
+      include: [
+        'test/worker/legacy-keepalive.integration.test.ts',
+        'test/worker/deny-egress.integration.test.ts',
+      ],
+      setupFiles: ['./test/worker/deny-egress.setup.ts'],
+    },
+  };
+});
+`;
 
 export function assertC1AConfig(root = process.cwd()): void {
   let packageJson: { scripts?: Record<string, unknown>; dependencies?: Record<string, unknown>; devDependencies?: Record<string, unknown> };
@@ -196,7 +392,7 @@ export function assertC1AConfig(root = process.cwd()): void {
   exactExecutable(root, 'next.config.js', EXACT_NEXT_CONFIG);
 
   const worker = read(root, 'cloudflare/app-worker.ts');
-  if (/\b(?:scheduled|durable_objects)\b/.test(worker)) fail('cloudflare/app-worker exports');
+  if (/\b(?:scheduled|durable_objects)\b|KV_REST|upstash/i.test(worker)) fail('cloudflare/app-worker exports');
   exactExecutable(root, 'cloudflare/app-worker.ts', EXACT_APP_WORKER, 'cloudflare/app-worker');
 
   const wrangler = readWranglerConfig(root);
@@ -208,6 +404,7 @@ export function assertC1AConfig(root = process.cwd()): void {
   exact(wrangler.workers_dev, false, 'wrangler.workers_dev');
   exact(wrangler.preview_urls, false, 'wrangler.preview_urls');
   exact(wrangler.assets, { directory: '.open-next/assets', binding: 'ASSETS' }, 'wrangler.assets');
+  if (Array.isArray(wrangler.services) && wrangler.services.some((service) => typeof service === 'object' && service !== null && (service as { service?: unknown }).service === 'event-every-legacy-keepalive-private')) fail('wrangler private keepalive service');
   exact(wrangler.services, [{ binding: 'WORKER_SELF_REFERENCE', service: 'event-every' }], 'wrangler.services');
   exact(wrangler.d1_databases, [{ binding: 'EVENT_EVERY_DB', database_name: 'event-every-local-disabled', database_id: '11111111-1111-4111-8111-111111111111' }], 'wrangler.d1_databases');
   exact(wrangler.durable_objects, { bindings: [
@@ -220,6 +417,19 @@ export function assertC1AConfig(root = process.cwd()): void {
   exact(wrangler.vars, {
     C1_DEPLOYMENT_DISABLED: '1', STATE_AUTHORITY_MODE: 'legacy', IDENTITY_KEY_CURRENT_VERSION: 'local-v1', IDENTITY_KEY_NEXT_VERSION: '', IDENTITY_KEY_ACTIVATES_AT: '', IDENTITY_KEY_SCHEDULE_DIGEST: 'local-v1-no-rotation', IDENTITY_HMAC_CURRENT: '', IDENTITY_HMAC_NEXT: '', RESOLVER_CAPABILITY_HMAC: '',
   }, 'wrangler.vars');
+
+  const keepalive = readWranglerConfig(root, 'cloudflare/legacy-keepalive-wrangler.jsonc');
+  if ('routes' in keepalive || 'triggers' in keepalive || 'services' in keepalive || keepalive.remote === true) fail('legacy keepalive deployment');
+  exact(keepalive, EXACT_KEEPALIVE_CONFIG, 'legacy keepalive wrangler');
+  if (!read(root, 'cloudflare/legacy-keepalive-wrangler.jsonc').includes('// Future P1 cron: 0 0 * * * (disabled until C1-A deployment controls are lifted).')) fail('legacy keepalive cron comment');
+  if (/KV_REST|upstash/i.test(JSON.stringify(wrangler))) fail('wrangler keepalive capability');
+  const keepaliveWorker = read(root, 'cloudflare/legacy-keepalive-worker.ts');
+  if (!isScheduledOnlyDefaultWorker(keepaliveWorker)) fail('legacy keepalive worker');
+  if (!keepaliveWorker.includes("if (env.STATE_AUTHORITY_MODE === 'cloudflare') return;")) fail('legacy keepalive cloudflare isolation');
+  if (!isStatusOnlyKeepAliveFailure(keepaliveWorker)) fail('legacy keepalive status-only');
+  const keepaliveTypes = read(root, 'cloudflare/legacy-keepalive-configuration.d.ts');
+  for (const binding of ['KEEPALIVE_DEPLOYMENT_DISABLED', 'STATE_AUTHORITY_MODE', 'KV_REST_API_URL', 'KV_REST_API_TOKEN']) if (!keepaliveTypes.includes(binding)) fail('legacy keepalive types');
+  exactExecutable(root, 'vitest.config.keepalive-workers.ts', EXACT_KEEPALIVE_VITEST, 'legacy keepalive vitest');
 
   exactExecutable(root, 'vitest.config.workers.ts', EXACT_WORKERS_CONFIG, 'vitest.config.workers remote');
   const generatedTypes = read(root, 'worker-configuration.d.ts');
