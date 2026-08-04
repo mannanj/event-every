@@ -1,5 +1,5 @@
 import type { AdmissionResult } from './contracts';
-import { ROUTE_MANIFEST, type RoutePolicy } from './route-manifest';
+import { RESERVED_ROUTE_MANIFEST, ROUTE_MANIFEST, type RoutePolicy } from './route-manifest';
 import {
   INTERNAL_IDENTITY_HEADER,
   deriveEdgeIdentity,
@@ -22,6 +22,7 @@ type BodyReadResult = AdmissionFailure | Readonly<{
 
 type AdmissionErrorCode =
   | 'route_not_found'
+  | 'auth_not_available'
   | 'method_not_allowed'
   | 'route_retired'
   | 'origin_not_allowed'
@@ -36,6 +37,7 @@ const ERRORS: Readonly<Record<AdmissionErrorCode, Readonly<{
   error: string;
 }>>> = {
   route_not_found: { status: 404, error: 'Route not found.' },
+  auth_not_available: { status: 404, error: 'Authentication is not available.' },
   method_not_allowed: { status: 405, error: 'Method not allowed.' },
   route_retired: { status: 410, error: 'Route retired.' },
   origin_not_allowed: { status: 403, error: 'Origin not allowed.' },
@@ -53,6 +55,9 @@ export async function admitEdgeRequest(
   trustedEdge: TrustedEdgeAddressPort,
 ): Promise<AdmissionResult> {
   const pathname = new URL(request.url).pathname;
+  if (RESERVED_ROUTE_MANIFEST[pathname] !== undefined) {
+    return rejectAdmission('auth_not_available');
+  }
   const policy = ROUTE_MANIFEST[pathname];
   if (policy === undefined) {
     if (pathname === '/api' || pathname.startsWith('/api/')) {

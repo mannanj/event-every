@@ -989,6 +989,15 @@ Task 8 then creates the guard/test under its own manifest and implements the alr
 closed `57|58|59` contract; Task 11 reuses them without restaging. No Task 8 product path may change
 in the prerequisite commit.
 
+There is one additional narrow Task 8 prerequisite exception for the already prior-owned reserved-
+auth boundary: repair `src/platform/route-manifest.ts` and its Task 3 test, plus
+`src/platform/admission.ts` and its Task 4 test, so `/api/auth/challenge` and `/api/auth/redeem`
+are explicitly reserved at the edge and return fixed `auth_not_available` before method, origin,
+body, or identity work. Independently rereview and commit exactly those four source/test paths plus
+this plan before Task 8 acceptance. These paths already have prior Task 3/4 and plan ownership, so
+this exception changes no task manifests or accepted manifest hashes; the later Task 8 acceptance
+uses the separately committed repair as prior ownership.
+
 `task-01.txt`:
 
     .gitignore

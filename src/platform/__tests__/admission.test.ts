@@ -65,6 +65,62 @@ async function expectFixedError(response: Response, status: number, code: string
 }
 
 describe('edge admission policy', () => {
+  test.each(['/api/auth/challenge', '/api/auth/redeem'])('%s is reserved before method, origin, body, or identity work', async (path) => {
+    const bodyCanary = 'reserved-auth-body-canary';
+    const methodProbe = probedStream([new TextEncoder().encode(bodyCanary)]);
+    const wrongMethod = new Request(`https://event-every.test${path}`, {
+      method: 'PUT',
+      headers: { origin: 'https://hostile.invalid', 'content-type': 'text/plain' },
+      body: methodProbe.stream,
+    });
+    const result = await admitEdgeRequest(wrongMethod, env, {}, {
+      readAddress() { throw new Error('identity must not run'); },
+    });
+
+    expect(result.status).toBe('failure');
+    if (result.status === 'success') throw new Error('expected reserved rejection');
+    await expectFixedError(result.response, 404, 'auth_not_available', bodyCanary);
+    expect(methodProbe.pulls()).toBe(0);
+
+    const originProbe = probedStream([new TextEncoder().encode(bodyCanary)]);
+    const hostileOrigin = new Request(`https://event-every.test${path}`, {
+      method: 'POST',
+      headers: { origin: 'https://hostile.invalid', 'content-type': 'application/json' },
+      body: originProbe.stream,
+    });
+    const originResult = await admitEdgeRequest(hostileOrigin, env, {}, {
+      readAddress() { throw new Error('identity must not run'); },
+    });
+
+    expect(originResult.status).toBe('failure');
+    if (originResult.status === 'success') throw new Error('expected reserved rejection');
+    await expectFixedError(originResult.response, 404, 'auth_not_available', bodyCanary);
+    expect(originProbe.pulls()).toBe(0);
+  });
+
+  test.each([
+    ['/api/auth/challenge', 'media', { 'content-type': 'text/plain' }],
+    ['/api/auth/challenge', 'encoding', { 'content-type': 'application/json', 'content-encoding': 'gzip' }],
+    ['/api/auth/redeem', 'media', { 'content-type': 'text/plain' }],
+    ['/api/auth/redeem', 'encoding', { 'content-type': 'application/json', 'content-encoding': 'gzip' }],
+  ])('%s is reserved before invalid %s validation', async (path, kind, headers) => {
+    const bodyCanary = `reserved-auth-${kind}-body-canary`;
+    const probe = probedStream([new TextEncoder().encode(bodyCanary)]);
+    const request = new Request(`https://event-every.test${path}`, {
+      method: 'POST',
+      headers: { origin: 'https://event-every.test', ...headers },
+      body: probe.stream,
+    });
+    const result = await admitEdgeRequest(request, env, {}, {
+      readAddress() { throw new Error('identity must not run'); },
+    });
+
+    expect(result.status).toBe('failure');
+    if (result.status === 'success') throw new Error('expected reserved rejection');
+    await expectFixedError(result.response, 404, 'auth_not_available', bodyCanary);
+    expect(probe.pulls()).toBe(0);
+  });
+
   test('cross-site text is rejected before route', async () => {
     const canary = 'private-cross-site-canary';
     const probe = probedStream([new TextEncoder().encode(canary)]);

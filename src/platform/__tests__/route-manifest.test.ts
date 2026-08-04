@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import ts from 'typescript';
-import { ROUTE_MANIFEST } from '@/platform/route-manifest';
+import { RESERVED_ROUTE_MANIFEST, ROUTE_MANIFEST } from '@/platform/route-manifest';
 
 type RouteSource = Readonly<{ route: string; path: string }>;
 const HTTP_METHODS = new Set(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS']);
@@ -60,5 +60,14 @@ describe('route manifest', () => {
       '/api/usage': { method: 'GET', maxBodyBytes: 0, allow: 'GET' },
       '/api/waitlist': { method: 'POST', maxBodyBytes: 4 * 1024, allow: 'POST' },
     });
+  });
+
+  test('reserves auth challenge and redeem outside the actual-route manifest', () => {
+    expect(RESERVED_ROUTE_MANIFEST).toEqual({
+      '/api/auth/challenge': { method: 'POST', maxBodyBytes: 2 * 1024, allow: 'POST' },
+      '/api/auth/redeem': { method: 'POST', maxBodyBytes: 2 * 1024, allow: 'POST' },
+    });
+    expect(Object.keys(ROUTE_MANIFEST)).not.toContain('/api/auth/challenge');
+    expect(Object.keys(ROUTE_MANIFEST)).not.toContain('/api/auth/redeem');
   });
 });

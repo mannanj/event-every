@@ -7,3 +7,8 @@ export const ROUTE_MANIFEST: Readonly<Record<string, RoutePolicy>> = {
   '/api/detect-urls': policy('POST', 128 * 1024), '/api/keep-alive': policy('GET', 0, true), '/api/resolve-timezone': policy('POST', 16 * 1024),
   '/api/scan': policy('POST', 12 * MiB), '/api/scrape-url': SCRAPE_URL_POLICY, '/api/summarize': policy('POST', 16 * 1024), '/api/usage': policy('GET', 0), '/api/waitlist': policy('POST', 4 * 1024),
 };
+
+export const RESERVED_ROUTE_MANIFEST: Readonly<Record<string, RoutePolicy>> = {
+  '/api/auth/challenge': policy('POST', 2 * 1024),
+  '/api/auth/redeem': policy('POST', 2 * 1024),
+};
