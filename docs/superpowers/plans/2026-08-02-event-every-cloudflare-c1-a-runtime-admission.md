@@ -972,14 +972,19 @@ For task 1 the exact command is `git add --pathspec-from-file=scripts/c1-a-task-
 
 Commit with the literal message in the table. No free-form staging is permitted.
 
-The manifest file contents are literal below. Task 1 also creates all eleven manifests and owns this reviewed implementation-plan path, so its manifest owns those twelve coordination paths. The accepted plan remains untracked and byte-frozen from final review through Task 1 staging; there is no separate Event Every plan commit. Any byte change after the accepted review invalidates acceptance and requires rereview. Later tasks do not normally restage the already committed plan or manifest files. Task 7 has one bounded exception required by its busy-retry proof: before staging Task 7, independently rereview and commit exactly this plan path plus the prior Task 6-owned `src/platform/cloudflare/resolver-request-authority.ts` as a prerequisite repair. The Task 7 path gate then observes those two committed paths only as prior-manifest ownership and still requires the staged set to equal the unchanged nine-path Task 7 manifest; terminal mode still requires the unchanged eleven-manifest union. No manifest or accepted manifest hash changes.
+The manifest file contents are literal below. Task 1 also creates all eleven manifests and owns this reviewed implementation-plan path, so its manifest owns those twelve coordination paths. The accepted plan remains untracked and byte-frozen from final review through Task 1 staging; there is no separate Event Every plan commit. Any byte change after the accepted review invalidates acceptance and requires rereview. Later tasks do not normally restage the already committed plan or manifest files. Task 7 has one bounded exception required by its busy-retry proof: before staging Task 7, independently rereview and commit exactly this plan path plus the prior Task 6-owned `src/platform/cloudflare/resolver-request-authority.ts` as a prerequisite repair. The Task 7 path gate then observes those two committed paths only as prior-manifest ownership and still requires the staged set to equal the ten-path Task 7 manifest; terminal mode still requires the unchanged eleven-manifest union. The busy-retry prerequisite repair itself makes no manifest or accepted manifest hash changes.
 
-Task 8 has one bounded ownership prerequisite required by its first GREEN command: before any Task
-8 product edit, move `scripts/assert-c1-a-e2e-inventory.ts` and its test from `task-11.txt` to
-`task-08.txt`, update only those two accepted manifest hashes, the causal path-guard test, this
-plan's two literal manifests, and the Task 8/11 Files declarations. Independently rereview and
-commit exactly those five governance paths. The terminal union must remain the same 149 paths with
-sorted UTF-8 digest `86d9cafd0d18bd1c19126d19c9a7b3069322185c2625c762bba049b2a81d7131`.
+Task 8 has bounded ownership prerequisites required by its first GREEN command. The browser
+inventory prerequisite is already represented below: before any Task 8 product edit, move
+`scripts/assert-c1-a-e2e-inventory.ts` and its test from `task-11.txt` to `task-08.txt`, update
+only those two accepted manifest hashes, the causal path-guard test, this plan's two literal
+manifests, and the Task 8/11 Files declarations. Independently rereview and commit exactly those
+five governance paths. A second prerequisite assigns the already committed singleton-verifier
+path `src/services/__tests__/scannerVendor.test.ts` to prior Task 7 ownership; update only the
+Task 7 manifest, its accepted hash, the causal path-guard test, and this plan. Independently
+rereview and commit exactly those four governance paths before Task 8 acceptance. The terminal
+union is 150 paths with sorted UTF-8 digest
+`0ee3eb10031279ebd0fb9de22b9c97cb335e6738a991111256ad48e2187c2a6a`.
 Task 8 then creates the guard/test under its own manifest and implements the already specified
 closed `57|58|59` contract; Task 11 reuses them without restaging. No Task 8 product path may change
 in the prerequisite commit.
@@ -1128,6 +1133,7 @@ in the prerequisite commit.
     src/platform/resolver/__tests__/url-policy.test.ts
     src/platform/resolver/html-to-text.ts
     src/platform/resolver/url-policy.ts
+    src/services/__tests__/scannerVendor.test.ts
     src/services/__tests__/urlServices.test.ts
     src/services/webScraper.ts
     test/worker/resolver.integration.test.ts

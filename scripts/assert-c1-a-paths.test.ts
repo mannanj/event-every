@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test';
+import { createHash } from 'node:crypto';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -49,7 +50,7 @@ describe('C1-A task path authority', () => {
     }
   });
 
-  test('assigns the closed browser inventory guard to Task 8 without changing the terminal union', () => {
+  test('assigns the closed browser inventory guard to Task 8 while preserving the terminal union', () => {
     const inventoryPaths = ['scripts/assert-c1-a-e2e-inventory.ts', 'scripts/assert-c1-a-e2e-inventory.test.ts'];
     const task8 = readTaskManifest(8);
     const task11 = readTaskManifest(11);
@@ -58,8 +59,21 @@ describe('C1-A task path authority', () => {
       expect(task11).not.toContain(file);
     }
     const terminal = new Set(Array.from({ length: 11 }, (_, index) => readTaskManifest(index + 1)).flat());
-    expect(terminal.size).toBe(149);
+    expect(terminal.size).toBe(150);
     for (const file of inventoryPaths) expect(terminal.has(file)).toBeTrue();
+  });
+
+  test('requires the committed scanner vendor test in Task 7 prior ownership for Task 8 and the terminal union', () => {
+    const scannerVendorTest = 'src/services/__tests__/scannerVendor.test.ts';
+    const task8 = readTaskManifest(8);
+    const terminal = new Set(Array.from({ length: 11 }, (_, index) => readTaskManifest(index + 1)).flat());
+    const digest = createHash('sha256').update(`${[...terminal].sort().join('\n')}\n`).digest('hex');
+
+    expect(readTaskManifest(7)).toContain(scannerVendorTest);
+    expect(() => assertAuthorizedPaths('base', 'head', 8, [scannerVendorTest], task8)).not.toThrow();
+    expect(() => assertAuthorizedPaths('base', 'head', 8, ['src/services/__tests__/unowned-control.test.ts'], task8)).toThrow('c1-a paths: observed path mismatch');
+    expect(terminal.size).toBe(150);
+    expect(digest).toBe('0ee3eb10031279ebd0fb9de22b9c97cb335e6738a991111256ad48e2187c2a6a');
   });
 
   test('keeps .env.example exclusively Task 8 provenance and rejects all runtime dotenv names', () => {
