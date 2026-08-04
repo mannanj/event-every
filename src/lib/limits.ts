@@ -44,7 +44,7 @@ const msToISO = (ms: number) => new Date(ms).toISOString();
 // user is also under their per-IP cap, matching "the USD budget controls ALL users".
 export async function evaluateLimits(request: NextRequest): Promise<UnifiedLimitStatus> {
   const mode: LlmMode = getLlmMode(request);
-  const isAdmin = mode === 'admin';
+  const isAdmin = false;
 
   const budgetStatus: BudgetStatus | null = await getCommunityBudgetStatus(mode);
   const ip = getClientIP(request);

@@ -1,11 +1,12 @@
 import { describe, expect, test } from 'bun:test';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { createE1OfflineEnvironment } from './run-e1-offline';
 import {
+  assertCommunityKeySourceGuard,
+  assertPatternAdminRetired,
   authorizeInvocationOutputs,
   createFocusedEnvironment,
-  FOCUSED_C04_TITLE,
   createTerminationSentinel,
   deriveInvocationPaths,
   forwardConfigPatches,
@@ -22,7 +23,102 @@ import {
   validateFocusedListing,
 } from './run-e1-focused';
 
+const TASK8_PATTERN_RETIREMENT_PATHS = [
+  '.env.example',
+  'README.md',
+  'e2e/community-limit.spec.ts',
+  'e2e/helpers.ts',
+  'playwright.config.ts',
+  'src/app/api/auth/check/route.ts',
+  'src/app/api/auth/logout/route.ts',
+  'src/app/api/auth/shared.ts',
+  'src/app/api/auth/verify/route.ts',
+  'src/app/layout.tsx',
+  'src/app/spent/page.tsx',
+  'src/components/AuthWrapper.tsx',
+  'src/components/CommunityLimitScreen.tsx',
+  'src/components/PatternLock.tsx',
+  'src/components/SideDrawerLockButton.tsx',
+  'src/hooks/useAuth.ts',
+  'src/lib/limits.ts',
+  'src/lib/llm.ts',
+] as const;
+
 describe('run-e1-focused argument and discovery seam', () => {
+  test('keeps AuthWrapper at the interactive home-page boundary', () => {
+    const root = path.resolve(import.meta.dir, '..');
+    const layout = readFileSync(path.join(root, 'src/app/layout.tsx'), 'utf8');
+    const page = readFileSync(path.join(root, 'src/app/page.tsx'), 'utf8');
+
+    expect(layout).not.toContain("import AuthWrapper from '@/components/AuthWrapper'");
+    expect(layout).not.toMatch(/<AuthWrapper[\s\S]*<\/AuthWrapper>/);
+    expect(page).toContain("import AuthWrapper from '@/components/AuthWrapper'");
+    expect(page).toMatch(/<AuthWrapper>\s*<main\b[\s\S]*<\/main>\s*<\/AuthWrapper>/);
+  });
+
+  test('serializes real Playwright config workers only for offline mode', async () => {
+    const configPath = path.resolve(import.meta.dir, '..', 'playwright.config.ts');
+    const readWorkers = (environment: Record<string, string | undefined>) => {
+      const result = Bun.spawnSync([
+        'bun',
+        '--eval',
+        `const config = (await import(${JSON.stringify(configPath)})).default; process.stdout.write(String(config.workers ?? 'undefined'));`,
+      ], { env: environment, stdout: 'pipe', stderr: 'pipe' });
+      if (result.exitCode !== 0) throw new Error(`Playwright config evaluation failed: ${result.exitCode}`);
+      return Buffer.from(result.stdout).toString('utf8');
+    };
+
+    const offline = createE1OfflineEnvironment({ ...process.env });
+    expect(readWorkers(offline)).toBe('1');
+
+    const local = { ...process.env, E1_OFFLINE: '', E1_OFFLINE_PRELOAD: '', E2E_TARGET: '' };
+    expect(readWorkers(local)).toBe('undefined');
+
+    const production = { ...local, E2E_TARGET: 'prod' };
+    expect(readWorkers(production)).toBe('1');
+  });
+
+  test('rejects every retired pattern/admin token in an allowed Task 8 source fixture', () => {
+    const tokens = [
+      'VALID_L_PATTERNS', 'AUTH_COOKIE_NAME', 'AUTH_SECRET', 'generateAuthToken',
+      'verifyAuthToken', 'PatternLock', '?unlock', 'NEXT_PUBLIC_DISABLE_AUTH',
+    ];
+    for (const token of tokens) {
+      expect(() => assertPatternAdminRetired({ 'src/app/layout.tsx': `fixture ${token}` }))
+        .toThrow('retired pattern token remains in src/app/layout.tsx');
+    }
+    expect(() => assertPatternAdminRetired({ 'src/app/layout.tsx': 'community only' })).not.toThrow();
+  });
+
+  test('contains no retired pattern/admin token in Task 8 product sources', () => {
+    const root = path.resolve(import.meta.dir, '..');
+    const sources = Object.fromEntries(TASK8_PATTERN_RETIREMENT_PATHS.filter((file) => existsSync(path.join(root, file))).map((file) => [
+      file,
+      readFileSync(path.join(root, file), 'utf8'),
+    ]));
+    assertPatternAdminRetired(sources);
+    assertCommunityKeySourceGuard(sources['src/lib/llm.ts']);
+  });
+
+  test('fails closed when the live community-key region contains the admin key name', () => {
+    const adminKeyName = ['OPENROUTER', '_API_KEY'].join('');
+    const communityOnly = `export function getLlmKey(_mode: LlmMode): string {
+  if (!process.env.OPENROUTER_COMMUNITY_KEY) throw new Error('community_key_unavailable');
+  return process.env.OPENROUTER_COMMUNITY_KEY;
+}
+
+export class CommunityLimitError extends Error {}`;
+    const behaviorNeutralLeak = communityOnly.replace(
+      "  return process.env.OPENROUTER_COMMUNITY_KEY;",
+      `  // ${adminKeyName} must never appear in this region.\n  return process.env.OPENROUTER_COMMUNITY_KEY;`,
+    );
+
+    expect(() => assertCommunityKeySourceGuard(communityOnly)).not.toThrow();
+    expect(() => assertCommunityKeySourceGuard(behaviorNeutralLeak)).toThrow(/community-key source region/);
+    expect(() => assertCommunityKeySourceGuard(`${adminKeyName}\n${communityOnly}`)).not.toThrow();
+    expect(() => assertCommunityKeySourceGuard('export const unrelated = true;')).toThrow(/community-key source region/);
+  });
+
   test('accepts exactly one Chromium, serial, end-anchored focused ledger tail', () => {
     expect(parseE1FocusedArguments([
       '--',
@@ -78,24 +174,19 @@ describe('run-e1-focused argument and discovery seam', () => {
     expect(validateFocusedListing('[chromium] › e2e/a.spec.ts:1:1 › one')).toBe(1);
   });
 
-  test('validates exact retained suite paths, per-project totals, and C04', () => {
+  test('validates the exact 56-title retained suite paths in either discovery scope', () => {
     const subset = [
       'community-limit.spec.ts', 'event-extraction.spec.ts', 'recent-input.spec.ts',
       'timezone-resolution.spec.ts', 'url-scrape.spec.ts', 'scanner-product-loop.spec.ts',
       'calendar-event-regression.spec.ts',
-    ].flatMap((file, index) => Array.from({ length: index === 0 ? 53 : 1 }, (_, row) =>
+    ].flatMap((file, index) => Array.from({ length: index === 0 ? 50 : 1 }, (_, row) =>
       `[chromium] › e2e/${file}:${row + 1}:1 › ${file} ${row}`,
     ));
-    subset[0] = `[chromium] › e2e/community-limit.spec.ts:1:1 › ${FOCUSED_C04_TITLE}`;
-    expect(validateDiscoveryListing(subset.join('\n'), 'chromium', 'task8')).toEqual({ titles: 59, paths: 7 });
-    expect(validateDiscoveryListing(subset.join('\n').replaceAll('› e2e/', '› '), 'chromium', 'task8')).toEqual({ titles: 59, paths: 7 });
-    const actualPlaywrightTitle = subset.join('\n').replace(FOCUSED_C04_TITLE, 'community limit screen › "Enter pattern lock" switches to the pattern screen as it looks today');
-    expect(validateDiscoveryListing(actualPlaywrightTitle, 'chromium', 'task8')).toEqual({ titles: 59, paths: 7 });
+    expect(validateDiscoveryListing(subset.join('\n'), 'chromium', 'task8')).toEqual({ titles: 56, paths: 7 });
+    expect(validateDiscoveryListing(subset.join('\n').replaceAll('› e2e/', '› '), 'chromium', 'task8')).toEqual({ titles: 56, paths: 7 });
     expect(() => validateDiscoveryListing(subset.join('\n'), 'webkit', 'task8')).toThrow();
-    expect(() => validateDiscoveryListing(subset.join('\n'), 'chromium', 'complete')).toThrow();
-    const complete = [...subset, `[chromium] › e2e/pattern-unlock.spec.ts:1:1 › other pattern coverage`];
-    expect(validateDiscoveryListing(complete.join('\n'), 'chromium', 'complete')).toEqual({ titles: 60, paths: 8 });
-    expect(validateDiscoveryListing(complete.join('\n').replaceAll('[chromium]', '[webkit]'), 'webkit', 'complete')).toEqual({ titles: 60, paths: 8 });
+    expect(validateDiscoveryListing(subset.join('\n'), 'chromium', 'complete')).toEqual({ titles: 56, paths: 7 });
+    expect(validateDiscoveryListing(subset.join('\n').replaceAll('[chromium]', '[webkit]'), 'webkit', 'complete')).toEqual({ titles: 56, paths: 7 });
   });
 
   test('derives only names owned by one mktemp invocation', () => {
@@ -276,7 +367,9 @@ describe('run-e1-focused argument and discovery seam', () => {
   test('literally reverses the installed Next full generated tsconfig bytes to repository pristine bytes', () => {
     const paths = deriveInvocationPaths('/private/tmp/e1-t8-focus.abc123', '/repo');
     const pristine = readFileSync(path.resolve(import.meta.dir, '../tsconfig.json'), 'utf8');
-    const generated = `{\n  "compilerOptions": {\n    "target": "ES2017",\n    "lib": [\n      "dom",\n      "dom.iterable",\n      "esnext"\n    ],\n    "allowJs": true,\n    "skipLibCheck": true,\n    "strict": true,\n    "noEmit": true,\n    "esModuleInterop": true,\n    "module": "esnext",\n    "moduleResolution": "bundler",\n    "resolveJsonModule": true,\n    "isolatedModules": true,\n    "jsx": "preserve",\n    "incremental": true,\n    "plugins": [\n      {\n        "name": "next"\n      }\n    ],\n    "paths": {\n      "@/*": [\n        "./src/*"\n      ]\n    }\n  },\n  "include": [\n    "**/*.ts",\n    "**/*.tsx",\n    ".next/types/**/*.ts",\n    "next-env.d.ts",\n    ".next-e1-t8-focus-abc123/types/**/*.ts"\n  ],\n  "exclude": [\n    "node_modules"\n  ]\n}\n`;
+    const parsed = JSON.parse(pristine) as { include: string[] };
+    parsed.include = [...parsed.include].sort().concat('.next-e1-t8-focus-abc123/types/**/*.ts');
+    const generated = `${JSON.stringify(parsed, null, 2)}\n`;
     const restored = inverseTsconfigMutation(generated, pristine, paths);
     expect(restored).toBe(pristine);
     expect(hashText(restored)).toBe(hashText(pristine));
@@ -285,13 +378,9 @@ describe('run-e1-focused argument and discovery seam', () => {
     expect(concurrentEdit).toContain('ES2020');
   });
 
-  test('blanks inherited and dotenv-discovered auth-pattern names without exposing their values', () => {
-    const environment = createFocusedEnvironment(
-      { TEST_AUTH_PATTERN: 'private', AUTH_PATTERN: 'also-private', CUSTOM_AUTH_PATTERN: 'dotenv-private', SAFE: 'yes' },
-      ['CUSTOM_AUTH_PATTERN', 'OTHER_VALUE'],
-    );
-    expect(environment).toMatchObject({ TEST_AUTH_PATTERN: '', AUTH_PATTERN: '', CUSTOM_AUTH_PATTERN: '', SAFE: 'yes' });
-    expect(environment.OTHER_VALUE).toBeUndefined();
+  test('uses the shared credential-scrubbed offline environment without retired setup', () => {
+    const environment = createFocusedEnvironment({ OPENROUTER_API_KEY: 'private', SAFE: 'yes' });
+    expect(environment).toMatchObject({ OPENROUTER_API_KEY: '', SAFE: 'yes', E1_OFFLINE: '1' });
   });
 
   test('attempts every owned removal in deterministic order and renders nested aggregate causes', () => {

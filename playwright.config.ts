@@ -1,9 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
-import * as dotenv from 'dotenv';
 
-// Load .env.local so secrets like TEST_AUTH_PATTERN reach the prod suite.
 const isOffline = process.env.E1_OFFLINE === '1';
-if (!isOffline) dotenv.config({ path: '.env.local' });
 
 const isProd = !isOffline && process.env.E2E_TARGET === 'prod';
 const PROD_URL = process.env.E2E_PROD_URL || 'https://www.summonit.app';
@@ -21,7 +18,7 @@ export default defineConfig({
   fullyParallel: !isProd,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  workers: isProd ? 1 : undefined,
+  workers: isOffline || isProd ? 1 : undefined,
   reporter: 'html',
   use: {
     baseURL: isProd ? PROD_URL : localUrl,

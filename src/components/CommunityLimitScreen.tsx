@@ -4,7 +4,6 @@ import { useMemo, useState } from 'react';
 
 interface CommunityLimitScreenProps {
   resetAt: string | null;
-  onEnterPattern: () => void;
 }
 
 // "June 11, 2026, 8:00 PM EDT" — the viewer's own timezone, with the zone listed.
@@ -23,7 +22,7 @@ function formatResetTime(resetAt: string | null): string {
   }).format(date);
 }
 
-export default function CommunityLimitScreen({ resetAt, onEnterPattern }: CommunityLimitScreenProps) {
+export default function CommunityLimitScreen({ resetAt }: CommunityLimitScreenProps) {
   const [email, setEmail] = useState('');
   const [honeypot, setHoneypot] = useState('');
   const [status, setStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
@@ -127,17 +126,6 @@ export default function CommunityLimitScreen({ resetAt, onEnterPattern }: Commun
             ) : null}
           </form>
         )}
-
-        <div className="text-center">
-          <button
-            type="button"
-            onClick={onEnterPattern}
-            className="text-blue-600 underline hover:text-blue-800 transition-colors"
-            data-testid="enter-pattern-link"
-          >
-            Enter pattern lock
-          </button>
-        </div>
       </div>
     </main>
   );

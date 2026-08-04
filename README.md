@@ -101,14 +101,13 @@ production deployment, and legacy-infrastructure retirement remain deferred to l
 
 ## Community Access & Budget
 
-The app is open to everyone — no pattern lock. Anonymous usage shares a daily
-community budget (`DAILY_BUDGET_USD`, default $5, resets midnight UTC) metered
+The app is open to everyone. Usage shares a daily community budget
+(`DAILY_BUDGET_USD`, default $5, resets midnight UTC) metered
 from OpenRouter's exact per-request `usage.cost` in Upstash Redis. When the
 pool is spent, visitors see the community-sponsored limit screen with the
 reset time in their own timezone, a Spirit & Hammer collective waitlist signup
-(saved to Cloudflare D1, confirmed via Resend), and an "Enter pattern lock"
-link. A valid pattern unlock switches the session to the unrestricted admin
-key (`/?unlock` opens the pattern screen directly).
+(saved to Cloudflare D1 and confirmed via Resend). There is no privileged
+bypass; community traffic requires its dedicated fail-closed provider key.
 
 Endpoints: `GET /api/usage` (budget status), `POST /api/waitlist` (signup).
 Preview the limit screen anytime at [`/spent`](https://www.summonit.app/spent)
@@ -118,7 +117,7 @@ Full numbers and levers: [docs/cost-analysis.md](docs/cost-analysis.md).
 | Env var | Purpose |
 |---|---|
 | `DAILY_BUDGET_USD` | Community pool per UTC day (default 5) |
-| `OPENROUTER_COMMUNITY_KEY` | Optional dedicated key for community traffic (recommended: $5 limit, daily reset) |
+| `OPENROUTER_COMMUNITY_KEY` | Required dedicated key for community traffic (recommended: $5 limit, daily reset) |
 | `CLOUDFLARE_ACCOUNT_ID` / `CLOUDFLARE_D1_DATABASE_ID` / `CLOUDFLARE_D1_API_TOKEN` | Waitlist D1 over REST |
 | `RESEND_API_KEY` / `RESEND_FROM` | Waitlist confirmation emails (verified domain required) |
 

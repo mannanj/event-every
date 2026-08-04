@@ -79,16 +79,6 @@ test.describe('community limit screen', () => {
     );
   });
 
-  test('"Enter pattern lock" switches to the pattern screen as it looks today', async ({ page }) => {
-    await mockAnonymous(page, EXHAUSTED);
-    await page.goto('/');
-
-    await page.getByTestId('enter-pattern-link').click();
-
-    await expect(page.locator('canvas')).toBeVisible();
-    await expect(page.getByTestId('community-limit-screen')).toHaveCount(0);
-  });
-
   test('app stays open (no pattern lock) when the budget is not exhausted', async ({ page }) => {
     await mockAnonymous(page, {
       exhausted: false,
@@ -102,16 +92,6 @@ test.describe('community limit screen', () => {
 
     await expect(page.getByTestId('input-box')).toBeVisible();
     await expect(page.getByTestId('community-limit-screen')).toHaveCount(0);
-  });
-
-  test('admins with a valid pattern session bypass the limit screen', async ({ page }) => {
-    await page.route('**/api/auth/check', (route) =>
-      route.fulfill({ json: { authenticated: true } })
-    );
-    await page.route('**/api/usage', (route) => route.fulfill({ json: EXHAUSTED }));
-    await page.goto('/');
-
-    await expect(page.getByTestId('input-box')).toBeVisible();
   });
 
   test('/spent previews the limit screen without the budget being exhausted', async ({ page }) => {
@@ -131,26 +111,6 @@ test.describe('community limit screen', () => {
     );
     await expect(message).toContainText(expectedResetText());
     await expect(page.getByTestId('waitlist-email')).toBeVisible();
-  });
-
-  test('"Enter pattern lock" on /spent opens the pattern screen via /?unlock', async ({ page }) => {
-    await mockAnonymous(page, {
-      exhausted: false,
-      isAdmin: false,
-      resetAt: RESET_AT,
-      limitUsd: 5,
-      spentUsd: 0,
-      remainingUsd: 5,
-    });
-    await page.goto('/spent');
-
-    await page.getByTestId('enter-pattern-link').click();
-
-    await expect(page).toHaveURL(/\?unlock/);
-    await expect(page.getByRole('heading', { name: 'Draw Pattern to Unlock' })).toBeVisible({
-      timeout: 15_000,
-    });
-    await expect(page.locator('canvas')).toBeVisible({ timeout: 15_000 });
   });
 
   test('a mid-session community 402 flips the app to the limit screen', async ({ page }) => {

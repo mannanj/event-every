@@ -9,7 +9,6 @@
 // first; per-IP is the per-user gate. Fail-open (Redis-absent → allowed) is the spec.
 import { beforeEach, describe, expect, mock, test } from 'bun:test';
 import { NextRequest } from 'next/server';
-import { AUTH_COOKIE_NAME, generateAuthToken } from '@/app/api/auth/shared';
 
 const IP_RESET_MS = Date.UTC(2026, 5, 14); // a fixed future UTC midnight (epoch ms)
 const IP_RESET_ISO = new Date(IP_RESET_MS).toISOString();
@@ -61,9 +60,9 @@ mock.module('@/lib/clientIp', () => ({
 
 const { evaluateLimits, chargeIpRate } = await import('@/lib/limits');
 
-const makeRequest = (opts: { ip?: string; admin?: boolean } = {}) => {
+const makeRequest = (opts: { ip?: string; cookie?: string } = {}) => {
   const headers: Record<string, string> = { 'x-forwarded-for': opts.ip || '203.0.113.7' };
-  if (opts.admin) headers['cookie'] = `${AUTH_COOKIE_NAME}=${generateAuthToken()}`;
+  if (opts.cookie) headers.cookie = opts.cookie;
   return new NextRequest('http://localhost/api/scan', { method: 'POST', headers });
 };
 
@@ -123,24 +122,14 @@ describe('evaluateLimits', () => {
     expect(r.allowed).toBe(false);
   });
 
-  test('admin mode → budget is null, isAdmin true, a budget-exhausted mock is irrelevant', async () => {
-    state.budgetExhausted = true; // would block a community user; admins bypass the pool
-    const r = await evaluateLimits(makeRequest({ admin: true }));
-    expect(r.isAdmin).toBe(true);
-    expect(r.budget).toBe(null);
-    expect(r.allowed).toBe(true);
-    expect(r.reason).toBe(null);
-    // The community pool is never even consulted for an admin.
-    expect(getBudgetStatus).not.toHaveBeenCalled();
-  });
-
-  test('admin still blocked by the per-IP gate (the only gate that applies)', async () => {
-    state.ipSuccess = false;
-    state.ipRemaining = 0;
-    const r = await evaluateLimits(makeRequest({ admin: true }));
-    expect(r.budget).toBe(null);
-    expect(r.reason).toBe('ip-rate');
+  test('legacy cookies never bypass the community budget', async () => {
+    state.budgetExhausted = true;
+    const r = await evaluateLimits(makeRequest({ cookie: 'event-every-auth=legacy' }));
+    expect(r.isAdmin).toBe(false);
+    expect(r.budget?.exhausted).toBe(true);
+    expect(r.reason).toBe('community-budget');
     expect(r.allowed).toBe(false);
+    expect(getBudgetStatus).toHaveBeenCalledTimes(1);
   });
 
   test('fail-open: Redis-absent (budget not exhausted + ip success) → allowed', async () => {

@@ -2,14 +2,28 @@ import { Page, Route } from '@playwright/test';
 import { ScanRequestSchema } from '../src/types/scanRequest';
 import type { ScanResponse } from '../src/types/scannerHttp';
 
-// Auth is a server cookie checked via /api/auth/check; mocking it true keeps the
-// pattern lock from blocking the app. (The old localStorage key was a no-op.)
+// The retired auth endpoint is fixed anonymous; retain this helper so existing
+// E1 setup call sites stay byte-stable while exercising that public contract.
 export async function mockAuth(page: Page) {
   await page.route('**/api/auth/check', async (route: Route) => {
     await route.fulfill({
       status: 200,
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ authenticated: true }),
+      body: JSON.stringify({ authenticated: false }),
+    });
+  });
+  await page.route('**/api/usage', async (route: Route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        exhausted: false,
+        isAdmin: false,
+        resetAt: '2026-08-04T00:00:00.000Z',
+        limitUsd: 5,
+        spentUsd: 0,
+        remainingUsd: 5,
+      }),
     });
   });
 }

@@ -10,8 +10,69 @@ const TASK8_PATHS = new Set([
   'timezone-resolution.spec.ts', 'url-scrape.spec.ts', 'scanner-product-loop.spec.ts',
   'calendar-event-regression.spec.ts',
 ]);
-const COMPLETE_EXTRA_PATH = 'pattern-unlock.spec.ts';
-export const FOCUSED_C04_TITLE = 'community limit screen "Enter pattern lock" switches to the pattern screen as it looks today';
+
+const RETIRED_PATTERN_TOKEN_PARTS = [
+  ['VALID_L_', 'PATTERNS'],
+  ['AUTH_COOKIE_', 'NAME'],
+  ['AUTH_', 'SECRET'],
+  ['generateAuth', 'Token'],
+  ['verifyAuth', 'Token'],
+  ['Pattern', 'Lock'],
+  ['?', 'unlock'],
+  ['NEXT_PUBLIC_DISABLE_', 'AUTH'],
+] as const;
+
+export function assertPatternAdminRetired(sources: Readonly<Record<string, string>>): void {
+  for (const [file, source] of Object.entries(sources)) {
+    for (const parts of RETIRED_PATTERN_TOKEN_PARTS) {
+      const token = parts.join('');
+      if (source.includes(token)) throw new Error(`retired pattern token remains in ${file}`);
+    }
+  }
+}
+
+export function assertCommunityKeySourceGuard(source: string): void {
+  const signature = 'export function getLlmKey';
+  const start = source.indexOf(signature);
+  const openBrace = start === -1 ? -1 : source.indexOf('{', start + signature.length);
+  if (start === -1 || openBrace === -1) throw new Error('community-key source region could not be identified');
+
+  let depth = 0;
+  let quote: 'single' | 'double' | 'template' | undefined;
+  let lineComment = false;
+  let blockComment = false;
+  let escaped = false;
+  let end = -1;
+  for (let index = openBrace; index < source.length; index += 1) {
+    const character = source[index];
+    const next = source[index + 1];
+    if (lineComment) {
+      if (character === '\n') lineComment = false;
+      continue;
+    }
+    if (blockComment) {
+      if (character === '*' && next === '/') { blockComment = false; index += 1; }
+      continue;
+    }
+    if (quote) {
+      if (escaped) { escaped = false; continue; }
+      if (character === '\\') { escaped = true; continue; }
+      if ((quote === 'single' && character === "'") || (quote === 'double' && character === '"') || (quote === 'template' && character === '`')) quote = undefined;
+      continue;
+    }
+    if (character === '/' && next === '/') { lineComment = true; index += 1; continue; }
+    if (character === '/' && next === '*') { blockComment = true; index += 1; continue; }
+    if (character === "'") { quote = 'single'; continue; }
+    if (character === '"') { quote = 'double'; continue; }
+    if (character === '`') { quote = 'template'; continue; }
+    if (character === '{') depth += 1;
+    if (character === '}' && --depth === 0) { end = index + 1; break; }
+  }
+  if (end === -1 || quote || blockComment) throw new Error('community-key source region could not be identified');
+
+  const adminKeyName = ['OPENROUTER', '_API_KEY'].join('');
+  if (source.slice(start, end).includes(adminKeyName)) throw new Error('community-key source region contains the admin key name');
+}
 
 type Project = 'chromium' | 'webkit';
 type DiscoveryScope = 'task8' | 'complete';
@@ -72,15 +133,11 @@ export function validateDiscoveryListing(output: string, project: Project, scope
   const lines = listedLines(output, project);
   const paths = new Set(lines.map(pathFromListLine).filter((value): value is string => Boolean(value)));
   const expected = new Set(TASK8_PATHS);
-  if (scope === 'complete') expected.add(COMPLETE_EXTRA_PATH);
-  const titleCount = scope === 'task8' ? 59 : 60;
+  const titleCount = 56;
   if (lines.length !== titleCount || paths.size !== expected.size || [...paths].some((file) => !expected.has(file)) || [...expected].some((file) => !paths.has(file))) {
     throw new Error(
       `Expected ${titleCount} ${project} titles across exact ${scope} paths; observed ${lines.length} title(s) across ${paths.size} path(s): ${[...paths].sort().join(', ') || '(none)'}.`,
     );
-  }
-  if (!lines.some((line) => line.replaceAll(' › ', ' ').includes(FOCUSED_C04_TITLE))) {
-    throw new Error('Discovery must include the C04 pattern-unlock title.');
   }
   return { titles: lines.length, paths: paths.size };
 }
@@ -99,16 +156,8 @@ export function authorizeInvocationOutputs(paths: InvocationPaths, exists: (file
 }
 
 export function hashText(text: string): string { return createHash('sha256').update(text).digest('hex'); }
-function dotenvVariableNames(dotenvPath: string): string[] {
-  if (!existsSync(dotenvPath)) return [];
-  return readFileSync(dotenvPath, 'utf8').split(/\r?\n/).map((line) => line.match(/^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=/)?.[1]).filter((name): name is string => Boolean(name));
-}
-export function createFocusedEnvironment(environment: Environment = process.env, dotenvNames = dotenvVariableNames(path.resolve(process.cwd(), '.env.local'))): Environment {
-  const clean = createE1OfflineEnvironment(environment);
-  for (const name of new Set(['TEST_AUTH_PATTERN', 'AUTH_PATTERN', ...Object.keys(environment), ...dotenvNames])) if (/AUTH_PATTERN/i.test(name)) clean[name] = '';
-  clean.TEST_AUTH_PATTERN = '';
-  clean.AUTH_PATTERN = '';
-  return clean;
+export function createFocusedEnvironment(environment: Environment = process.env): Environment {
+  return createE1OfflineEnvironment(environment);
 }
 function replaceExactly(source: string, oldText: string, newText: string, label: string): string {
   if (source.split(oldText).length !== 2) throw new Error(`Expected exactly one ${label} literal.`);
@@ -244,7 +293,7 @@ export async function runE1Focused(argv = process.argv.slice(2)): Promise<void> 
       async list() {
         const projects: Project[] = request.kind === 'focused' ? ['chromium'] : request.projects;
         for (const project of projects) {
-          const args = request.kind === 'focused' ? [...request.tail, '--list'] : ['--list', `--project=${project}`, ...[...TASK8_PATHS, ...(request.scope === 'complete' ? [COMPLETE_EXTRA_PATH] : [])].map((file) => `e2e/${file}`)];
+          const args = request.kind === 'focused' ? [...request.tail, '--list'] : ['--list', `--project=${project}`, ...[...TASK8_PATHS].map((file) => `e2e/${file}`)];
           const child = spawn(['node', '--require', environment.E1_OFFLINE_PRELOAD!, 'node_modules/@playwright/test/cli.js', 'test', ...args], environment, 'pipe'); children.playwright = child; const exit = await childExitOrSignal(child, termination); const output = await readChildOutput(child.stdout); if (exit !== 0) throw new Error('Playwright list failed.'); children.playwright = undefined;
           if (request.kind === 'focused') validateFocusedListing(output); else validateDiscoveryListing(output, project, request.scope);
         }
@@ -253,7 +302,7 @@ export async function runE1Focused(argv = process.argv.slice(2)): Promise<void> 
         if (request.listOnly) return;
         const projects: Project[] = request.kind === 'focused' ? ['chromium'] : request.projects;
         for (const project of projects) {
-          const specs = request.kind === 'focused' ? request.tail : [`--project=${project}`, ...[...TASK8_PATHS, ...(request.scope === 'complete' ? [COMPLETE_EXTRA_PATH] : [])].map((file) => `e2e/${file}`)];
+          const specs = request.kind === 'focused' ? request.tail : [`--project=${project}`, ...[...TASK8_PATHS].map((file) => `e2e/${file}`)];
           const child = spawn(['node', '--require', environment.E1_OFFLINE_PRELOAD!, 'node_modules/@playwright/test/cli.js', 'test', ...specs], environment); children.playwright = child; const exit = await childExitOrSignal(child, termination); if (exit !== 0) throw new Error(`Playwright failed with exit ${exit}.`); children.playwright = undefined;
         }
       },

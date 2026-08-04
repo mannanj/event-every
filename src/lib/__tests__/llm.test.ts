@@ -3,6 +3,8 @@
 // global fetch is mocked per case. recordCommunitySpend is spied to pin the usage-
 // accounting contract (community records spend, admin does not).
 import { beforeEach, describe, expect, mock, test } from 'bun:test';
+import { createHmac } from 'node:crypto';
+import { NextRequest } from 'next/server';
 
 const recordCommunitySpend = mock(async (_cost: number) => {});
 mock.module('@/lib/budget', () => ({
@@ -18,7 +20,7 @@ mock.module('@/lib/budget', () => ({
   DAILY_BUDGET_USD: 5,
 }));
 
-const { openRouterChat, CommunityLimitError, OpenRouterUpstreamError } = await import('@/lib/llm');
+const { getLlmKey, getLlmMode, openRouterChat, CommunityLimitError, OpenRouterUpstreamError } = await import('@/lib/llm');
 
 const ADMIN = { key: 'sk-test', mode: 'admin' as const };
 const COMMUNITY = { key: 'sk-test', mode: 'community' as const };
@@ -72,6 +74,40 @@ function unreadErrorResponse(status: number) {
 
 beforeEach(() => {
   recordCommunitySpend.mockClear();
+});
+
+describe('community-only authority', () => {
+  test('community mode has no cookie admin bypass', () => {
+    const secret = 'legacy-cookie-test-secret';
+    process.env['AUTH_' + 'SECRET'] = secret;
+    const data = JSON.stringify({ iat: Date.now(), exp: Date.now() + 60_000, nonce: 'legacy' });
+    const hmac = createHmac('sha256', secret).update(data).digest('hex');
+    const token = Buffer.from(JSON.stringify({ data, hmac })).toString('base64');
+    const request = new NextRequest('http://localhost/api/scan', {
+      headers: { cookie: `event-every-auth=${token}` },
+    });
+
+    try {
+      expect(getLlmMode(request)).toBe('community');
+    } finally {
+      delete process.env['AUTH_' + 'SECRET'];
+    }
+  });
+
+  test('community request never falls back to admin key', () => {
+    const previousCommunity = process.env.OPENROUTER_COMMUNITY_KEY;
+    const previousAdmin = process.env.OPENROUTER_API_KEY;
+    delete process.env.OPENROUTER_COMMUNITY_KEY;
+    process.env.OPENROUTER_API_KEY = 'legacy-admin-key';
+    try {
+      expect(() => getLlmKey('community')).toThrow('community_key_unavailable');
+    } finally {
+      if (previousCommunity === undefined) delete process.env.OPENROUTER_COMMUNITY_KEY;
+      else process.env.OPENROUTER_COMMUNITY_KEY = previousCommunity;
+      if (previousAdmin === undefined) delete process.env.OPENROUTER_API_KEY;
+      else process.env.OPENROUTER_API_KEY = previousAdmin;
+    }
+  });
 });
 
 describe('openRouterChat', () => {

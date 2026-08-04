@@ -32,6 +32,7 @@ import { createBrowserDownloadEffects, createScannerExporter } from '@/services/
 import { reviewStorage } from '@/services/reviewStorage';
 import type { ReviewDraft, ReviewFieldEdit } from '@/types/review';
 import type { ScanRequest } from '@/types/scannerHttp';
+import AuthWrapper from '@/components/AuthWrapper';
 
 export default function Home() {
   const [processingEvents, setProcessingEvents] = useState<ProcessingEvent[]>([]);
@@ -644,7 +645,8 @@ export default function Home() {
   const showMarketing = !hasStarted && totalEventsInStorage === 0;
 
   return (
-    <main id="top" className="min-h-screen rainbow-gradient-bg flex flex-col">
+    <AuthWrapper>
+      <main id="top" className="min-h-screen rainbow-gradient-bg flex flex-col">
       <RateLimitBanner rateLimitInfo={rateLimitInfo} />
       <SiteNav showHow={showMarketing} />
 
@@ -1175,6 +1177,7 @@ export default function Home() {
         onApply={handleApplyInput}
         pendingSummaryIds={pendingSummaryIds}
       />
-    </main>
+      </main>
+    </AuthWrapper>
   );
 }

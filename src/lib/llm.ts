@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { AUTH_COOKIE_NAME, verifyAuthToken } from '@/app/api/auth/shared';
 import { getBudgetStatus, nextResetISO, recordCommunitySpend } from './budget';
 import type { BudgetStatus } from './budget';
 import type { OpenRouterChatRequest } from '@event-every/scanner/openrouter';
@@ -13,17 +12,14 @@ export const COMMUNITY_LIMIT_CODE = 'community_limit';
 export const COMMUNITY_LIMIT_MESSAGE =
   'This app is community sponsored. The usage limits have been hit today.';
 
-// The pattern-lock cookie doubles as the admin signal: admins use the
-// unrestricted OpenRouter key and bypass the community budget entirely.
-export function getLlmMode(request: NextRequest): LlmMode {
-  const token = request.cookies.get(AUTH_COOKIE_NAME)?.value;
-  return token && verifyAuthToken(token) ? 'admin' : 'community';
+// Product requests use the community authority; no request-derived admin path exists.
+export function getLlmMode(_request: NextRequest): LlmMode {
+  return 'community';
 }
 
-export function getLlmKey(mode: LlmMode): string {
-  const adminKey = process.env.OPENROUTER_API_KEY || '';
-  if (mode === 'admin') return adminKey;
-  return process.env.OPENROUTER_COMMUNITY_KEY || adminKey;
+export function getLlmKey(_mode: LlmMode): string {
+  if (!process.env.OPENROUTER_COMMUNITY_KEY) throw new Error('community_key_unavailable');
+  return process.env.OPENROUTER_COMMUNITY_KEY;
 }
 
 export class CommunityLimitError extends Error {
@@ -43,7 +39,7 @@ export async function ensureCommunityBudget(mode: LlmMode): Promise<void> {
 
 // Resolves the community-pool decision for a mode WITHOUT throwing, so the
 // unified limit authority (src/lib/limits.ts) can compose it alongside the
-// per-IP gate. Admins bypass the community pool entirely (unrestricted key).
+// per-IP gate. The typed admin branch remains for non-product callers.
 export async function getCommunityBudgetStatus(mode: LlmMode): Promise<BudgetStatus | null> {
   if (mode === 'admin') return null;
   return getBudgetStatus();

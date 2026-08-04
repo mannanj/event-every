@@ -1,6 +1,5 @@
 import type { Metadata } from 'next'
 import './globals.css'
-import AuthWrapper from '@/components/AuthWrapper'
 
 export const metadata: Metadata = {
   title: 'Event Every — anything to your calendar',
@@ -15,7 +14,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <AuthWrapper>{children}</AuthWrapper>
+        {children}
       </body>
     </html>
   )
