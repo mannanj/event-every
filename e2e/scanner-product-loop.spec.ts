@@ -1003,6 +1003,8 @@ test('reload restores raw-free Scanner drafts with recomputed readiness', async 
   await mockSummarize(page);
   await page.goto('/');
   await page.waitForSelector('[data-testid="smart-input-textarea"]', { state: 'visible', timeout: 20000 });
+  const legacyStorage = JSON.stringify([{ id: 'legacy-event-storage-1' }]);
+  await page.evaluate((value) => localStorage.setItem('event_every_history', value), legacyStorage);
 
   const rawSubmission = 'Private raw reload source that must not enter review storage.';
   await submitText(page, rawSubmission);
@@ -1049,6 +1051,7 @@ test('reload restores raw-free Scanner drafts with recomputed readiness', async 
 
   const storedAfterReload = await readStoredDraft();
   expect(storedAfterReload).toEqual(storedBeforeReload);
+  expect(await page.evaluate(() => localStorage.getItem('event_every_history'))).toBe(legacyStorage);
 });
 
 test('edited claims clear only their evidence and export fresh Scanner calendar bytes', async ({ page }) => {

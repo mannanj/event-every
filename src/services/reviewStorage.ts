@@ -5,7 +5,15 @@ import { E1SourceHandleSchema } from '@/types/scannerHttp';
 import { createReviewDraft } from './scannerDraft';
 import type { StorageResult } from './storage';
 
-const REVIEW_DRAFTS_KEY = 'event-every:review-drafts:v1';
+const REVIEW_STORAGE_KEY = 'event-every:review-drafts:v1';
+
+type StorageLike = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
+
+export type ReviewDraftLoadResult =
+  | Readonly<{ status: 'loaded'; drafts: ReviewDraft[] }>
+  | Readonly<{ status: 'empty'; drafts: [] }>
+  | Readonly<{ status: 'recovered-corrupt'; drafts: [] }>
+  | Readonly<{ status: 'unavailable' }>;
 
 const StoredReviewDraftSchema = z.strictObject({
   version: z.literal(1),
@@ -20,8 +28,9 @@ const StoredReviewDraftSchema = z.strictObject({
   }),
 });
 
-function save(drafts: readonly ReviewDraft[]): StorageResult<void> {
+function save(drafts: readonly ReviewDraft[], storage?: StorageLike): StorageResult<void> {
   try {
+    storage ??= localStorage;
     const records = drafts.map((draft) => StoredReviewDraftSchema.parse({
       version: 1,
       id: draft.id,
@@ -34,18 +43,25 @@ function save(drafts: readonly ReviewDraft[]): StorageResult<void> {
         label: draft.source.label,
       },
     }));
-    localStorage.setItem(REVIEW_DRAFTS_KEY, JSON.stringify(records));
+    storage.setItem(REVIEW_STORAGE_KEY, JSON.stringify(records));
     return { success: true };
   } catch {
     return { success: false, error: 'Failed to save review drafts' };
   }
 }
 
-function load(): StorageResult<ReviewDraft[]> {
+function load(storage?: StorageLike): ReviewDraftLoadResult {
+  let serialized: string | null;
   try {
-    const serialized = localStorage.getItem(REVIEW_DRAFTS_KEY);
-    if (serialized === null) return { success: true, data: [] };
+    storage ??= localStorage;
+    serialized = storage.getItem(REVIEW_STORAGE_KEY);
+  } catch {
+    return { status: 'unavailable' };
+  }
 
+  if (serialized === null) return { status: 'empty', drafts: [] };
+
+  try {
     const records = z.array(StoredReviewDraftSchema).parse(JSON.parse(serialized));
     const drafts = records.map((record) => createReviewDraft(
       record.candidate,
@@ -57,15 +73,23 @@ function load(): StorageResult<ReviewDraft[]> {
         createdAt: record.createdAt,
       },
     ));
-    return { success: true, data: drafts };
+    return { status: 'loaded', drafts };
   } catch {
-    return { success: false, error: 'Failed to load review drafts', data: [] };
+    try {
+      storage ??= localStorage;
+      storage.removeItem(REVIEW_STORAGE_KEY);
+      return { status: 'recovered-corrupt', drafts: [] };
+    } catch {
+      return { status: 'unavailable' };
+    }
   }
 }
 
-function clear(): StorageResult<void> {
+function clear(storage?: StorageLike): StorageResult<void> {
   try {
-    localStorage.removeItem(REVIEW_DRAFTS_KEY);
+    storage ??= localStorage;
+    const remove = storage.removeItem.bind(storage);
+    remove(REVIEW_STORAGE_KEY);
     return { success: true };
   } catch {
     return { success: false, error: 'Failed to clear review drafts' };

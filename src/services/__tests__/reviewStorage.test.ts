@@ -3,6 +3,7 @@ import { EventCandidateSchema } from '@event-every/scanner';
 import { createReviewDraft, editReviewDraft } from '../scannerDraft';
 import { reviewStorage } from '../reviewStorage';
 import { eventStorage } from '../storage';
+import Home from '@/app/page';
 
 class MemoryStorage implements Storage {
   private readonly values = new Map<string, string>();
@@ -112,29 +113,75 @@ describe('review draft storage', () => {
 
     const result = reviewStorage.load();
 
-    expect(result.success).toBe(true);
-    expect(result.data).toHaveLength(1);
-    expect(result.data?.[0]?.candidate.title.value).toBeNull();
-    expect(result.data?.[0]?.candidate.description.value).toBe('Human edited description');
-    expect(result.data?.[0]?.readiness.canGenerate).toBe(true);
+    expect(result.status).toBe('loaded');
+    if (result.status !== 'loaded') throw new Error('Expected persisted Scanner drafts');
+    expect(result.drafts).toHaveLength(1);
+    expect(result.drafts[0]?.candidate.title.value).toBeNull();
+    expect(result.drafts[0]?.candidate.description.value).toBe('Human edited description');
+    expect(result.drafts[0]?.readiness.canGenerate).toBe(true);
   });
 
-  test('rejects an entire record set when candidate, issues, or opaque source validation fails', () => {
+  test('recovers malformed JSON, wrong schemas, and corrupt DTOs by removing only the Scanner key', () => {
     expect(reviewStorage.save([draft])).toEqual({ success: true });
     const [valid] = JSON.parse(localStorage.getItem('event-every:review-drafts:v1')!);
-    const corruptions = [
+    const legacyCalendarState = JSON.stringify([{ id: 'legacy-event-1' }]);
+    localStorage.setItem('event_every_history', legacyCalendarState);
+    localStorage.setItem('event_every_temp_unsaved', JSON.stringify([{ id: 'legacy-unsaved-1' }]));
+
+    const corruptions: unknown[] = [
+      '{not-json',
+      JSON.stringify({ version: 1 }),
       { ...valid, candidate: { ...valid.candidate, unexpected: true } },
       { ...valid, scanIssues: [{ code: 'not-a-scanner-issue' }] },
       { ...valid, source: { ...valid.source, rawBody: 'private source body' } },
     ];
 
     for (const corrupt of corruptions) {
-      localStorage.setItem('event-every:review-drafts:v1', JSON.stringify([valid, corrupt]));
+      localStorage.setItem('event-every:review-drafts:v1', typeof corrupt === 'string' ? corrupt : JSON.stringify([valid, corrupt]));
       const result = reviewStorage.load();
-      expect(result.success).toBe(false);
-      expect(result.data).toEqual([]);
-      expect(result.error).toBe('Failed to load review drafts');
+      expect(result).toEqual({ status: 'recovered-corrupt', drafts: [] });
+      expect(localStorage.getItem('event-every:review-drafts:v1')).toBeNull();
+      expect(localStorage.getItem('event_every_history')).toBe(legacyCalendarState);
+      expect(localStorage.getItem('event_every_temp_unsaved')).not.toBeNull();
     }
+  });
+
+  test('recovered corrupt storage completes hydration', () => {
+    expect(Home.resolveReviewDraftHydration('recovered-corrupt')).toEqual({ hydrationComplete: true });
+    expect(Home.resolveReviewDraftHydration('unavailable')).toEqual({ hydrationComplete: false });
+  });
+
+  test('corrupt Scanner key is removed', () => {
+    const storage = new MemoryStorage();
+    storage.setItem('event-every:review-drafts:v1', '{not-json');
+
+    expect(reviewStorage.load(storage)).toEqual({ status: 'recovered-corrupt', drafts: [] });
+    expect(storage.getItem('event-every:review-drafts:v1')).toBeNull();
+  });
+
+  test('unrelated storage remains untouched', () => {
+    // Recent input drafts/history live in the summon-input IndexedDB database, never localStorage.
+    let indexedDbOperations = 0;
+    Object.defineProperty(globalThis, 'indexedDB', {
+      configurable: true,
+      value: { open: () => { indexedDbOperations += 1; } } as unknown as IDBFactory,
+    });
+    const storage = new MemoryStorage();
+    const legacyEvent = JSON.stringify([{ id: 'legacy-event-1' }]);
+    storage.setItem('event-every:review-drafts:v1', '{not-json');
+    storage.setItem('event_every_history', legacyEvent);
+
+    expect(reviewStorage.load(storage)).toEqual({ status: 'recovered-corrupt', drafts: [] });
+    expect(storage.getItem('event_every_history')).toBe(legacyEvent);
+    expect(indexedDbOperations).toBe(0);
+  });
+
+  test('returns unavailable when corrupt Scanner storage cannot be removed', () => {
+    const storage = new ThrowingStorage('remove');
+    storage.setItem('event-every:review-drafts:v1', '{not-json');
+
+    expect(reviewStorage.load(storage)).toEqual({ status: 'unavailable' });
+    expect(storage.getItem('event-every:review-drafts:v1')).toBe('{not-json');
   });
 
   test('clears only Scanner drafts and leaves legacy event state readable', () => {
@@ -178,14 +225,15 @@ describe('review draft storage', () => {
     expect(reviewStorage.save([second])).toEqual({ success: true });
 
     const result = reviewStorage.load();
-    expect(result.success).toBe(true);
-    expect(result.data?.map(({ id }) => id)).toEqual([second.id]);
+    expect(result.status).toBe('loaded');
+    if (result.status !== 'loaded') throw new Error('Expected persisted Scanner drafts');
+    expect(result.drafts.map(({ id }) => id)).toEqual([second.id]);
   });
 
-  test('returns generic StorageResult errors without serialized payloads', () => {
+  test('returns an unavailable load outcome without serialized payloads', () => {
     const operations = [
       ['set', () => reviewStorage.save([draft]), 'Failed to save review drafts'],
-      ['get', () => reviewStorage.load(), 'Failed to load review drafts'],
+      ['get', () => reviewStorage.load(), undefined],
       ['remove', () => reviewStorage.clear(), 'Failed to clear review drafts'],
     ] as const;
 
@@ -195,10 +243,34 @@ describe('review draft storage', () => {
         value: new ThrowingStorage(operation),
       });
       const result = call();
-      expect(result.success).toBe(false);
-      expect(result.error).toBe(expectedError);
-      expect(result.error).not.toContain('payload');
-      expect(result.error).not.toContain(draft.candidate.description.value!);
+      if (operation === 'get') {
+        expect(result).toEqual({ status: 'unavailable' });
+      } else {
+        if (!('success' in result)) throw new Error('Expected a save or clear result');
+        expect(result.success).toBe(false);
+        expect(result.error).toBe(expectedError);
+        expect(result.error).not.toContain('payload');
+        expect(result.error).not.toContain(draft.candidate.description.value!);
+      }
     }
+  });
+
+  test('maps throwing default localStorage property access to unavailable without escaping', () => {
+    Object.defineProperty(globalThis, 'localStorage', {
+      configurable: true,
+      get: () => { throw new Error('storage-access-denied'); },
+    });
+
+    expect(reviewStorage.load()).toEqual({ status: 'unavailable' });
+  });
+
+  test('keeps save and clear failure contracts when default localStorage property access throws', () => {
+    Object.defineProperty(globalThis, 'localStorage', {
+      configurable: true,
+      get: () => { throw new Error('storage-access-denied'); },
+    });
+
+    expect(reviewStorage.save([draft])).toEqual({ success: false, error: 'Failed to save review drafts' });
+    expect(reviewStorage.clear()).toEqual({ success: false, error: 'Failed to clear review drafts' });
   });
 });

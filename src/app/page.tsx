@@ -29,17 +29,28 @@ import { ProcessingEvent, ImageProcessingStatus, BatchProcessing, URLProcessingS
 import { scan, ScanClientError } from '@/services/scanClient';
 import { createReviewDrafts, editReviewDraft } from '@/services/scannerDraft';
 import { createBrowserDownloadEffects, createScannerExporter } from '@/services/scannerExporter';
-import { reviewStorage } from '@/services/reviewStorage';
+import { reviewStorage, type ReviewDraftLoadResult } from '@/services/reviewStorage';
 import type { ReviewDraft, ReviewFieldEdit } from '@/types/review';
 import type { ScanRequest } from '@/types/scannerHttp';
 import AuthWrapper from '@/components/AuthWrapper';
 
-export default function Home() {
+type ReviewDraftLoadStatus = ReviewDraftLoadResult['status'];
+
+function resolveReviewDraftHydrationState(status: ReviewDraftLoadStatus): { hydrationComplete: boolean } {
+  switch (status) {
+    case 'loaded':
+    case 'empty': return { hydrationComplete: true };
+    case 'recovered-corrupt': return { hydrationComplete: true };
+    case 'unavailable': return { hydrationComplete: false };
+  }
+}
+
+function Home() {
   const [processingEvents, setProcessingEvents] = useState<ProcessingEvent[]>([]);
   const [batchProcessing, setBatchProcessing] = useState<BatchProcessing | null>(null);
   const [unsavedEvents, setUnsavedEvents] = useState<CalendarEvent[]>([]);
   const [reviewDrafts, setReviewDrafts] = useState<ReviewDraft[]>([]);
-  const [hasLoadedReviewDrafts, setHasLoadedReviewDrafts] = useState(false);
+  const [reviewDraftLoadStatus, setReviewDraftLoadStatus] = useState<'pending' | ReviewDraftLoadStatus>('pending');
   const [, setUserTouchedTimezones] = useState<Set<string>>(new Set());
   const [tzSuggestions, setTzSuggestions] = useState<Record<string, { timezone: string; confidence: number }>>({});
   // Selection for the unsaved batch lives here so it can outlive any single
@@ -83,6 +94,7 @@ export default function Home() {
   const activeSubmissionRef = useRef<string | null>(null);
   const activeImageBatchRef = useRef<string | null>(null);
   const loadedSigRef = useRef<string | null>(null);
+  const reviewHydrationRef = useRef<ReviewDraftLoadResult | null>(null);
   const [showDateRangePicker, setShowDateRangePicker] = useState(false);
   const [isCustomMode, setIsCustomMode] = useState(false);
   const [lastPresetDates, setLastPresetDates] = useState<{ start: Date; end: Date } | null>(null);
@@ -94,11 +106,13 @@ export default function Home() {
   useEffect(() => () => abortRef.current?.abort(), []);
 
   useEffect(() => {
-    const reviewResult = reviewStorage.load();
-    if (reviewResult.success && reviewResult.data) {
-      setReviewDrafts(reviewResult.data);
-      setHasLoadedReviewDrafts(true);
+    const reviewResult = reviewHydrationRef.current ?? reviewStorage.load();
+    reviewHydrationRef.current = reviewResult;
+    const reviewHydration = resolveReviewDraftHydrationState(reviewResult.status);
+    if (reviewHydration.hydrationComplete && reviewResult.status !== 'unavailable') {
+      setReviewDrafts(reviewResult.drafts);
     }
+    setReviewDraftLoadStatus(reviewResult.status);
 
     const result = eventStorage.getTempUnsavedEvents();
     if (result.success && result.data && result.data.length > 0) {
@@ -138,13 +152,13 @@ export default function Home() {
   }, [unsavedEvents, hasLoadedTempEvents]);
 
   useEffect(() => {
-    if (!hasLoadedReviewDrafts) return;
+    if (reviewDraftLoadStatus === 'pending' || reviewDraftLoadStatus === 'unavailable') return;
     if (reviewDrafts.length === 0) {
       reviewStorage.clear();
     } else {
       reviewStorage.save(reviewDrafts);
     }
-  }, [hasLoadedReviewDrafts, reviewDrafts]);
+  }, [reviewDraftLoadStatus, reviewDrafts]);
 
   const runScan = useCallback(async (request: ScanRequest, signal: AbortSignal): Promise<ReviewDraft[]> => {
     const response = await scan(request, signal);
@@ -688,6 +702,11 @@ export default function Home() {
           }))}
           onDismiss={handleRemoveFromQueue}
         />
+        {reviewDraftLoadStatus === 'recovered-corrupt' && (
+          <div className="mb-12 border-2 border-black bg-white p-4" data-testid="review-storage-recovery-notice" role="alert">
+            Saved Scanner drafts could not be recovered. Start a new scan to continue.
+          </div>
+        )}
 
         {/* Unified processing and unsaved events section */}
         <UnsavedEventsSection
@@ -1181,3 +1200,5 @@ export default function Home() {
     </AuthWrapper>
   );
 }
+
+export default Object.assign(Home, { resolveReviewDraftHydration: resolveReviewDraftHydrationState });
