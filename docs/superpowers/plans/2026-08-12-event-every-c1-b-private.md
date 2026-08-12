@@ -189,7 +189,7 @@ The accepted design is already committed. After this plan passes independent rev
 First write the minimal preload, then load the runner tests through it before implementing the runner. `private-offline-preload.cjs` must delete inherited credential-like variables before loading application modules, reject non-loopback `net`, `tls`, `http`, `https`, WebSocket, and global `fetch` destinations, and allow in-process MSW interception of the exact provider URL without a real socket. `run-private-offline.ts` accepts a command only after `--`, constructs an allowlisted child environment, applies the preload to Bun and Node descendants, bounds stdout/stderr, enforces a timeout, forwards termination, and reports only a fixed stage error.
 
 ```bash
-bun --preload ./scripts/private-offline-preload.cjs test scripts/run-private-offline.test.ts --isolate
+bun test --preload ./scripts/private-offline-preload.cjs scripts/run-private-offline.test.ts --isolate
 ```
 
 Expected: RED until the runner exists, then PASS including injected secret, outbound-socket, timeout, signal, and bounded-output cases.
