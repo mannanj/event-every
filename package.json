@@ -23,8 +23,6 @@
     "test:workers": "bun scripts/run-with-open-next.ts -- node node_modules/vitest/vitest.mjs run --config vitest.config.workers.ts",
     "assert:c1:a-config": "bun scripts/assert-c1-a-config.ts",
     "assert:c1:a-paths": "bun scripts/assert-c1-a-paths.ts",
-    "test:c1:a-mutations": "bun scripts/run-c1-a-mutations.ts --verify-ledger --all",
-    "validate:c1:a-evidence": "bun scripts/validate-c1-a-evidence.ts docs/testing/c1-a-terminal-evidence.json",
     "test:e2e:c1:a": "playwright test --config playwright.c1-a.config.ts",
     "verify:c1:a": "bun scripts/run-c1-a-offline.ts"
   },

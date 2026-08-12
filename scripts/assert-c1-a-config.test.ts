@@ -7,7 +7,7 @@ import { assertC1AConfig } from './assert-c1-a-config';
 const roots: string[] = [];
 const scripts = {
   'build:cloudflare': 'opennextjs-cloudflare build', 'cf:types': 'bun scripts/run-c1-a-cloudflare.ts app-types', 'cf:types:keepalive': 'bun scripts/run-c1-a-cloudflare.ts keepalive-types',
-  'test:workers': 'bun scripts/run-with-open-next.ts -- node node_modules/vitest/vitest.mjs run --config vitest.config.workers.ts', 'assert:c1:a-config': 'bun scripts/assert-c1-a-config.ts', 'assert:c1:a-paths': 'bun scripts/assert-c1-a-paths.ts', 'test:c1:a-mutations': 'bun scripts/run-c1-a-mutations.ts --verify-ledger --all', 'validate:c1:a-evidence': 'bun scripts/validate-c1-a-evidence.ts docs/testing/c1-a-terminal-evidence.json', 'test:e2e:c1:a': 'playwright test --config playwright.c1-a.config.ts', 'verify:c1:a': 'bun scripts/run-c1-a-offline.ts',
+  'test:workers': 'bun scripts/run-with-open-next.ts -- node node_modules/vitest/vitest.mjs run --config vitest.config.workers.ts', 'assert:c1:a-config': 'bun scripts/assert-c1-a-config.ts', 'assert:c1:a-paths': 'bun scripts/assert-c1-a-paths.ts', 'test:e2e:c1:a': 'playwright test --config playwright.c1-a.config.ts', 'verify:c1:a': 'bun scripts/run-c1-a-offline.ts',
 } as const;
 const dependencies = { '@opennextjs/cloudflare': '1.20.2', wrangler: '4.118.0', vitest: '4.1.10', '@cloudflare/vitest-pool-workers': '0.20.1', msw: '2.15.0' } as const;
 const task9Files = {
@@ -20,7 +20,7 @@ const task9Files = {
   'cloudflare/legacy-keepalive-configuration.d.ts': 'interface LegacyKeepAliveEnv { KEEPALIVE_DEPLOYMENT_DISABLED: "1"; STATE_AUTHORITY_MODE: "legacy"; KV_REST_API_URL: ""; KV_REST_API_TOKEN: ""; }\n',
   'vitest.config.keepalive-workers.ts': "import { defineConfig } from 'vitest/config'; export default defineConfig(async () => { const { cloudflareTest } = await import('@cloudflare/vitest-pool-workers'); return { plugins: [cloudflareTest({ wrangler: { configPath: './cloudflare/legacy-keepalive-wrangler.jsonc' }, miniflare: { bindings: { KV_REST_API_URL: 'http://127.0.0.1:8799', KV_REST_API_TOKEN: 'synthetic-c1-a-token', }, }, }),], test: { include: ['test/worker/legacy-keepalive.integration.test.ts', 'test/worker/deny-egress.integration.test.ts',], setupFiles: ['./test/worker/deny-egress.setup.ts'], }, }; });\n",
 } as const;
-function fixture(changes: Record<string, string> = {}): string { const root = mkdtempSync(path.join(tmpdir(), 'event-every-c1-a-config-')); roots.push(root); const files = { 'package.json': JSON.stringify({ name: 'fixture', scripts, devDependencies: dependencies }), '.gitignore': '.dev.vars\n.dev.vars.*\n.open-next/\n.wrangler/\ndist-c1-a-*\ntest-results-c1-a-*\nplaywright-report-c1-a-*\n', 'bun.lock': 'lock', ...task9Files, ...changes }; for (const [file, content] of Object.entries(files)) { mkdirSync(path.dirname(path.join(root, file)), { recursive: true }); writeFileSync(path.join(root, file), content); } return root; }
+function fixture(changes: Record<string, string> = {}): string { const root = mkdtempSync(path.join(tmpdir(), 'event-every-c1-a-config-')); roots.push(root); const files = { 'package.json': JSON.stringify({ name: 'fixture', scripts, devDependencies: dependencies }), 'scripts/run-c1-a-offline.ts': 'export const leanC1AOfflineGate = true;\n', '.gitignore': '.dev.vars\n.dev.vars.*\n.open-next/\n.wrangler/\ndist-c1-a-*\ntest-results-c1-a-*\nplaywright-report-c1-a-*\n', 'bun.lock': 'lock', ...task9Files, ...changes }; for (const [file, content] of Object.entries(files)) { mkdirSync(path.dirname(path.join(root, file)), { recursive: true }); writeFileSync(path.join(root, file), content); } return root; }
 afterEach(() => { while (roots.length) rmSync(roots.pop()!, { recursive: true, force: true }); });
 
 describe('C1-A Task 1 package/offline config boundary', () => {
@@ -28,6 +28,16 @@ describe('C1-A Task 1 package/offline config boundary', () => {
   test('rejects each exact dependency independently', () => { for (const name of Object.keys(dependencies)) { const copy = { ...dependencies }; delete copy[name as keyof typeof copy]; expect(() => assertC1AConfig(fixture({ 'package.json': JSON.stringify({ scripts, devDependencies: copy }) }))).toThrow(`c1-a config: dependency ${name}`); } });
   test('requires all five exact C1-A devDependency versions and rejects production ownership', () => { for (const [name, version] of Object.entries(dependencies)) { expect(() => assertC1AConfig(fixture({ 'package.json': JSON.stringify({ scripts, dependencies: { [name]: version }, devDependencies: dependencies }) }))).toThrow(`c1-a config: dependency ${name}`); expect(() => assertC1AConfig(fixture({ 'package.json': JSON.stringify({ scripts, devDependencies: { ...dependencies, [name]: `^${version}` } }) }))).toThrow(`c1-a config: dependency ${name}`); } });
   test('rejects each missing or altered required script independently', () => { for (const [name, command] of Object.entries(scripts)) { const copy = { ...scripts, [name]: `${command} altered` }; expect(() => assertC1AConfig(fixture({ 'package.json': JSON.stringify({ scripts: copy, devDependencies: dependencies }) }))).toThrow(`c1-a config: script ${name}`); } });
+  test('rejects every obsolete Task 11 evidence command from package scripts and the active offline runner', () => {
+    for (const token of ['run-c1-a-mutations', 'validate-c1-a-evidence', 'c1-a-terminal-evidence', '--write-ledger', '--verify-ledger', '--write-evidence']) {
+      expect(() => assertC1AConfig(fixture({
+        ...task2Files,
+        'package.json': JSON.stringify({ scripts: { ...scripts, obsolete: `bun ${token}` }, devDependencies: dependencies }),
+      }))).toThrow('c1-a config: obsolete Task 11 evidence');
+      expect(() => assertC1AConfig(fixture({ ...task2Files, 'scripts/run-c1-a-offline.ts': `const obsolete = '${token}';\n` })))
+        .toThrow('c1-a config: obsolete Task 11 evidence');
+    }
+  });
   test('rejects every generated ignore omission independently', () => { for (const missing of ['.dev.vars', '.dev.vars.*', '.open-next/', '.wrangler/']) { const ignore = ['.dev.vars', '.dev.vars.*', '.open-next/', '.wrangler/'].filter((line) => line !== missing).join('\n'); expect(() => assertC1AConfig(fixture({ '.gitignore': ignore }))).toThrow(`c1-a config: ignore ${missing}`); } });
   test('rejects deploy/upload/publish commands, repository auth, and credential evidence independently', () => {
     for (const [files, message] of [

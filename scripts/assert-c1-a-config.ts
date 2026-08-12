@@ -20,8 +20,6 @@ const REQUIRED_SCRIPTS = {
   'test:workers': 'bun scripts/run-with-open-next.ts -- node node_modules/vitest/vitest.mjs run --config vitest.config.workers.ts',
   'assert:c1:a-config': 'bun scripts/assert-c1-a-config.ts',
   'assert:c1:a-paths': 'bun scripts/assert-c1-a-paths.ts',
-  'test:c1:a-mutations': 'bun scripts/run-c1-a-mutations.ts --verify-ledger --all',
-  'validate:c1:a-evidence': 'bun scripts/validate-c1-a-evidence.ts docs/testing/c1-a-terminal-evidence.json',
   'test:e2e:c1:a': 'playwright test --config playwright.c1-a.config.ts',
   'verify:c1:a': 'bun scripts/run-c1-a-offline.ts',
 } as const;
@@ -29,6 +27,7 @@ const REQUIRED_SCRIPTS = {
 const CREDENTIAL_ASSIGNMENT = /(?:OPENROUTER|ANTHROPIC|CLOUDFLARE|RESEND|KV_REST|AUTH_PATTERN)[A-Z0-9_.-]*\s*[:=]\s*\S+|(?:[A-Z][A-Z0-9_]*_)?(?:API_KEY|TOKEN|SECRET|D1|R2)\s*[:=]\s*\S+/;
 const DEPLOY_CAPABLE = /\b(?:deploy|publish|upload)\b/i;
 const ORDINARY_INSTALL = /\b(?:bun(?:\s+--[\w-]+(?:=\S+)?)*\s+(?:install|i|add|update)|npm\s+(?:install|i|ci)|pnpm\s+(?:install|i|add)|yarn\s+(?:install|add))\b/i;
+const OBSOLETE_TASK_11_EVIDENCE = /run-c1-a-mutations|validate-c1-a-evidence|c1-a-terminal-evidence|--write-ledger|--verify-ledger|--write-evidence/;
 
 type SourceFileWithParseDiagnostics = ts.SourceFile & {
   readonly parseDiagnostics?: readonly ts.Diagnostic[];
@@ -372,6 +371,8 @@ export function assertC1AConfig(root = process.cwd()): void {
   for (const [name, value] of Object.entries(REQUIRED_SCRIPTS)) {
     if (packageJson.scripts?.[name] !== value) fail(`script ${name}`);
   }
+  if (OBSOLETE_TASK_11_EVIDENCE.test(JSON.stringify(packageJson.scripts ?? {}))
+    || OBSOLETE_TASK_11_EVIDENCE.test(read(root, 'scripts/run-c1-a-offline.ts'))) fail('obsolete Task 11 evidence');
   for (const [name, value] of Object.entries(packageJson.scripts ?? {})) {
     if (typeof value === 'string' && (DEPLOY_CAPABLE.test(value) || ORDINARY_INSTALL.test(value))) fail(`install/deploy script ${name}`);
   }
