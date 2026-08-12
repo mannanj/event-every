@@ -52,11 +52,16 @@ const SmartInput = forwardRef<SmartInputHandle, SmartInputProps>(
     const [isDragging, setIsDragging] = useState(false);
     const [hoveredImageIndex, setHoveredImageIndex] = useState<number | null>(null);
     const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
+    const [isHydrated, setIsHydrated] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const editorRef = useRef<HTMLDivElement>(null);
     const restoredRef = useRef(false);
 
     const objectUrlsRef = useRef<string[]>([]);
+
+    useEffect(() => {
+      setIsHydrated(true);
+    }, []);
 
     const applyStoredFiles = useCallback(async (files: StoredInputFile[]) => {
       // Revoke object URLs from a previous load before creating new ones.
@@ -565,7 +570,7 @@ const SmartInput = forwardRef<SmartInputHandle, SmartInputProps>(
               aria-label="Enter event details as text or drop images"
               aria-describedby={error ? 'smart-input-error' : undefined}
               aria-invalid={error ? 'true' : 'false'}
-              contentEditable
+              contentEditable={isHydrated}
               suppressContentEditableWarning
               suppressHydrationWarning
               spellCheck

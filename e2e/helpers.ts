@@ -133,16 +133,24 @@ export async function mockScanAPIDelayed(
   });
 }
 
+export async function waitForSmartInputReady(page: Page) {
+  await page.waitForSelector('[data-testid="smart-input-textarea"]', { state: 'visible', timeout: 20000 });
+  await page.waitForFunction(() => (
+    document.querySelector('[data-testid="smart-input-textarea"]')?.getAttribute('contenteditable') === 'true'
+  ));
+}
+
 export async function setupLocal(page: Page) {
   await mockAuth(page);
   await mockURLDetection(page);
   await mockSummarize(page);
   await page.addInitScript(() => localStorage.clear());
   await page.goto('/');
-  await page.waitForSelector('[data-testid="smart-input-textarea"]', { state: 'visible', timeout: 20000 });
+  await waitForSmartInputReady(page);
 }
 
 export async function submitText(page: Page, text: string) {
+  await waitForSmartInputReady(page);
   const textarea = page.locator('[data-testid="smart-input-textarea"]');
   await textarea.fill(text);
   await textarea.press('Meta+Enter');

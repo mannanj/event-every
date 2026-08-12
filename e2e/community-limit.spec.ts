@@ -1,5 +1,6 @@
 import { test, expect, Page } from '@playwright/test';
 import { ScanRequestSchema } from '../src/types/scanRequest';
+import { waitForSmartInputReady } from './helpers';
 
 const RESET_AT = '2026-06-11T00:00:00.000Z';
 const TZ = 'America/New_York';
@@ -140,6 +141,7 @@ test.describe('community limit screen', () => {
       });
     });
     await page.goto('/');
+    await waitForSmartInputReady(page);
 
     const textarea = page.locator('[data-testid="smart-input-textarea"]');
     await textarea.fill('Dinner with Sam tomorrow at 7pm');

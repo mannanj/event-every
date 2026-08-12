@@ -199,9 +199,16 @@ test.describe('UI Interaction Tests', () => {
   });
 
   test('Submit button enables with 3+ chars', async ({ page }) => {
+    const pageErrors: string[] = [];
+    page.on('pageerror', error => pageErrors.push(error.message));
+    await page.route('**/_next/static/**/*.js', async route => {
+      await new Promise(resolve => setTimeout(resolve, 750));
+      await route.continue();
+    });
     await setupLocal(page);
     await page.getByTestId('smart-input-textarea').fill('abc');
     await expect(page.locator('button[aria-label="Transform content to events"]')).toBeEnabled();
+    expect(pageErrors).toEqual([]);
   });
 
   test('Error notification can be dismissed', async ({ page }) => {
