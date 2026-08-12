@@ -1,4 +1,4 @@
-import { expect, test, type Route } from '@playwright/test';
+import { expect, test, type Page, type Route } from '@playwright/test';
 
 const scannerClaim = <Value>(value: Value) => ({ value, confidence: null, evidence: [] });
 
@@ -27,6 +27,22 @@ async function fulfillJson(route: Route, body: unknown) {
   await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
 }
 
+async function requestFromPage(page: Page, method: 'GET' | 'POST', requestPath: string, data?: unknown) {
+  const response = page.waitForResponse((candidate) => {
+    return candidate.request().method() === method && new URL(candidate.url()).pathname === requestPath;
+  });
+  await page.evaluate(async ({ requestMethod, path, body }) => {
+    const init: RequestInit = { method: requestMethod };
+    if (body !== undefined) {
+      init.headers = { 'content-type': 'application/json' };
+      init.body = JSON.stringify(body);
+    }
+    const result = await fetch(path, init);
+    await result.arrayBuffer();
+  }, { requestMethod: method, path: requestPath, body: data });
+  return response;
+}
+
 test('community exhaustion exposes no pattern or admin bypass', async ({ page }) => {
   await page.goto('/spent');
 
@@ -34,13 +50,13 @@ test('community exhaustion exposes no pattern or admin bypass', async ({ page })
   await expect(page.getByTestId('enter-pattern-link')).toHaveCount(0);
   await expect(page.getByRole('heading', { name: 'Draw Pattern to Unlock' })).toHaveCount(0);
 
-  const verify = await page.request.post('/api/auth/verify', { data: { pattern: [0, 3, 6, 7, 8] } });
+  const verify = await requestFromPage(page, 'POST', '/api/auth/verify', { pattern: [0, 3, 6, 7, 8] });
   expect(verify.status()).toBe(410);
-  const check = await page.request.get('/api/auth/check');
+  const check = await requestFromPage(page, 'GET', '/api/auth/check');
   expect(await check.json()).toEqual({ authenticated: false });
-  const logout = await page.request.post('/api/auth/logout');
+  const logout = await requestFromPage(page, 'POST', '/api/auth/logout');
   expect(logout.status()).toBe(200);
-  expect(logout.headers()['set-cookie']).toBeUndefined();
+  expect((await logout.allHeaders())['set-cookie']).toBeUndefined();
 
   await page.goto('/?unlock');
   await expect(page.getByRole('heading', { name: 'Draw Pattern to Unlock' })).toHaveCount(0);
