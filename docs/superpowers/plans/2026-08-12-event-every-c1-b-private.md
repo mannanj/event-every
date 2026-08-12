@@ -223,7 +223,7 @@ The replay test injects a candidate URL, provider-authored issue message, eviden
 - [ ] **Step 3: Run the tests and verify RED through the offline boundary**
 
 ```bash
-bun scripts/run-private-offline.ts -- bun test scripts/assert-c1-b-paths.test.ts src/platform/provider/__tests__/policy.test.ts src/platform/provider/__tests__/request-binding.test.ts src/platform/provider/__tests__/cost.test.ts src/platform/provider/__tests__/replay.test.ts --isolate
+bun -- scripts/run-private-offline.ts -- bun test scripts/assert-c1-b-paths.test.ts src/platform/provider/__tests__/policy.test.ts src/platform/provider/__tests__/request-binding.test.ts src/platform/provider/__tests__/cost.test.ts src/platform/provider/__tests__/replay.test.ts --isolate
 ```
 
 Expected: FAIL because the C1-B modules and ownership checker do not exist.
@@ -264,8 +264,8 @@ For summary, accept only Title Case with exactly two or three whitespace-separat
 - [ ] **Step 6: Run focused tests and static checks**
 
 ```bash
-bun scripts/run-private-offline.ts -- bun test scripts/run-private-offline.test.ts scripts/assert-c1-b-paths.test.ts src/platform/provider/__tests__/policy.test.ts src/platform/provider/__tests__/request-binding.test.ts src/platform/provider/__tests__/cost.test.ts src/platform/provider/__tests__/replay.test.ts --isolate
-bun scripts/run-private-offline.ts -- bun run type-check
+bun -- scripts/run-private-offline.ts -- bun test scripts/run-private-offline.test.ts scripts/assert-c1-b-paths.test.ts src/platform/provider/__tests__/policy.test.ts src/platform/provider/__tests__/request-binding.test.ts src/platform/provider/__tests__/cost.test.ts src/platform/provider/__tests__/replay.test.ts --isolate
+bun -- scripts/run-private-offline.ts -- bun run type-check
 git diff --check
 ```
 
@@ -318,7 +318,7 @@ expect(Number.isSafeInteger(rows.reduce((sum, row) => sum + row.settled_nanodoll
 - [ ] **Step 2: Run the Workerd test and verify RED**
 
 ```bash
-bun scripts/run-private-offline.ts -- bun scripts/run-with-open-next.ts -- node node_modules/vitest/vitest.mjs run --config vitest.config.workers.ts test/worker/owner-budget-authority.integration.test.ts
+bun -- scripts/run-private-offline.ts -- bun scripts/run-with-open-next.ts -- node node_modules/vitest/vitest.mjs run --config vitest.config.workers.ts test/worker/owner-budget-authority.integration.test.ts
 ```
 
 Expected: FAIL because `OwnerBudgetAuthority` and its binding do not exist; `.open-next` and `.wrangler` are removed by the wrapper.
@@ -360,8 +360,8 @@ Add `OWNER_BUDGET_AUTHORITY` and migration tag `c1-b-budget-v1`. Do not change `
 - [ ] **Step 5: Run focused proof**
 
 ```bash
-bun scripts/run-private-offline.ts -- bun scripts/run-with-open-next.ts -- node node_modules/vitest/vitest.mjs run --config vitest.config.workers.ts test/worker/owner-budget-authority.integration.test.ts
-bun scripts/run-private-offline.ts -- bun run type-check
+bun -- scripts/run-private-offline.ts -- bun scripts/run-with-open-next.ts -- node node_modules/vitest/vitest.mjs run --config vitest.config.workers.ts test/worker/owner-budget-authority.integration.test.ts
+bun -- scripts/run-private-offline.ts -- bun run type-check
 git diff --check
 ```
 
@@ -408,7 +408,7 @@ await expect(authority.completeKnown({
 - [ ] **Step 2: Run RED**
 
 ```bash
-bun scripts/run-private-offline.ts -- bun scripts/run-with-open-next.ts -- node node_modules/vitest/vitest.mjs run --config vitest.config.workers.ts test/worker/provider-request-authority.integration.test.ts
+bun -- scripts/run-private-offline.ts -- bun scripts/run-with-open-next.ts -- node node_modules/vitest/vitest.mjs run --config vitest.config.workers.ts test/worker/provider-request-authority.integration.test.ts
 ```
 
 Expected: FAIL because the class/binding does not exist.
@@ -426,8 +426,8 @@ Export `ProviderRequestAuthority`, add `PROVIDER_REQUEST_AUTHORITY`, and add mig
 - [ ] **Step 5: Run focused proof and commit**
 
 ```bash
-bun scripts/run-private-offline.ts -- bun scripts/run-with-open-next.ts -- node node_modules/vitest/vitest.mjs run --config vitest.config.workers.ts test/worker/provider-request-authority.integration.test.ts test/worker/owner-budget-authority.integration.test.ts
-bun scripts/run-private-offline.ts -- bun run type-check
+bun -- scripts/run-private-offline.ts -- bun scripts/run-with-open-next.ts -- node node_modules/vitest/vitest.mjs run --config vitest.config.workers.ts test/worker/provider-request-authority.integration.test.ts test/worker/owner-budget-authority.integration.test.ts
+bun -- scripts/run-private-offline.ts -- bun run type-check
 git diff --check
 git add src/platform/cloudflare/provider-request-authority.ts test/worker/provider-request-authority.integration.test.ts cloudflare/app-worker.ts wrangler.jsonc worker-configuration.d.ts vitest.config.workers.ts src/platform/contracts.ts
 git commit -m "feat(event-every): persist provider request outcomes"
@@ -479,7 +479,7 @@ With a fake clock, prove that no permit is issued before both authorities durabl
 - [ ] **Step 2: Run RED**
 
 ```bash
-bun scripts/run-private-offline.ts -- bun test src/platform/provider/__tests__/transport.test.ts src/platform/provider/__tests__/operation.test.ts src/server/scanner/__tests__/transport.test.ts
+bun -- scripts/run-private-offline.ts -- bun test src/platform/provider/__tests__/transport.test.ts src/platform/provider/__tests__/operation.test.ts src/server/scanner/__tests__/transport.test.ts
 ```
 
 Expected: FAIL because the common transport/coordinator do not exist and the scanner still controls provider work directly.
@@ -516,8 +516,8 @@ Keep `src/server/scanner/transport.ts` as a typed adapter only. Refactor `src/se
 - [ ] **Step 5: Prove the coordinator and commit**
 
 ```bash
-bun scripts/run-private-offline.ts -- bun test src/platform/provider/__tests__/transport.test.ts src/platform/provider/__tests__/operation.test.ts src/server/scanner/__tests__/transport.test.ts
-bun scripts/run-private-offline.ts -- bun run type-check
+bun -- scripts/run-private-offline.ts -- bun test src/platform/provider/__tests__/transport.test.ts src/platform/provider/__tests__/operation.test.ts src/server/scanner/__tests__/transport.test.ts
+bun -- scripts/run-private-offline.ts -- bun run type-check
 git diff --check
 git add src/platform/provider/transport.ts src/platform/provider/__tests__/transport.test.ts src/platform/cloudflare/provider-operation.ts src/platform/provider/__tests__/operation.test.ts src/platform/cloudflare-context.ts src/server/scanner/transport.ts src/server/scanner/job.ts src/server/scanner/__tests__/transport.test.ts
 git commit -m "feat(event-every): coordinate provider execution"
@@ -591,7 +591,7 @@ At route level, freeze a request on day D, retry after UTC midnight on day D+1, 
 - [ ] **Step 2: Run route tests RED**
 
 ```bash
-bun scripts/run-private-offline.ts -- bun test src/app/api/scan/__tests__/route.test.ts src/app/api/summarize/__tests__/route.test.ts src/app/api/resolve-timezone/__tests__/route.test.ts src/app/api/usage/__tests__/route.test.ts src/app/api/provider-status/__tests__/route.test.ts src/platform/__tests__/route-manifest.test.ts
+bun -- scripts/run-private-offline.ts -- bun test src/app/api/scan/__tests__/route.test.ts src/app/api/summarize/__tests__/route.test.ts src/app/api/resolve-timezone/__tests__/route.test.ts src/app/api/usage/__tests__/route.test.ts src/app/api/provider-status/__tests__/route.test.ts src/platform/__tests__/route-manifest.test.ts
 ```
 
 Expected: FAIL because routes still use the legacy provider and the status route does not exist.
@@ -609,9 +609,9 @@ Delete the listed modules and `@upstash/redis`. Make `src/platform/runtime.ts` a
 - [ ] **Step 5: Prove the route cutover and commit**
 
 ```bash
-bun scripts/run-private-offline.ts -- bun test src/app/api/scan/__tests__/route.test.ts src/app/api/summarize/__tests__/route.test.ts src/app/api/resolve-timezone/__tests__/route.test.ts src/app/api/usage/__tests__/route.test.ts src/app/api/provider-status/__tests__/route.test.ts src/platform/__tests__/route-manifest.test.ts src/platform/__tests__/runtime.test.ts
-bun scripts/run-private-offline.ts -- bun run lint
-bun scripts/run-private-offline.ts -- bun run type-check
+bun -- scripts/run-private-offline.ts -- bun test src/app/api/scan/__tests__/route.test.ts src/app/api/summarize/__tests__/route.test.ts src/app/api/resolve-timezone/__tests__/route.test.ts src/app/api/usage/__tests__/route.test.ts src/app/api/provider-status/__tests__/route.test.ts src/platform/__tests__/route-manifest.test.ts src/platform/__tests__/runtime.test.ts
+bun -- scripts/run-private-offline.ts -- bun run lint
+bun -- scripts/run-private-offline.ts -- bun run type-check
 git diff --check
 git add src/app/api src/platform/runtime.ts src/platform/__tests__/runtime.test.ts src/platform/route-manifest.ts src/platform/__tests__/route-manifest.test.ts src/platform/legacy src/lib package.json bun.lock
 git commit -m "refactor(event-every): route provider work through durable state"
@@ -655,7 +655,7 @@ Test newly created history-entry IDs as UUIDs while legacy IDs remain readable. 
 - [ ] **Step 2: Run browser tests RED**
 
 ```bash
-bun scripts/run-private-offline.ts -- bun test src/services/__tests__/providerOperation.test.ts src/services/__tests__/inputStorage.test.ts src/services/__tests__/scanClient.test.ts src/services/__tests__/summarizer.test.ts
+bun -- scripts/run-private-offline.ts -- bun test src/services/__tests__/providerOperation.test.ts src/services/__tests__/inputStorage.test.ts src/services/__tests__/scanClient.test.ts src/services/__tests__/summarizer.test.ts
 ```
 
 Expected: FAIL because operation persistence/restoration does not exist.
@@ -671,9 +671,9 @@ Deliver a minimized replay to `consumerRef` and delete the record only after con
 - [ ] **Step 4: Prove browser lifecycle and commit**
 
 ```bash
-bun scripts/run-private-offline.ts -- bun test src/services/__tests__/providerOperation.test.ts src/services/__tests__/inputStorage.test.ts src/services/__tests__/scanClient.test.ts src/services/__tests__/summarizer.test.ts
-bun scripts/run-private-offline.ts -- bun run type-check
-bun scripts/run-private-offline.ts -- bun run lint
+bun -- scripts/run-private-offline.ts -- bun test src/services/__tests__/providerOperation.test.ts src/services/__tests__/inputStorage.test.ts src/services/__tests__/scanClient.test.ts src/services/__tests__/summarizer.test.ts
+bun -- scripts/run-private-offline.ts -- bun run type-check
+bun -- scripts/run-private-offline.ts -- bun run lint
 git diff --check
 git add src/services/providerOperation.ts src/services/__tests__/providerOperation.test.ts src/services/inputStorage.ts src/services/__tests__/inputStorage.test.ts src/services/requestId.ts src/services/scanClient.ts src/services/__tests__/scanClient.test.ts src/services/summarizer.ts src/services/__tests__/summarizer.test.ts src/app/page.tsx
 git commit -m "feat(event-every): recover provider work after reload"
@@ -725,7 +725,7 @@ Add fixtures proving failure when a forbidden symbol exists only in a statically
 - [ ] **Step 2: Run RED**
 
 ```bash
-bun scripts/run-private-offline.ts -- bun test scripts/assert-c1-a-config.test.ts scripts/assert-c1-a-e2e-inventory.test.ts scripts/run-c1-a-offline.test.ts scripts/assert-private-worker.test.ts test/worker/app-worker.test.ts --isolate
+bun -- scripts/run-private-offline.ts -- bun test scripts/assert-c1-a-config.test.ts scripts/assert-c1-a-e2e-inventory.test.ts scripts/run-c1-a-offline.test.ts scripts/assert-private-worker.test.ts test/worker/app-worker.test.ts --isolate
 ```
 
 Expected: FAIL because the final bindings and artifact scanner are not installed.
@@ -757,9 +757,9 @@ Keep `SmartInput`'s server and first client markup deterministically empty and n
 - [ ] **Step 6: Build, scan, regress C1-A, and commit**
 
 ```bash
-bun scripts/run-private-offline.ts -- bun test scripts/assert-c1-a-config.test.ts scripts/assert-c1-a-e2e-inventory.test.ts scripts/run-c1-a-offline.test.ts scripts/assert-private-worker.test.ts scripts/run-c1-a-worker-e2e.test.ts test/worker/app-worker.test.ts --isolate
-bun scripts/run-private-offline.ts -- bun scripts/assert-private-worker.ts
-bun scripts/run-private-offline.ts -- bun run verify:c1:a
+bun -- scripts/run-private-offline.ts -- bun test scripts/assert-c1-a-config.test.ts scripts/assert-c1-a-e2e-inventory.test.ts scripts/run-c1-a-offline.test.ts scripts/assert-private-worker.test.ts scripts/run-c1-a-worker-e2e.test.ts test/worker/app-worker.test.ts --isolate
+bun -- scripts/run-private-offline.ts -- bun scripts/assert-private-worker.ts
+bun -- scripts/run-private-offline.ts -- bun run verify:c1:a
 git diff --check
 git add .env.example cloudflare/app-worker.ts wrangler.jsonc worker-configuration.d.ts package.json test/worker/app-worker.test.ts scripts/assert-c1-a-config.ts scripts/assert-c1-a-config.test.ts scripts/assert-c1-a-e2e-inventory.ts scripts/assert-c1-a-e2e-inventory.test.ts scripts/run-c1-a-offline.ts scripts/run-c1-a-offline.test.ts scripts/run-c1-a-worker-e2e.ts scripts/run-c1-a-worker-e2e.test.ts playwright.c1-a.config.ts e2e/c1-a-runtime-admission.spec.ts e2e/community-limit.spec.ts docs/testing/c1-a-private-control-matrix.md src/components/OwnerBudgetBoundary.tsx src/components/OwnerBudgetScreen.tsx src/components/AuthWrapper.tsx src/components/SmartInput.tsx src/components/CommunityLimitScreen.tsx src/components/landing/LandingSections.tsx src/services/urlDetector.ts src/app/spent/page.tsx src/utils/communityLimit.ts scripts/assert-private-worker.ts scripts/assert-private-worker.test.ts
 git commit -m "chore(event-every): lock the private worker graph"
@@ -811,7 +811,7 @@ The Task 1 preload deletes credential-like variables before module import and de
 - [ ] **Step 5: Run the required canary and commit**
 
 ```bash
-bun scripts/run-private-offline.ts -- bun test scripts/run-private-privacy.test.ts scripts/run-private-worker-e2e.test.ts --isolate
+bun -- scripts/run-private-offline.ts -- bun test scripts/run-private-privacy.test.ts scripts/run-private-worker-e2e.test.ts --isolate
 bun run verify:private:privacy
 git diff --check
 git add scripts/run-private-privacy.ts scripts/run-private-privacy.test.ts vitest.config.private-workers.ts test/worker/private-provider.integration.test.ts test/worker/provider-privacy.integration.test.ts scripts/run-private-worker-e2e.ts scripts/run-private-worker-e2e.test.ts playwright.private.config.ts e2e/private-provider-state.spec.ts package.json
@@ -871,9 +871,9 @@ The manifest has these exact one-for-one entries:
 - [ ] **Step 4: Run all mutations and commit**
 
 ```bash
-bun scripts/run-private-offline.ts -- bun test scripts/run-c1-b-mutations.test.ts --isolate
-bun scripts/run-private-offline.ts -- bun scripts/run-c1-b-mutations.ts --write-ledger
-bun scripts/run-private-offline.ts -- bun scripts/run-c1-b-mutations.ts --verify-ledger
+bun -- scripts/run-private-offline.ts -- bun test scripts/run-c1-b-mutations.test.ts --isolate
+bun -- scripts/run-private-offline.ts -- bun scripts/run-c1-b-mutations.ts --write-ledger
+bun -- scripts/run-private-offline.ts -- bun scripts/run-c1-b-mutations.ts --verify-ledger
 git diff --check
 git add scripts/run-c1-b-mutations.ts scripts/run-c1-b-mutations.test.ts docs/testing/c1-b-private-mutation-ledger.md package.json
 git commit -m "test(event-every): prove private state mutations"
