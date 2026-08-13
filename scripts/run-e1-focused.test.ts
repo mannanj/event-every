@@ -97,7 +97,12 @@ describe('run-e1-focused argument and discovery seam', () => {
       readFileSync(path.join(root, file), 'utf8'),
     ]));
     assertPatternAdminRetired(sources);
-    assertCommunityKeySourceGuard(sources['src/lib/llm.ts']);
+    const retiredLlmSource = sources['src/lib/llm.ts'];
+    if (retiredLlmSource === undefined) {
+      expect(existsSync(path.join(root, 'src/lib/llm.ts'))).toBe(false);
+    } else {
+      assertCommunityKeySourceGuard(retiredLlmSource);
+    }
   });
 
   test('fails closed when the live community-key region contains the admin key name', () => {

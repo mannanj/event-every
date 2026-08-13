@@ -34,7 +34,7 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: "What does it cost?",
-    a: "Free, on a shared daily limit. It’s community-sponsored.",
+    a: "Private owner access during this phase.",
   },
 ];
 

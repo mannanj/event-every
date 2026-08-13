@@ -10,6 +10,8 @@ export default defineConfig(async () => {
           bindings: {
             IDENTITY_HMAC_CURRENT: 'synthetic-c1-a-identity-key',
             RESOLVER_CAPABILITY_HMAC: 'synthetic-c1-a-capability-key',
+            OPENROUTER_OWNER_KEY: 'deliberately-invalid-synthetic-owner-key',
+            PROVIDER_REQUEST_HMAC_CURRENT: 'synthetic-c1-b-request-shape-key',
           },
         },
       }),

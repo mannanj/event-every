@@ -19,13 +19,21 @@ const INTERNAL_MODE = '--internal-harness';
 const INTERNAL_TOKEN_ENV = 'C1_A_WORKER_E2E_INTERNAL_TOKEN';
 const INJECTION_CONTROLS = ['NODE_OPTIONS', 'BUN_OPTIONS', 'NODE_PATH', 'NODE_REPL_EXTERNAL_MODULE', 'LD_PRELOAD', 'DYLD_INSERT_LIBRARIES', 'DYLD_LIBRARY_PATH', 'HTTP_PROXY', 'HTTPS_PROXY', 'ALL_PROXY', 'NO_PROXY'] as const;
 export const C1_A_WORKER_E2E_READY = 'C1_A_WORKER_E2E_READY';
-const PLAYWRIGHT_TITLES = ['community exhaustion exposes no pattern or admin bypass', 'corrupt Scanner review storage recovers and persists the next scan', 'URL-only scan waits through resolver rollover and busy responses then succeeds'] as const;
+const PLAYWRIGHT_TITLES = ['owner budget exhaustion exposes no pattern or admin bypass', 'corrupt Scanner review storage recovers and persists the next scan', 'draft reload hydrates without React errors'] as const;
 const AUTHORED_INPUTS = ['open-next.config.ts', 'wrangler.jsonc', 'next.config.js', 'playwright.c1-a.config.ts', 'vitest.config.workers.ts'] as const;
 const MODULE_DIR = (import.meta as ImportMeta & { dirname?: string }).dirname ?? path.dirname(fileURLToPath(import.meta.url));
 
 export const C1_A_WORKER_E2E_STATES = ['preflight', 'process-boundary-installed', 'build', 'harness-child-started', 'harness-ready', 'http-ready', 'playwright-started', 'playwright-settled', 'playwright-stopped', 'harness-child-stopped', 'port-closed', 'outputs-removed'] as const;
 export type C1AWorkerE2EState = typeof C1_A_WORKER_E2E_STATES[number];
-export const C1_A_HARNESS_VARS = { IDENTITY_HMAC_CURRENT: 'synthetic-c1-a-identity-key', RESOLVER_CAPABILITY_HMAC: 'synthetic-c1-a-capability-key', OPENROUTER_COMMUNITY_KEY: 'synthetic-c1-a-never-sent' } as const;
+export const C1_A_HARNESS_VARS = {
+  IDENTITY_HMAC_CURRENT: 'synthetic-c1-a-identity-key',
+  RESOLVER_CAPABILITY_HMAC: 'synthetic-c1-a-capability-key',
+  OPENROUTER_OWNER_KEY: 'deliberately-invalid-synthetic-owner-key',
+  PROVIDER_REQUEST_HMAC_CURRENT: 'synthetic-c1-b-request-shape-key',
+  PROVIDER_REQUEST_HMAC_CURRENT_VERSION: 'c1-b-current-v1',
+  PROVIDER_POLICY_VERSION: 'owner-v1',
+  STATE_AUTHORITY_MODE: 'cloudflare',
+} as const;
 
 type ParsedArgs = Readonly<{ project?: 'chromium' | 'webkit'; grep?: typeof PLAYWRIGHT_TITLES[number] }>;
 type Harness = Readonly<{ listen(): Promise<unknown>; close(): Promise<void>; fetch(input: string | URL, init?: RequestInit): Promise<Response> }>;
@@ -68,8 +76,57 @@ export function awaitHarnessChildReady(child: C1AWorkerE2EChild, env: C1AEnviron
 
 function isLoopback(url: string): boolean { const host = new URL(url).hostname; return ['127.0.0.1', 'localhost', '::1', '[::1]'].includes(host); }
 function isLoopbackSocketArgs(args: readonly unknown[]): boolean { const first = args[0]; const host = typeof first === 'number' ? args[1] : first && typeof first === 'object' ? (first as { hostname?: unknown; host?: unknown }).hostname ?? (first as { host?: unknown }).host : undefined; return typeof host === 'string' && ['127.0.0.1', 'localhost', '::1', '[::1]'].includes(host.toLowerCase()); }
-export async function startEgressGuard(): Promise<EgressGuard> { const { setupServer } = await import('msw/node'); const { http, passthrough } = await import('msw'); const observed: Array<{ method: string; url: string }> = []; const originalNetConnect = net.connect; const originalNetCreateConnection = net.createConnection; const originalTlsConnect = tls.connect; const guardSocket = <T extends (...args: never[]) => unknown>(original: T): T => function guardedSocket(this: unknown, ...args: never[]) { if (!isLoopbackSocketArgs(args)) fail('non-loopback socket'); return original.apply(this, args); } as T; net.connect = guardSocket(net.connect); net.createConnection = guardSocket(net.createConnection); tls.connect = guardSocket(tls.connect); const server = setupServer(http.all(/^https?:\/\/(?:localhost|127(?:\.\d{1,3}){3}|\[::1\])(?::\d+)?(?:\/|$)/, ({ request }) => { if (!isLoopback(request.url)) fail('non-loopback egress'); return passthrough(); })); server.events.on('request:unhandled', ({ request }) => observed.push({ method: request.method, url: request.url })); try { server.listen({ onUnhandledRequest: 'error' }); } catch (error) { net.connect = originalNetConnect; net.createConnection = originalNetCreateConnection; tls.connect = originalTlsConnect; throw error; } return { assertOutboundCanary: () => { if (observed.length !== 1 || observed[0]?.method !== 'POST' || observed[0]?.url !== 'https://openrouter.ai/api/v1/chat/completions') fail('outbound canary target'); }, close: () => { net.connect = originalNetConnect; net.createConnection = originalNetCreateConnection; tls.connect = originalTlsConnect; server.close(); } }; }
-export async function runOutboundCanary(harness: Harness, guard: EgressGuard): Promise<void> { const response = await harness.fetch('http://127.0.0.1:8788/api/scan', { method: 'POST', headers: { 'content-type': 'application/json', origin: 'http://127.0.0.1:8788', 'cf-connecting-ip': '203.0.113.10', 'X-Event-Every-Request-Id': '018f47a0-7b5c-7cc4-9a34-123456789abc' }, body: JSON.stringify({ kind: 'text', text: 'C1-A outbound canary' }) }); let body: unknown; try { body = await response.json(); } catch { fail('outbound canary response'); } if (response.status !== 502 || !body || typeof body !== 'object' || (body as { code?: unknown }).code !== 'scan_provider_failed') fail('outbound canary response'); guard.assertOutboundCanary(); }
+export function providerStreamFailureResponse(): Response {
+  return new Response('{', {
+    status: 200,
+    headers: { 'content-encoding': 'gzip', 'content-type': 'application/octet-stream' },
+  });
+}
+export async function startEgressGuard(): Promise<EgressGuard> {
+  const { setupServer } = await import('msw/node');
+  const { http, passthrough } = await import('msw');
+  const observed: Array<{ method: string; url: string }> = [];
+  const originalNetConnect = net.connect;
+  const originalNetCreateConnection = net.createConnection;
+  const originalTlsConnect = tls.connect;
+  const guardSocket = <T extends (...args: never[]) => unknown>(original: T): T => function guardedSocket(this: unknown, ...args: never[]) {
+    if (!isLoopbackSocketArgs(args)) fail('non-loopback socket');
+    return original.apply(this, args);
+  } as T;
+  net.connect = guardSocket(net.connect);
+  net.createConnection = guardSocket(net.createConnection);
+  tls.connect = guardSocket(tls.connect);
+  const server = setupServer(
+    http.post('https://openrouter.ai/api/v1/chat/completions', ({ request }) => {
+      observed.push({ method: request.method, url: request.url });
+      return providerStreamFailureResponse();
+    }),
+    http.all(/^https?:\/\/(?:localhost|127(?:\.\d{1,3}){3}|\[::1\])(?::\d+)?(?:\/|$)/, ({ request }) => {
+      if (!isLoopback(request.url)) fail('non-loopback egress');
+      return passthrough();
+    }),
+  );
+  try {
+    server.listen({ onUnhandledRequest: 'error' });
+  } catch (error) {
+    net.connect = originalNetConnect;
+    net.createConnection = originalNetCreateConnection;
+    tls.connect = originalTlsConnect;
+    throw error;
+  }
+  return {
+    assertOutboundCanary: () => {
+      if (observed.length !== 1 || observed[0]?.method !== 'POST' || observed[0]?.url !== 'https://openrouter.ai/api/v1/chat/completions') fail('outbound canary target');
+    },
+    close: () => {
+      net.connect = originalNetConnect;
+      net.createConnection = originalNetCreateConnection;
+      tls.connect = originalTlsConnect;
+      server.close();
+    },
+  };
+}
+export async function runOutboundCanary(harness: Harness, guard: EgressGuard): Promise<void> { const response = await harness.fetch('http://127.0.0.1:8788/api/scan', { method: 'POST', headers: { 'content-type': 'application/json', origin: 'http://127.0.0.1:8788', 'cf-connecting-ip': '203.0.113.10', 'X-Event-Every-Request-Id': '018f47a0-7b5c-4cc4-9a34-123456789abc' }, body: JSON.stringify({ kind: 'text', text: 'C1-A outbound canary' }) }); let body: unknown; try { body = await response.json(); } catch { fail('outbound canary response'); } if (response.status !== 502 || !body || typeof body !== 'object' || (body as { code?: unknown }).code !== 'provider_outcome_unknown') fail('outbound canary response'); guard.assertOutboundCanary(); }
 
 export type BridgeRequest = Readonly<{ input: string; init: RequestInit }>;
 export function requestFromNode(req: IncomingMessage): BridgeRequest { const headers = new Headers(); for (const [name, value] of Object.entries(req.headers)) if (value !== undefined) headers.set(name, Array.isArray(value) ? value.join(', ') : value); const method = req.method || 'GET'; const init: RequestInit = { method, headers }; if (method !== 'GET' && method !== 'HEAD') Object.assign(init, { body: Readable.toWeb(req) as unknown as ReadableStream, duplex: 'half' }); return { input: `http://127.0.0.1:${PORT}${req.url || '/'}`, init }; }

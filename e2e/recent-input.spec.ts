@@ -237,7 +237,7 @@ test.describe('Input history', () => {
     await page.evaluate(
       (createdAt) =>
         new Promise<void>((resolve, reject) => {
-          const req = indexedDB.open('summon-input', 1);
+          const req = indexedDB.open('summon-input', 2);
           req.onsuccess = () => {
             const db = req.result;
             const tx = db.transaction('history', 'readwrite');

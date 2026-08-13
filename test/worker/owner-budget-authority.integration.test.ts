@@ -203,6 +203,18 @@ describe('OwnerBudgetAuthority SQLite Durable Object', () => {
     });
   });
 
+  it('accepts only the exact Miniflare name metadata table beyond the application schema', async () => {
+    const stub = authority('miniflare-metadata');
+    await stub.reserve(binding());
+    const expected = await stub.status({ authorityDay });
+    await runInDurableObject(stub, async (instance: OwnerBudgetAuthority, state: DurableObjectStateLike) => {
+      state.storage.sql.exec('CREATE TABLE __miniflare_do_name (name TEXT)');
+      await expect(instance.status({ authorityDay })).resolves.toEqual(expected);
+      state.storage.sql.exec('CREATE TABLE unexpected_application_table (value TEXT)');
+      await expect(instance.status({ authorityDay })).rejects.toThrow('owner budget schema unavailable');
+    });
+  });
+
   it('rejects every changed immutable reservation binding without changing the original row', async () => {
     const stub = authority('binding-conflict');
     const input = binding();

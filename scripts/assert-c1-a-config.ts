@@ -4,6 +4,7 @@ import ts from 'typescript';
 import { createCloudflareChildEnvironment } from './run-c1-a-cloudflare';
 
 const TOOL_ROOT = path.resolve(import.meta.dir, '..');
+const WRANGLER_CONFIG_CACHE = new Map<string, Record<string, unknown>>();
 
 const REQUIRED_DEPENDENCIES = {
   '@opennextjs/cloudflare': '1.20.2',
@@ -20,6 +21,7 @@ const REQUIRED_SCRIPTS = {
   'test:workers': 'bun scripts/run-with-open-next.ts -- node node_modules/vitest/vitest.mjs run --config vitest.config.workers.ts',
   'assert:c1:a-config': 'bun scripts/assert-c1-a-config.ts',
   'assert:c1:a-paths': 'bun scripts/assert-c1-a-paths.ts',
+  'assert:private-worker': 'bun scripts/assert-private-worker.ts',
   'test:e2e:c1:a': 'playwright test --config playwright.c1-a.config.ts',
   'verify:c1:a': 'bun scripts/run-c1-a-offline.ts',
 } as const;
@@ -51,6 +53,9 @@ function read(root: string, file: string): string {
 function readWranglerConfig(root: string, file = 'wrangler.jsonc'): Record<string, unknown> {
   const target = path.join(root, file);
   if (!existsSync(target)) fail(`missing ${file}`);
+  const cacheKey = `${file}\u0000${readFileSync(target, 'utf8')}`;
+  const cached = WRANGLER_CONFIG_CACHE.get(cacheKey);
+  if (cached) return cached;
   const source = [
     "import { cloudflareTest } from '@cloudflare/vitest-pool-workers';",
     "import { experimental_readRawConfig } from 'wrangler';",
@@ -66,7 +71,9 @@ function readWranglerConfig(root: string, file = 'wrangler.jsonc'): Record<strin
   });
   if (result.exitCode !== 0 || result.stdout.byteLength > 64 * 1024) fail(file);
   try {
-    return JSON.parse(new TextDecoder().decode(result.stdout)) as Record<string, unknown>;
+    const parsed = JSON.parse(new TextDecoder().decode(result.stdout)) as Record<string, unknown>;
+    WRANGLER_CONFIG_CACHE.set(cacheKey, parsed);
+    return parsed;
   } catch {
     fail(file);
   }
@@ -257,16 +264,58 @@ import { cloudflareTrustedEdgeAddress } from '../src/platform/identity';
 export { DailyCounter } from '../src/platform/cloudflare/daily-counter';
 export { IdentityDayPolicy } from '../src/platform/cloudflare/identity-day-policy';
 export { ResolverRequestAuthority } from '../src/platform/cloudflare/resolver-request-authority';
+export { OwnerBudgetAuthority } from '../src/platform/cloudflare/owner-budget-authority';
+export { ProviderRequestAuthority } from '../src/platform/cloudflare/provider-request-authority';
+const PRIVATE_PROVIDER_PATHS = new Set([
+  '/api/scan',
+  '/api/resolve-timezone',
+  '/api/summarize',
+  '/api/provider-status',
+]);
+type PrivateCloudflareEnv = CloudflareEnv & Readonly<{
+  STATE_AUTHORITY_MODE?: string;
+  PROVIDER_POLICY_VERSION?: string;
+  PROVIDER_REQUEST_HMAC_CURRENT_VERSION?: string;
+  PROVIDER_REQUEST_HMAC_PREVIOUS_VERSION?: string;
+  OPENROUTER_OWNER_KEY?: string;
+  PROVIDER_REQUEST_HMAC_CURRENT?: string;
+  PROVIDER_REQUEST_HMAC_PREVIOUS?: string;
+  OWNER_BUDGET_AUTHORITY?: unknown;
+  PROVIDER_REQUEST_AUTHORITY?: unknown;
+}>;
 type ExportedHandler<Env> = Readonly<{
   fetch(request: Request, env: Env, ctx: unknown): Response | Promise<Response>;
 }>;
+function nonempty(value: unknown): value is string {
+  return typeof value === 'string' && value.length > 0;
+}
+function privateProviderConfigurationAvailable(env: PrivateCloudflareEnv): boolean {
+  const hasPreviousKey = nonempty(env.PROVIDER_REQUEST_HMAC_PREVIOUS);
+  const hasPreviousVersion = nonempty(env.PROVIDER_REQUEST_HMAC_PREVIOUS_VERSION);
+  return env.STATE_AUTHORITY_MODE === 'cloudflare'
+    && env.PROVIDER_POLICY_VERSION === 'owner-v1'
+    && env.PROVIDER_REQUEST_HMAC_CURRENT_VERSION === 'c1-b-current-v1'
+    && nonempty(env.OPENROUTER_OWNER_KEY)
+    && nonempty(env.PROVIDER_REQUEST_HMAC_CURRENT)
+    && Boolean(env.OWNER_BUDGET_AUTHORITY)
+    && Boolean(env.PROVIDER_REQUEST_AUTHORITY)
+    && hasPreviousKey === hasPreviousVersion;
+}
+function providerStateUnavailable(): Response {
+  return Response.json(
+    { error: 'Provider state unavailable.', code: 'provider_state_unavailable' },
+    { status: 503, headers: { 'Cache-Control': 'no-store' } },
+  );
+}
 export default {
-  async fetch(request: Request, env: CloudflareEnv, ctx: unknown) {
+  async fetch(request: Request, env: PrivateCloudflareEnv, ctx: unknown) {
     const admitted = await admitEdgeRequest(request, env, ctx, cloudflareTrustedEdgeAddress);
     if (admitted.status === 'failure') return admitted.response;
+    if (PRIVATE_PROVIDER_PATHS.has(new URL(admitted.request.url).pathname)
+      && !privateProviderConfigurationAvailable(env)) return providerStateUnavailable();
     return handler.fetch(admitted.request, env, ctx);
   },
-} satisfies ExportedHandler<CloudflareEnv>;
+} satisfies ExportedHandler<PrivateCloudflareEnv>;
 `;
 const EXACT_WORKERS_CONFIG = `
 import { defineConfig } from 'vitest/config';
@@ -280,6 +329,8 @@ export default defineConfig(async () => {
           bindings: {
             IDENTITY_HMAC_CURRENT: 'synthetic-c1-a-identity-key',
             RESOLVER_CAPABILITY_HMAC: 'synthetic-c1-a-capability-key',
+            OPENROUTER_OWNER_KEY: 'deliberately-invalid-synthetic-owner-key',
+            PROVIDER_REQUEST_HMAC_CURRENT: 'synthetic-c1-b-request-shape-key',
           },
         },
       }),
@@ -290,6 +341,8 @@ export default defineConfig(async () => {
         'test/worker/admission.integration.test.ts',
         'test/worker/resolver.integration.test.ts',
         'test/worker/deny-egress.integration.test.ts',
+        'test/worker/owner-budget-authority.integration.test.ts',
+        'test/worker/provider-request-authority.integration.test.ts',
       ],
       setupFiles: ['./test/worker/deny-egress.setup.ts'],
     },
@@ -384,6 +437,16 @@ export function assertC1AConfig(root = process.cwd()): void {
   for (const file of ['bun.lock', 'package.json', '.gitignore']) {
     if (CREDENTIAL_ASSIGNMENT.test(read(root, file))) fail('credential evidence');
   }
+  const envExample = read(root, '.env.example');
+  const envAssignments = envExample.split(/\r?\n/).filter((line) => /^[A-Z][A-Z0-9_]*=/.test(line));
+  exact(envAssignments, [
+    'OPENROUTER_OWNER_KEY=',
+    'PROVIDER_REQUEST_HMAC_CURRENT=',
+    'PROVIDER_REQUEST_HMAC_PREVIOUS=',
+  ], '.env.example');
+  if (envExample.split(/\r?\n/).some((line) => CREDENTIAL_ASSIGNMENT.test(line))
+    || /OPENROUTER_(?:COMMUNITY_KEY|API_KEY|BASE_URL)|(?:SUMMARY|TIMEZONE)_MODEL|KV_REST|UPSTASH|RESEND|WAITLIST/i.test(envExample)
+    || !/real values are inputs to the later deployment/i.test(envExample)) fail('.env.example');
   if (existsSync(path.join(root, '.npmrc'))) fail('registry auth');
   const bunfig = path.join(root, 'bunfig.toml');
   if (existsSync(bunfig) && /(?:auth|token|registry)/i.test(readFileSync(bunfig, 'utf8'))) fail('registry auth');
@@ -412,11 +475,17 @@ export function assertC1AConfig(root = process.cwd()): void {
     { name: 'IDENTITY_DAY_POLICY', class_name: 'IdentityDayPolicy' },
     { name: 'RESOLVER_REQUEST_AUTHORITY', class_name: 'ResolverRequestAuthority' },
     { name: 'RESOLVER_DAILY_COUNTER', class_name: 'DailyCounter' },
+    { name: 'OWNER_BUDGET_AUTHORITY', class_name: 'OwnerBudgetAuthority' },
+    { name: 'PROVIDER_REQUEST_AUTHORITY', class_name: 'ProviderRequestAuthority' },
   ] }, 'wrangler.durable_objects');
-  exact(wrangler.migrations, [{ tag: 'c1-a-v1', new_sqlite_classes: ['IdentityDayPolicy', 'ResolverRequestAuthority', 'DailyCounter'] }], 'wrangler.migrations');
+  exact(wrangler.migrations, [
+    { tag: 'c1-a-v1', new_sqlite_classes: ['IdentityDayPolicy', 'ResolverRequestAuthority', 'DailyCounter'] },
+    { tag: 'c1-b-budget-v1', new_sqlite_classes: ['OwnerBudgetAuthority'] },
+    { tag: 'c1-b-request-v1', new_sqlite_classes: ['ProviderRequestAuthority'] },
+  ], 'wrangler.migrations');
   if ('routes' in wrangler || 'triggers' in wrangler || wrangler.remote === true) fail('wrangler deployment');
   exact(wrangler.vars, {
-    C1_DEPLOYMENT_DISABLED: '1', STATE_AUTHORITY_MODE: 'legacy', IDENTITY_KEY_CURRENT_VERSION: 'local-v1', IDENTITY_KEY_NEXT_VERSION: '', IDENTITY_KEY_ACTIVATES_AT: '', IDENTITY_KEY_SCHEDULE_DIGEST: 'local-v1-no-rotation', IDENTITY_HMAC_CURRENT: '', IDENTITY_HMAC_NEXT: '', RESOLVER_CAPABILITY_HMAC: '',
+    C1_DEPLOYMENT_DISABLED: '1', STATE_AUTHORITY_MODE: 'cloudflare', IDENTITY_KEY_CURRENT_VERSION: 'local-v1', IDENTITY_KEY_NEXT_VERSION: '', IDENTITY_KEY_ACTIVATES_AT: '', IDENTITY_KEY_SCHEDULE_DIGEST: 'local-v1-no-rotation', PROVIDER_POLICY_VERSION: 'owner-v1', PROVIDER_REQUEST_HMAC_CURRENT_VERSION: 'c1-b-current-v1', PROVIDER_REQUEST_HMAC_PREVIOUS_VERSION: '',
   }, 'wrangler.vars');
 
   const keepalive = readWranglerConfig(root, 'cloudflare/legacy-keepalive-wrangler.jsonc');
@@ -434,7 +503,8 @@ export function assertC1AConfig(root = process.cwd()): void {
 
   exactExecutable(root, 'vitest.config.workers.ts', EXACT_WORKERS_CONFIG, 'vitest.config.workers remote');
   const generatedTypes = read(root, 'worker-configuration.d.ts');
-  for (const binding of ['EVENT_EVERY_DB', 'ASSETS', 'C1_DEPLOYMENT_DISABLED', 'STATE_AUTHORITY_MODE', 'IDENTITY_KEY_CURRENT_VERSION', 'IDENTITY_KEY_NEXT_VERSION', 'IDENTITY_KEY_ACTIVATES_AT', 'IDENTITY_KEY_SCHEDULE_DIGEST', 'IDENTITY_HMAC_CURRENT', 'IDENTITY_HMAC_NEXT', 'RESOLVER_CAPABILITY_HMAC', 'IDENTITY_DAY_POLICY', 'RESOLVER_REQUEST_AUTHORITY', 'RESOLVER_DAILY_COUNTER', 'WORKER_SELF_REFERENCE']) if (!generatedTypes.includes(binding)) fail('worker-configuration.d.ts');
+  for (const binding of ['EVENT_EVERY_DB', 'ASSETS', 'C1_DEPLOYMENT_DISABLED', 'STATE_AUTHORITY_MODE', 'IDENTITY_KEY_CURRENT_VERSION', 'IDENTITY_KEY_NEXT_VERSION', 'IDENTITY_KEY_ACTIVATES_AT', 'IDENTITY_KEY_SCHEDULE_DIGEST', 'PROVIDER_POLICY_VERSION', 'PROVIDER_REQUEST_HMAC_CURRENT_VERSION', 'PROVIDER_REQUEST_HMAC_PREVIOUS_VERSION', 'IDENTITY_HMAC_CURRENT', 'IDENTITY_HMAC_NEXT', 'RESOLVER_CAPABILITY_HMAC', 'OPENROUTER_OWNER_KEY', 'PROVIDER_REQUEST_HMAC_CURRENT', 'PROVIDER_REQUEST_HMAC_PREVIOUS', 'IDENTITY_DAY_POLICY', 'RESOLVER_REQUEST_AUTHORITY', 'RESOLVER_DAILY_COUNTER', 'OWNER_BUDGET_AUTHORITY', 'PROVIDER_REQUEST_AUTHORITY', 'WORKER_SELF_REFERENCE']) if (!generatedTypes.includes(binding)) fail('worker-configuration.d.ts');
+  for (const declaration of ['OPENROUTER_OWNER_KEY: string;', 'PROVIDER_REQUEST_HMAC_CURRENT: string;', 'PROVIDER_REQUEST_HMAC_PREVIOUS?: string;']) if (!generatedTypes.includes(declaration)) fail('worker-configuration.d.ts');
   exactExecutable(root, 'playwright.c1-a.config.ts', EXACT_C1_PLAYWRIGHT);
   const ordinaryPlaywright = ts.createSourceFile('playwright.config.ts', read(root, 'playwright.config.ts'), ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
   let ignoresC1A = false;

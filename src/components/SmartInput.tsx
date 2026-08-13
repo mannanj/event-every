@@ -59,10 +59,6 @@ const SmartInput = forwardRef<SmartInputHandle, SmartInputProps>(
 
     const objectUrlsRef = useRef<string[]>([]);
 
-    useEffect(() => {
-      setIsHydrated(true);
-    }, []);
-
     const applyStoredFiles = useCallback(async (files: StoredInputFile[]) => {
       // Revoke object URLs from a previous load before creating new ones.
       objectUrlsRef.current.forEach(u => URL.revokeObjectURL(u));
@@ -146,24 +142,27 @@ const SmartInput = forwardRef<SmartInputHandle, SmartInputProps>(
     // Restore an in-progress draft (text + files) so a refresh/reload never loses work.
     useEffect(() => {
       let cancelled = false;
-      inputStorage.getDraft().then(async draft => {
+      void inputStorage.getDraft().then(async draft => {
         if (cancelled) return;
+        const browserRestoredText = editorRef.current?.innerText ?? '';
         if (draft && (draft.text || draft.files.length > 0)) {
-          if (editorRef.current) editorRef.current.innerText = draft.text || '';
-          setText(draft.text || '');
+          setEditorContent(draft.text || '');
           await applyStoredFiles(draft.files);
-        } else if (editorRef.current?.innerText) {
-          // The browser can restore contentEditable text (bfcache / form restore)
-          // before React hydrates. Capture it into state so data-empty, the
-          // placeholder, and the Transform button reflect the real DOM content.
-          setText(editorRef.current.innerText);
+        } else if (browserRestoredText) {
+          // Browser restoration is read only after React's deterministic empty first render.
+          setEditorContent(browserRestoredText);
         }
+      }).catch(() => {
+        // Draft storage is optional for rendering. The input still becomes usable.
+      }).finally(() => {
+        if (cancelled) return;
         restoredRef.current = true;
+        setIsHydrated(true);
       });
       return () => {
         cancelled = true;
       };
-    }, [applyStoredFiles]);
+    }, [applyStoredFiles, setEditorContent]);
 
     // Persist the current draft (debounced) once the initial restore has run.
     useEffect(() => {

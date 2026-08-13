@@ -1,4 +1,3 @@
-import { emitIfCommunityLimited } from '@/utils/communityLimit';
 import { normalizeUrl } from '@/utils/url';
 import type { ScrapedContent } from '@/services/webScraper';
 
@@ -107,7 +106,6 @@ export async function detectURLs(text: string, signal?: AbortSignal): Promise<UR
     });
 
     if (!response.ok) {
-      await emitIfCommunityLimited(response);
       const errorData = await response.json().catch(() => ({ error: 'Failed to detect URLs' }));
       throw new Error(errorData.error || 'Failed to detect URLs');
     }

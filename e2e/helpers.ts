@@ -17,12 +17,16 @@ export async function mockAuth(page: Page) {
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({
+        status: 'available',
+        policyVersion: 'owner-v1',
+        authorityDay: '2026-08-04',
+        limitNanodollars: 5_000_000_000,
+        spentNanodollars: 0,
+        reservedNanodollars: 0,
+        remainingNanodollars: 5_000_000_000,
         exhausted: false,
-        isAdmin: false,
+        frozen: false,
         resetAt: '2026-08-04T00:00:00.000Z',
-        limitUsd: 5,
-        spentUsd: 0,
-        remainingUsd: 5,
       }),
     });
   });
@@ -137,7 +141,7 @@ export async function waitForSmartInputReady(page: Page) {
   await page.waitForSelector('[data-testid="smart-input-textarea"]', { state: 'visible', timeout: 20000 });
   await page.waitForFunction(() => (
     document.querySelector('[data-testid="smart-input-textarea"]')?.getAttribute('contenteditable') === 'true'
-  ));
+  ), undefined, { timeout: 20000 });
 }
 
 export async function setupLocal(page: Page) {

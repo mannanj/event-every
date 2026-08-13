@@ -1317,6 +1317,18 @@ describe('ProviderRequestAuthority SQLite Durable Object', () => {
     });
   });
 
+  it('accepts only the exact Miniflare name metadata table beyond the application schema', async () => {
+    const stub = authority('miniflare-metadata');
+    await beginPrepared(stub);
+    const expected = await stub.status({});
+    await runInDurableObject(stub, async (instance: ProviderRequestAuthority, state: DurableObjectStateLike) => {
+      state.storage.sql.exec('CREATE TABLE __miniflare_do_name (name TEXT)');
+      await expect(instance.status({})).resolves.toEqual(expected);
+      state.storage.sql.exec('CREATE TABLE unexpected_application_table (value TEXT)');
+      await expect(instance.status({})).rejects.toThrow('provider request schema unavailable');
+    });
+  });
+
   it('review finding 5: fails closed on exact-schema, duplicate-row, cross-table, integer, and state-residue corruption', { timeout: 30_000 }, async () => {
     const corruptions: readonly Readonly<{
       name: string;

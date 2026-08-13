@@ -2,14 +2,19 @@
 
 Baseline: `469bd1de78340b61348613e0ba1404d5770e1283`
 
-Scope: local synthetic C1-A closure. This matrix does not claim C1-B provider budget/idempotency,
-owner Access, deployment, backup/rollback, owner data, community access, or public release.
+Scope: retained local synthetic C1-A closure plus C1-B Task 7's authoritative private Worker graph
+and browser boundary. This matrix does not claim the full C1-B provider lifecycle, owner Access,
+deployment, backup/rollback, owner data, community access, or public release.
 
 ## Product controls
 
 | Private control | Production seam | Current proof | Retained causal check | Closure result |
 | --- | --- | --- | --- | --- |
 | Provider routes fail closed before C1-B state | `src/platform/runtime.ts` | runtime unit tests; app-worker workerd tests | C1A-M30 | named RED; exact restore; focused GREEN |
+| Private provider routes require the owner key, request HMAC, fixed policy labels, and both Durable Object bindings before delegation | `cloudflare/app-worker.ts`; `wrangler.jsonc` | app-worker workerd tests; exact config assertions | ordinary GREEN | pass in Task 7 gate |
+| Emitted private Worker reachability excludes community, waitlist, Redis/Upstash, legacy dispatch, and runtime-selected provider configuration | `scripts/assert-private-worker.ts` | adversarial artifact fixtures; credential-scrubbed OpenNext build scan | ordinary GREEN | pass in Task 7 gate; owned output removed |
+| Owner exhaustion/freeze/unavailability has one fixed local UI and no retired pattern, waitlist, or `/spent` action | `src/components/OwnerBudgetBoundary.tsx`; `src/components/OwnerBudgetScreen.tsx` | owner-boundary browser scenarios; C1-A runtime exhaustion scenario | ordinary GREEN | pass in Chromium and WebKit |
+| Browser-restored draft is applied only after server-identical first markup | `src/components/SmartInput.tsx` | C1-A hydration scenario captures first DOM plus React errors/warnings before navigation | ordinary GREEN | pass in Chromium and WebKit |
 | Caller forwarding headers cannot forge edge identity | `src/platform/identity.ts` | identity unit tests; app-worker workerd tests | C1A-M01 | named RED; exact restore; focused GREEN |
 | Same-origin admission rejects cross-site requests | `src/platform/admission.ts` | admission unit tests; admission workerd tests | C1A-M02 | named RED; exact restore; focused GREEN |
 | Streamed body size uses received bytes | `src/platform/admission.ts` | admission unit tests; admission workerd tests | C1A-M03 | named RED; exact restore; focused GREEN |
@@ -23,6 +28,9 @@ owner Access, deployment, backup/rollback, owner data, community access, or publ
 | Retired keep-alive stays isolated and status-only | public route; private scheduled worker | route unit tests; keep-alive/deny-egress workerd tests | ordinary GREEN | pass in nine-step gate |
 | Scanner loop stays raw-free and temporally truthful | Scanner consumer and Event Every E1 seams | `bun run verify:e1:offline` | accepted E1 causal ledger | pass in nine-step gate |
 | Closure has no credential, provider, external-network, or deployment effect | offline preload, scrubbed child environments, deny-egress setup | lean full gate and final status/protected hashes | process boundary | pass; owned outputs removed |
+
+`Lunch with Priya` is only the ordinary calendar draft used by the hydration regression. “Priya” is
+not a product, provider, project, or brand name.
 
 ## Retained mutation results
 

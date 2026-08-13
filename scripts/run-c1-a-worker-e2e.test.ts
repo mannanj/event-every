@@ -5,7 +5,7 @@ import net from 'node:net';
 import path from 'node:path';
 import { Readable } from 'node:stream';
 import tls from 'node:tls';
-import { C1_A_WORKER_E2E_STATES, assertBridgeRootSmoke, assertInternalHarnessInvocation, awaitHarnessChildReady, createC1AWorkerE2EEnvironment, createHarnessChildEnvironment, createInternalHarnessLifecycle, detachedDelay, dispatchBridgeRequest, drainChildOutput, emitReadyAfterBridgeSmoke, harnessChildInvocation, nodeHarnessChildInvocation, parseC1AWorkerE2EArgs, requestFromNode, runC1AWorkerE2E, runOutboundCanary, startEgressGuard, stopChild, type C1AWorkerE2EChild, type C1AWorkerE2ESeams } from './run-c1-a-worker-e2e';
+import { C1_A_HARNESS_VARS, C1_A_WORKER_E2E_STATES, assertBridgeRootSmoke, assertInternalHarnessInvocation, awaitHarnessChildReady, createC1AWorkerE2EEnvironment, createHarnessChildEnvironment, createInternalHarnessLifecycle, detachedDelay, dispatchBridgeRequest, drainChildOutput, emitReadyAfterBridgeSmoke, harnessChildInvocation, nodeHarnessChildInvocation, parseC1AWorkerE2EArgs, providerStreamFailureResponse, requestFromNode, runC1AWorkerE2E, runOutboundCanary, startEgressGuard, stopChild, type C1AWorkerE2EChild, type C1AWorkerE2ESeams } from './run-c1-a-worker-e2e';
 
 const root = '/fixture'; const suffix = '0123456789ab'; const token = 'a'.repeat(64);
 const stream = (...chunks: string[]) => new ReadableStream<Uint8Array>({ start(controller) { for (const chunk of chunks) controller.enqueue(new TextEncoder().encode(chunk)); controller.close(); } });
@@ -98,7 +98,20 @@ describe('C1-A Worker E2E runner', () => {
     expect(states).toEqual(C1_A_WORKER_E2E_STATES); expect(f.calls).toEqual(['dev-vars', 'probe', 'boundary', 'build', 'harness', 'playwright:["node","node_modules/@playwright/test/cli.js","test","--config","playwright.c1-a.config.ts"]', 'signals-removed']); expect(f.cleanup).toEqual(['playwright', 'harness child', 'port', 'outputs']);
   });
 
-  test('passes exact browser options without dotenv values', async () => { const f = fixture(); await runC1AWorkerE2E(['--project=chromium', '--grep', 'community exhaustion exposes no pattern or admin bypass'], root, f.seams); expect(f.calls.find((value) => value.startsWith('playwright:'))).toBe('playwright:["node","node_modules/@playwright/test/cli.js","test","--config","playwright.c1-a.config.ts","--project=chromium","--grep","community exhaustion exposes no pattern or admin bypass"]'); });
+  test('passes exact browser options without dotenv values', async () => { const f = fixture(); await runC1AWorkerE2E(['--project=chromium', '--grep', 'owner budget exhaustion exposes no pattern or admin bypass'], root, f.seams); expect(f.calls.find((value) => value.startsWith('playwright:'))).toBe('playwright:["node","node_modules/@playwright/test/cli.js","test","--config","playwright.c1-a.config.ts","--project=chromium","--grep","owner budget exhaustion exposes no pattern or admin bypass"]'); });
+
+  test('uses only the final synthetic private bindings and fixed labels', () => {
+    expect(C1_A_HARNESS_VARS).toEqual({
+      IDENTITY_HMAC_CURRENT: 'synthetic-c1-a-identity-key',
+      RESOLVER_CAPABILITY_HMAC: 'synthetic-c1-a-capability-key',
+      OPENROUTER_OWNER_KEY: 'deliberately-invalid-synthetic-owner-key',
+      PROVIDER_REQUEST_HMAC_CURRENT: 'synthetic-c1-b-request-shape-key',
+      PROVIDER_REQUEST_HMAC_CURRENT_VERSION: 'c1-b-current-v1',
+      PROVIDER_POLICY_VERSION: 'owner-v1',
+      STATE_AUTHORITY_MODE: 'cloudflare',
+    });
+    expect(JSON.stringify(C1_A_HARNESS_VARS)).not.toContain('OPENROUTER_COMMUNITY_KEY');
+  });
 
   test('starts the absolute deadline before child acquisition and cleans a late child', async () => {
     let release!: (value: C1AWorkerE2EChild) => void; const pending = new Promise<C1AWorkerE2EChild>((resolve) => { release = resolve; }); const f = fixture({ startHarnessChild: async () => pending, startupDeadline: async () => { release(child(Promise.resolve(0))); } });
@@ -139,14 +152,54 @@ describe('C1-A Worker E2E runner', () => {
   });
 
   test('keeps exact canary response shape and ignores safe human error text', async () => {
-    let observed: { input?: RequestInfo | URL; init?: RequestInit } = {}; const harness = { listen: async () => undefined, close: async () => undefined, fetch: async (input: RequestInfo | URL, init?: RequestInit) => { observed = { input, init }; return Response.json({ error: 'safe', code: 'scan_provider_failed' }, { status: 502 }); } }; await runOutboundCanary(harness, { assertOutboundCanary: () => undefined, close: () => undefined }); expect(observed.input).toBe('http://127.0.0.1:8788/api/scan'); expect(observed.init?.method).toBe('POST'); await expect(runOutboundCanary({ ...harness, fetch: async () => Response.json({ error: 'scan_provider_failed' }, { status: 502 }) }, { assertOutboundCanary: () => undefined, close: () => undefined })).rejects.toThrow('outbound canary response');
+    let observed: { input?: RequestInfo | URL; init?: RequestInit } = {};
+    const harness = {
+      listen: async () => undefined,
+      close: async () => undefined,
+      fetch: async (input: RequestInfo | URL, init?: RequestInit) => {
+        observed = { input, init };
+        return Response.json({ error: 'safe', code: 'provider_outcome_unknown' }, { status: 502 });
+      },
+    };
+    await runOutboundCanary(harness, { assertOutboundCanary: () => undefined, close: () => undefined });
+    expect(observed.input).toBe('http://127.0.0.1:8788/api/scan');
+    expect(observed.init?.method).toBe('POST');
+    expect(new Headers(observed.init?.headers).get('x-event-every-request-id')).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+    );
+    await expect(runOutboundCanary({ ...harness, fetch: async () => Response.json({ error: 'provider_outcome_unknown' }, { status: 502 }) }, { assertOutboundCanary: () => undefined, close: () => undefined })).rejects.toThrow('outbound canary response');
   });
 
   test('throws before every non-loopback connector can delegate and permits loopback', async () => {
     const originalNet = net.connect; const originalCreate = net.createConnection; const originalTls = tls.connect; let called = 0; const fake = (() => { called += 1; return { on() { return this; } }; }) as unknown as typeof net.connect; net.connect = fake; net.createConnection = fake; tls.connect = fake as unknown as typeof tls.connect; const guard = await startEgressGuard(); try { expect(() => net.connect({ host: '192.0.2.1', port: 443 })).toThrow('non-loopback socket'); expect(() => tls.connect({ host: '192.0.2.1', port: 443 })).toThrow('non-loopback socket'); expect(called).toBe(0); net.connect({ host: '127.0.0.1', port: 1 }); expect(called).toBe(1); } finally { guard.close(); net.connect = originalNet; net.createConnection = originalCreate; tls.connect = originalTls; }
   });
 
-  test('records only exact OpenRouter target without a provider request', async () => { const guard = await startEgressGuard(); try { await expect(fetch('https://openrouter.ai/api/v1/chat/completions', { method: 'POST' })).rejects.toThrow(); expect(() => guard.assertOutboundCanary()).not.toThrow(); } finally { guard.close(); } });
+  test('records only exact OpenRouter target without a provider request', async () => {
+    const diagnostic = Bun.spawnSync([
+      'node', '--no-warnings', '--experimental-strip-types', '--input-type=module', '--eval',
+      `const { startEgressGuard } = await import('./scripts/run-c1-a-worker-e2e.ts');
+       const guard = await startEgressGuard();
+       try {
+         const response = await fetch('https://openrouter.ai/api/v1/chat/completions', { method: 'POST' });
+         let body = 'resolved';
+         try { await response.arrayBuffer(); } catch { body = 'rejected'; }
+         guard.assertOutboundCanary();
+         process.stdout.write(response.status + ':' + body + ':observed');
+       } finally { guard.close(); }`,
+    ], { cwd: process.cwd(), env: process.env, stdout: 'pipe', stderr: 'pipe' });
+    expect(diagnostic.exitCode).toBe(0);
+    expect(new TextDecoder().decode(diagnostic.stdout)).toBe('200:rejected:observed');
+    expect(new TextDecoder().decode(diagnostic.stderr)).toBe('');
+  });
+
+  test('injects ambiguity after a successful provider response starts', async () => {
+    const response = providerStreamFailureResponse();
+    expect(response.status).toBe(200);
+    expect(response.headers.get('content-encoding')).toBe('gzip');
+    expect(response.headers.get('content-type')).toBe('application/octet-stream');
+    expect(response.headers.get('content-length')).toBeNull();
+    expect(await response.text()).toBe('{');
+  });
 
   test('bounds and redacts child output and sanitizes native runner failures', async () => {
     const output = await drainChildOutput(stream(`OPENROUTER_API_KEY:secret:${'x'.repeat(70_000)}`), { OPENROUTER_API_KEY: 'secret' }); expect(output).not.toContain('secret'); expect(output).not.toContain('OPENROUTER_API_KEY'); expect(output.length).toBeLessThanOrEqual(64 * 1024); const boundary = await drainChildOutput(stream('x'.repeat(64 * 1024 - 6), 'boundary-secret-canary'), { OPENROUTER_API_KEY: 'boundary-secret-canary' }); expect(boundary).not.toContain('secret'); expect(boundary.length).toBeLessThanOrEqual(64 * 1024); const f = fixture({ build: async () => { throw new Error('native secret'); } }); const error = await runC1AWorkerE2E([], root, f.seams).then(() => { throw new Error('expected failure'); }, (value) => value instanceof Error ? value : new Error()); expect(error.message).toBe('c1-a worker e2e: build failed'); expect(error.message).not.toContain('secret');

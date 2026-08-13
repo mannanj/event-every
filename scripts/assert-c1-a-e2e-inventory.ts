@@ -10,9 +10,9 @@ export const RETIRED_E1_TITLES = [
 ] as const;
 
 export const C1_A_TITLES = [
-  'community exhaustion exposes no pattern or admin bypass',
+  'owner budget exhaustion exposes no pattern or admin bypass',
   'corrupt Scanner review storage recovers and persists the next scan',
-  'URL-only scan waits through resolver rollover and busy responses then succeeds',
+  'draft reload hydrates without React errors',
 ] as const;
 
 export const PRESERVED_E1_TITLES = [
@@ -24,12 +24,12 @@ export const PRESERVED_E1_TITLES = [
   'CalendarEvent regressions › legacy CalendarEvent batch export omits the deselected event',
   'CalendarEvent regressions › legacy CalendarEvent edited start survives timezone change',
   'CalendarEvent regressions › legacy CalendarEvent moving start past end preserves duration',
-  'community limit screen › shows the community-sponsored message with reset time in the local timezone',
-  'community limit screen › waitlist signup shows the on-screen confirmation',
-  'community limit screen › already-joined emails get the already-on-the-list message',
-  'community limit screen › app stays open (no pattern lock) when the budget is not exhausted',
-  'community limit screen › /spent previews the limit screen without the budget being exhausted',
-  'community limit screen › a mid-session community 402 flips the app to the limit screen',
+  'owner budget boundary › shows the fixed exhausted state without private operational details',
+  'owner budget boundary › shows the fixed frozen state before the exhausted state',
+  'owner budget boundary › shows the fixed unavailable state when usage fails closed',
+  'owner budget boundary › treats a malformed successful usage response as unavailable',
+  'owner budget boundary › keeps the app open when the owner budget is available',
+  'owner budget boundary › reads only the usage endpoint and renders no retired action',
   'Event Extraction Scenarios › Scenario 4: one strict Scanner response keeps every candidate as an ordered selectable review draft',
   'Event Extraction Scenarios › Scenario 5: zero Scanner candidates leave no review drafts or processing error',
   'UI Interaction Tests › Submit button is disabled with empty input',

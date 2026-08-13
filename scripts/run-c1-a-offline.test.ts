@@ -7,12 +7,13 @@ import * as offline from './run-c1-a-offline';
 function bytes(value = ''): Uint8Array { return new TextEncoder().encode(value); }
 
 const EXPECTED_FULL_COMMANDS = [
-  ['bun', 'test', 'scripts/assert-c1-a-config.test.ts', 'scripts/assert-c1-a-e2e-inventory.test.ts', 'scripts/install-c1-a-dependencies.test.ts', 'scripts/c1-a-offline-preload.test.ts', 'scripts/run-c1-a-cloudflare.test.ts', 'scripts/run-c1-a-offline.test.ts', 'scripts/run-c1-a-worker-e2e.test.ts', 'scripts/run-e1-focused.test.ts', 'scripts/run-with-open-next.test.ts', '--isolate'],
+  ['bun', 'test', 'scripts/assert-c1-a-config.test.ts', 'scripts/assert-c1-a-e2e-inventory.test.ts', 'scripts/assert-private-worker.test.ts', 'scripts/install-c1-a-dependencies.test.ts', 'scripts/c1-a-offline-preload.test.ts', 'scripts/run-c1-a-cloudflare.test.ts', 'scripts/run-c1-a-offline.test.ts', 'scripts/run-c1-a-worker-e2e.test.ts', 'scripts/run-e1-focused.test.ts', 'scripts/run-with-open-next.test.ts', '--isolate'],
   ['bun', 'scripts/run-e1-offline.ts'],
-  ['bun', 'scripts/run-with-open-next.ts', '--', 'node', 'node_modules/vitest/vitest.mjs', 'run', '--config', 'vitest.config.workers.ts', 'test/worker/app-worker.test.ts', 'test/worker/admission.integration.test.ts', 'test/worker/resolver.integration.test.ts', 'test/worker/deny-egress.integration.test.ts'],
+  ['bun', 'scripts/run-with-open-next.ts', '--', 'node', 'node_modules/vitest/vitest.mjs', 'run', '--config', 'vitest.config.workers.ts', 'test/worker/app-worker.test.ts', 'test/worker/admission.integration.test.ts', 'test/worker/resolver.integration.test.ts', 'test/worker/deny-egress.integration.test.ts', 'test/worker/owner-budget-authority.integration.test.ts', 'test/worker/provider-request-authority.integration.test.ts'],
   ['bun', 'scripts/run-c1-a-cloudflare.ts', 'keepalive-tests'],
-  ['bun', 'scripts/assert-c1-a-e2e-inventory.ts', '58'],
+  ['bun', 'scripts/assert-c1-a-e2e-inventory.ts', '59'],
   ['bun', 'scripts/run-c1-a-worker-e2e.ts'],
+  ['bun', 'scripts/assert-private-worker.ts'],
   ['bun', 'scripts/assert-e1-protected.ts'],
   ['bun', 'scripts/assert-c1-a-config.ts'],
   ['git', 'diff', '--check'],

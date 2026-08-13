@@ -1,36 +1,47 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-// @ts-expect-error cloudflare:test is injected by the Workers Vitest pool only.
-import { createExecutionContext, waitOnExecutionContext } from 'cloudflare:test';
 
 const { delegated } = vi.hoisted(() => ({ delegated: vi.fn() }));
 vi.mock('../../.open-next/worker.js', () => ({
   default: { fetch: delegated },
 }));
 
-import worker, { DailyCounter, IdentityDayPolicy, ResolverRequestAuthority } from '../../cloudflare/app-worker';
+import worker, {
+  DailyCounter,
+  IdentityDayPolicy,
+  OwnerBudgetAuthority,
+  ProviderRequestAuthority,
+  ResolverRequestAuthority,
+} from '../../cloudflare/app-worker';
 import { INTERNAL_IDENTITY_HEADER } from '../../src/platform/admission';
-import { settleLegacyDispatch, startLegacyDispatch } from '../../src/platform/legacy/dispatch';
 
-const workerEnv = {
-  IDENTITY_KEY_CURRENT_VERSION: 'test-v1',
-  IDENTITY_HMAC_CURRENT: 'synthetic-worker-key',
-} as unknown as CloudflareEnv;
-
-type WaitUntilContext = Readonly<{
-  waitUntil(work: Promise<unknown>): void;
-}>;
-
-function deferred<Value>() {
-  let resolve!: (value: Value | PromiseLike<Value>) => void;
-  const promise = new Promise<Value>((resolvePromise) => { resolve = resolvePromise; });
-  return { promise, resolve };
+function workerEnv(overrides: Record<string, unknown> = {}): CloudflareEnv {
+  return {
+    C1_DEPLOYMENT_DISABLED: '1',
+    STATE_AUTHORITY_MODE: 'cloudflare',
+    PROVIDER_POLICY_VERSION: 'owner-v1',
+    PROVIDER_REQUEST_HMAC_CURRENT_VERSION: 'c1-b-current-v1',
+    PROVIDER_REQUEST_HMAC_PREVIOUS_VERSION: '',
+    PROVIDER_REQUEST_HMAC_CURRENT: 'synthetic-request-shape-key',
+    OPENROUTER_OWNER_KEY: 'deliberately-invalid-opaque-owner-key',
+    OWNER_BUDGET_AUTHORITY: {},
+    PROVIDER_REQUEST_AUTHORITY: {},
+    IDENTITY_KEY_CURRENT_VERSION: 'test-v1',
+    IDENTITY_HMAC_CURRENT: 'synthetic-worker-key',
+    ...overrides,
+  } as unknown as CloudflareEnv;
 }
 
 describe('C1-A app Worker admission wrapper', () => {
   beforeEach(() => delegated.mockReset());
 
   it('wrapper forwards only rebuilt admitted request', async () => {
-    expect([DailyCounter, IdentityDayPolicy, ResolverRequestAuthority].every((value) => typeof value === 'function')).toBe(true);
+    expect([
+      DailyCounter,
+      IdentityDayPolicy,
+      ResolverRequestAuthority,
+      OwnerBudgetAuthority,
+      ProviderRequestAuthority,
+    ].every((value) => typeof value === 'function')).toBe(true);
     const request = new Request('https://event-every.test/api/scan', {
       method: 'POST',
       headers: {
@@ -43,11 +54,7 @@ describe('C1-A app Worker admission wrapper', () => {
       },
       body: '{}',
     });
-    const env = {
-      C1_DEPLOYMENT_DISABLED: '1',
-      IDENTITY_KEY_CURRENT_VERSION: 'test-v1',
-      IDENTITY_HMAC_CURRENT: 'synthetic-worker-key',
-    } as unknown as CloudflareEnv;
+    const env = workerEnv();
     const ctx = { waitUntil: vi.fn() };
     const response = new Response('delegated exactly', { status: 209, headers: { 'x-c1-a': 'response' } });
     delegated.mockResolvedValueOnce(response);
@@ -77,10 +84,7 @@ describe('C1-A app Worker admission wrapper', () => {
         'x-preserved-asset': 'yes',
       },
     });
-    const env = {
-      IDENTITY_KEY_CURRENT_VERSION: 'test-v1',
-      IDENTITY_HMAC_CURRENT: 'synthetic-worker-key',
-    } as unknown as CloudflareEnv;
+    const env = workerEnv();
     const ctx = { waitUntil: vi.fn() };
     const response = new Response('asset');
     delegated.mockResolvedValueOnce(response);
@@ -102,10 +106,7 @@ describe('C1-A app Worker admission wrapper', () => {
       headers: { origin: 'https://cross-site.invalid', 'content-type': 'application/json' },
       body: '{"private":"worker-canary"}',
     });
-    const env = {
-      IDENTITY_KEY_CURRENT_VERSION: 'test-v1',
-      IDENTITY_HMAC_CURRENT: 'synthetic-worker-key',
-    } as unknown as CloudflareEnv;
+    const env = workerEnv();
 
     const response = await worker.fetch(request, env, {} as never);
     expect(response.status).toBe(403);
@@ -113,88 +114,35 @@ describe('C1-A app Worker admission wrapper', () => {
     expect(delegated).not.toHaveBeenCalled();
   });
 
-  it('keeps late legacy charge observation owned after the response', async () => {
-    const ctx = createExecutionContext();
-    const releaseCharge = deferred<void>();
-    let chargeObserved = false;
-    delegated.mockImplementationOnce(async (
-      request: Request,
-      _env: CloudflareEnv,
-      delegatedCtx: WaitUntilContext,
-    ) => {
-      const start = startLegacyDispatch({
-        signal: request.signal,
-        charge: () => releaseCharge.promise.then(() => {
-          chargeObserved = true;
-          return { status: 'charged' as const };
-        }),
-        provider: () => ({ status: 'success' as const, value: 'response-ready' }),
-      });
-      if (start.status !== 'started') throw new Error('dispatch did not start');
-      const result = await settleLegacyDispatch(start, request.signal, (work) => delegatedCtx.waitUntil(work));
-      return new Response(result.status === 'success' ? result.value : result.code);
-    });
-
+  it.each([
+    ['owner key', { OPENROUTER_OWNER_KEY: '' }],
+    ['request HMAC', { PROVIDER_REQUEST_HMAC_CURRENT: '' }],
+    ['owner authority binding', { OWNER_BUDGET_AUTHORITY: undefined }],
+    ['request authority binding', { PROVIDER_REQUEST_AUTHORITY: undefined }],
+    ['authority mode', { STATE_AUTHORITY_MODE: 'legacy' }],
+    ['policy version', { PROVIDER_POLICY_VERSION: 'community-v1' }],
+    ['request HMAC version', { PROVIDER_REQUEST_HMAC_CURRENT_VERSION: 'wrong-v1' }],
+    ['unpaired previous key', { PROVIDER_REQUEST_HMAC_PREVIOUS: 'synthetic-previous' }],
+    ['unpaired previous version', { PROVIDER_REQUEST_HMAC_PREVIOUS_VERSION: 'previous-v1' }],
+  ])('fails closed before delegation when %s is invalid', async (_label, overrides) => {
     const response = await worker.fetch(
-      new Request('https://event-every.test/_next/task-5-charge'),
-      workerEnv,
-      ctx,
+      new Request('https://event-every.test/api/scan', {
+        method: 'POST',
+        headers: {
+          origin: 'https://event-every.test',
+          'content-type': 'application/json',
+          'cf-connecting-ip': '203.0.113.12',
+        },
+        body: '{}',
+      }),
+      workerEnv(overrides),
+      {} as never,
     );
-
-    expect(await response.text()).toBe('response-ready');
-    expect(chargeObserved).toBe(false);
-    releaseCharge.resolve();
-    await waitOnExecutionContext(ctx);
-    expect(chargeObserved).toBe(true);
-  });
-
-  it('keeps concurrent late charge work scoped to each request context', async () => {
-    const ctxA = createExecutionContext();
-    const ctxB = createExecutionContext();
-    const charges = {
-      a: deferred<void>(),
-      b: deferred<void>(),
-    };
-    const observed: string[] = [];
-    const delegateRequest = (expectedLabel: 'a' | 'b') => async (
-      request: Request,
-      _env: CloudflareEnv,
-      delegatedCtx: WaitUntilContext,
-    ) => {
-      const label = request.headers.get('x-task-5-label');
-      if (label !== expectedLabel) throw new Error('missing request label');
-      const start = startLegacyDispatch({
-        signal: request.signal,
-        charge: () => charges[expectedLabel].promise.then(() => {
-          observed.push(expectedLabel);
-          return { status: 'charged' as const };
-        }),
-        provider: () => ({ status: 'success' as const, value: expectedLabel }),
-      });
-      if (start.status !== 'started') throw new Error('dispatch did not start');
-      const result = await settleLegacyDispatch(start, request.signal, (work) => delegatedCtx.waitUntil(work));
-      return new Response(result.status === 'success' ? result.value : result.code);
-    };
-    delegated.mockImplementationOnce(delegateRequest('a'));
-    delegated.mockImplementationOnce(delegateRequest('b'));
-
-    const responseA = await worker.fetch(
-      new Request('https://event-every.test/_next/task-5-a', { headers: { 'x-task-5-label': 'a' } }),
-      workerEnv,
-      ctxA,
-    );
-    const responseB = await worker.fetch(
-      new Request('https://event-every.test/_next/task-5-b', { headers: { 'x-task-5-label': 'b' } }),
-      workerEnv,
-      ctxB,
-    );
-    await expect(Promise.all([responseA.text(), responseB.text()])).resolves.toEqual(['a', 'b']);
-
-    charges.a.resolve();
-    await waitOnExecutionContext(ctxA);
-    expect(observed).toEqual(['a']);
-    charges.b.resolve();
-    await waitOnExecutionContext(ctxB);
-    expect(observed).toEqual(['a', 'b']);
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({
+      error: 'Provider state unavailable.',
+      code: 'provider_state_unavailable',
+    });
+    expect(delegated).not.toHaveBeenCalled();
   });
 });

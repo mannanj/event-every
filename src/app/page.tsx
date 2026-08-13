@@ -56,11 +56,12 @@ function resolveReviewDraftHydrationState(status: ReviewDraftLoadStatus): { hydr
 
 function providerScanDrafts(response: ReturnType<typeof ScanResponseSchema.parse>, operation: ProviderOperationRecord): ReviewDraft[] {
   const createdAt = new Date(operation.createdAtMs).toISOString();
-  return createReviewDrafts(response, (candidate) => ({
-    id: candidate.candidateId,
-    exportUid: `${candidate.candidateId}@event-every`,
-    createdAt,
-  }));
+  return createReviewDrafts(response, (_candidate, index) => {
+    const tail = Number.parseInt(operation.consumerRef.slice(28), 16);
+    const derivedTail = ((tail + index) >>> 0).toString(16).padStart(8, '0');
+    const id = `${operation.consumerRef.slice(0, 28)}${derivedTail}`;
+    return { id, exportUid: `${id}@event-every`, createdAt };
+  });
 }
 
 function mergeReviewDrafts(previous: ReviewDraft[], incoming: ReviewDraft[]): ReviewDraft[] {
@@ -145,7 +146,6 @@ function Home() {
         activeProviderRequestIdsRef.current.add(operation.requestId);
         providerAbortControllersRef.current.set(operation.requestId, controller);
         setRestoringProviderOperations([operation]);
-        setProviderOperationsReady(false);
         const summary = await summarizeInput({ text: text.trim(), eventTitles }, operation, controller.signal);
         providerCompleted = true;
         if (summary && !controller.signal.aborted) await acceptProviderSummary(entryId, summary);
@@ -283,7 +283,6 @@ function Home() {
   const runScan = useCallback(async (
     request: ScanRequest,
     signal: AbortSignal,
-    consumerRef: string,
   ): Promise<ReviewDraft[]> => {
     let operation: ProviderOperationRecord | undefined;
     let providerCompleted = false;
@@ -292,7 +291,7 @@ function Home() {
       operation = await beginProviderOperation({
         route: '/api/scan',
         consumerKind: request.kind === 'text' ? 'scan_text' : 'scan_image',
-        consumerRef,
+        consumerRef: crypto.randomUUID(),
       });
       activeProviderRequestIdsRef.current.add(operation.requestId);
       setRestoringProviderOperations([operation]);
@@ -364,7 +363,7 @@ function Home() {
           updateProgress(queueItem.id, Math.round((index / imageFiles.length) * 100));
           const dataUrl = await fileToDataUrl(imageFiles[index]);
           if (controller.signal.aborted || activeSubmissionRef.current !== batchId) break;
-          const drafts = await runScan({ kind: 'image', dataUrl }, controller.signal, batchId);
+          const drafts = await runScan({ kind: 'image', dataUrl }, controller.signal);
           if (controller.signal.aborted || activeSubmissionRef.current !== batchId) break;
           titles.push(...drafts.map((draft) => draft.candidate.title.value).filter((title): title is string => title !== null));
           setImageProcessingStatuses((previous) => previous.map((item) =>
@@ -422,7 +421,7 @@ function Home() {
 
         setUrlProcessingStatus({ phase: 'extracting', message: 'Extracting events...' });
         updateProgress(queueItem.id, 50);
-        const drafts = await runScan({ kind: 'text', text: combinedText }, controller.signal, batchId);
+        const drafts = await runScan({ kind: 'text', text: combinedText }, controller.signal);
         if (controller.signal.aborted || activeSubmissionRef.current !== batchId) return [];
         const titles = drafts.map((draft) => draft.candidate.title.value).filter((title): title is string => title !== null);
         summarizeAndStore(summaryEntryId, inputText, titles.map((title) => ({ title })));

@@ -467,7 +467,7 @@ export class ProviderRequestAuthority extends DurableObject<RequestAuthorityEnv>
 
   private validateSchema(): void {
     const tables = this.ctx.storage.sql.exec<{ name: string }>(
-      "SELECT name FROM sqlite_schema WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%' ORDER BY name",
+      "SELECT name FROM sqlite_schema WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%' AND name != '__miniflare_do_name' ORDER BY name",
     ).toArray().map(({ name }) => name);
     const requestColumns = this.ctx.storage.sql.exec<SchemaColumn>('PRAGMA table_info(provider_request)').toArray();
     const outboxColumns = this.ctx.storage.sql.exec<SchemaColumn>('PRAGMA table_info(provider_request_outbox)').toArray();
