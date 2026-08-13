@@ -13,6 +13,7 @@ interface SmartInputProps {
   onError: (error: string) => void;
   onOpenHistory: () => void;
   hasHistory: boolean;
+  processingDisabled?: boolean;
 }
 
 export interface SmartInputHandle {
@@ -43,7 +44,7 @@ interface CalendarFilePreview {
 }
 
 const SmartInput = forwardRef<SmartInputHandle, SmartInputProps>(
-  function SmartInput({ onSubmit, onError, onOpenHistory, hasHistory }, ref) {
+  function SmartInput({ onSubmit, onError, onOpenHistory, hasHistory, processingDisabled = false }, ref) {
     const [text, setText] = useState('');
     const [images, setImages] = useState<ImagePreview[]>([]);
     const [calendarFiles, setCalendarFiles] = useState<CalendarFilePreview[]>([]);
@@ -346,6 +347,8 @@ const SmartInput = forwardRef<SmartInputHandle, SmartInputProps>(
     const handleSubmit = useCallback(() => {
       setError(null);
 
+      if (processingDisabled) return;
+
       const trimmedText = text.trim();
 
       if (trimmedText.length < MIN_TEXT_LENGTH && images.length === 0 && calendarFiles.length === 0) {
@@ -358,7 +361,7 @@ const SmartInput = forwardRef<SmartInputHandle, SmartInputProps>(
         images: images.map(img => img.file),
         calendarFiles: calendarFiles.map(cal => cal.file),
       });
-    }, [text, images, calendarFiles, onSubmit]);
+    }, [text, images, calendarFiles, onSubmit, processingDisabled]);
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
       if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
@@ -389,7 +392,8 @@ const SmartInput = forwardRef<SmartInputHandle, SmartInputProps>(
       fileInputRef.current?.click();
     };
 
-    const isButtonEnabled = text.trim().length >= MIN_TEXT_LENGTH || images.length > 0 || calendarFiles.length > 0;
+    const isButtonEnabled = !processingDisabled
+      && (text.trim().length >= MIN_TEXT_LENGTH || images.length > 0 || calendarFiles.length > 0);
 
     // Calculate content density (0 to 1) for sun-like color progression
     const calculateDensity = (): number => {

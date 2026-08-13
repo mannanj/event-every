@@ -17,7 +17,13 @@ const CONTENT: Readonly<Record<OwnerBudgetScreenState, Readonly<{ title: string;
   },
 };
 
-export default function OwnerBudgetScreen({ state }: { state: OwnerBudgetScreenState }) {
+export default function OwnerBudgetScreen({
+  state,
+  onViewEvents,
+}: {
+  state: OwnerBudgetScreenState;
+  onViewEvents: () => void;
+}) {
   const content = CONTENT[state];
   return (
     <main
@@ -31,6 +37,13 @@ export default function OwnerBudgetScreen({ state }: { state: OwnerBudgetScreenS
         <p className="text-black text-base leading-relaxed" data-testid="owner-budget-message">
           {content.message}
         </p>
+        <button
+          type="button"
+          onClick={onViewEvents}
+          className="mt-6 w-full border-2 border-black bg-black px-4 py-3 font-semibold text-white transition-colors hover:bg-white hover:text-black focus:outline-none focus:ring-2 focus:ring-black"
+        >
+          View my events
+        </button>
       </div>
     </main>
   );

@@ -69,7 +69,7 @@ function mergeReviewDrafts(previous: ReviewDraft[], incoming: ReviewDraft[]): Re
   return [...previous.filter((draft) => !incomingIds.has(draft.id)), ...incoming];
 }
 
-function Home() {
+function Home({ processingDisabled }: { processingDisabled: boolean }) {
   const [processingEvents, setProcessingEvents] = useState<ProcessingEvent[]>([]);
   const [batchProcessing, setBatchProcessing] = useState<BatchProcessing | null>(null);
   const [unsavedEvents, setUnsavedEvents] = useState<CalendarEvent[]>([]);
@@ -189,6 +189,12 @@ function Home() {
   }, []);
 
   useEffect(() => {
+    if (processingDisabled) {
+      setRestoringProviderOperations([]);
+      setProviderStorageUnavailable(false);
+      setProviderOperationsReady(false);
+      return;
+    }
     const controller = new AbortController();
     recoveryAbortRef.current = controller;
     void (async () => {
@@ -221,7 +227,7 @@ function Home() {
       }
     });
     return () => controller.abort();
-  }, [acceptProviderScan, acceptProviderSummary]);
+  }, [acceptProviderScan, acceptProviderSummary, processingDisabled]);
 
   useEffect(() => {
     const reviewResult = reviewHydrationRef.current ?? reviewStorage.load();
@@ -481,6 +487,7 @@ function Home() {
   };
 
   const handleSmartInputSubmit = async (data: { text: string; images: File[]; calendarFiles: File[] }) => {
+    if (processingDisabled) return;
     const { text, images, calendarFiles } = data;
 
     let pendingProviderOperations: ProviderOperationRecord[];
@@ -829,7 +836,6 @@ function Home() {
   const showMarketing = !hasStarted && totalEventsInStorage === 0;
 
   return (
-    <AuthWrapper>
       <main id="top" className="min-h-screen rainbow-gradient-bg flex flex-col">
       <RateLimitBanner rateLimitInfo={rateLimitInfo} />
       <SiteNav showHow={showMarketing} />
@@ -851,13 +857,19 @@ function Home() {
           className="rise rise-3 border-2 border-black bg-white p-[5px] h-[400px] offset-shadow"
           data-testid="input-box"
         >
-          {providerOperationsReady ? (
+          {processingDisabled && (
+            <div className="border-b-2 border-black bg-white px-4 py-3 text-sm text-black" data-testid="owner-budget-view-only" role="status">
+              Event processing is paused. You can review your saved events and keep editing this draft; it saves automatically in this browser.
+            </div>
+          )}
+          {processingDisabled || providerOperationsReady ? (
             <SmartInput
               ref={smartInputRef}
               onSubmit={handleSmartInputSubmit}
               onError={handleError}
               onOpenHistory={() => setHistoryOpen(true)}
               hasHistory={inputHistory.length > 0}
+              processingDisabled={processingDisabled}
             />
           ) : (
             <div className="flex h-full flex-col items-center justify-center gap-4 p-8 text-center" data-testid="provider-operation-recovery">
@@ -1382,8 +1394,15 @@ function Home() {
         pendingSummaryIds={pendingSummaryIds}
       />
       </main>
+  );
+}
+
+function Page() {
+  return (
+    <AuthWrapper>
+      {({ processingDisabled }) => <Home processingDisabled={processingDisabled} />}
     </AuthWrapper>
   );
 }
 
-export default Object.assign(Home, { resolveReviewDraftHydration: resolveReviewDraftHydrationState });
+export default Object.assign(Page, { resolveReviewDraftHydration: resolveReviewDraftHydrationState });

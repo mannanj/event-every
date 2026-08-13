@@ -17,6 +17,23 @@ async function mockUsage(page: Page, body: unknown, status = 200) {
   await page.route('**/api/usage', (route) => route.fulfill({ status, json: body }));
 }
 
+async function seedSavedEvent(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    localStorage.setItem('event_every_history', JSON.stringify([{
+      id: 'saved-budget-event',
+      title: 'Saved budget event',
+      startDate: '2027-01-05T15:00:00.000Z',
+      endDate: '2027-01-05T16:00:00.000Z',
+      allDay: false,
+      timezone: 'UTC',
+      timezoneStatus: 'resolved',
+      timezoneSource: 'extracted',
+      created: '2026-08-01T00:00:00.000Z',
+      source: 'text',
+    }]));
+  });
+}
+
 test.describe('owner budget boundary', () => {
   test('shows the fixed exhausted state without private operational details', async ({ page }) => {
     await mockUsage(page, {
@@ -62,7 +79,78 @@ test.describe('owner budget boundary', () => {
     await expect(page.getByTestId('owner-budget-screen')).toHaveCount(0);
   });
 
-  test('reads only the usage endpoint and renders no retired action', async ({ page }) => {
+  test('opens saved events while provider processing remains disabled', async ({ page }) => {
+    await seedSavedEvent(page);
+    await mockUsage(page, { ...BASE_USAGE, exhausted: true, remainingNanodollars: 0 });
+    await page.goto('/');
+
+    await page.getByRole('button', { name: 'View my events' }).click();
+
+    await expect(page.getByTestId('owner-budget-view-only')).toBeVisible();
+    await expect(page.getByText('Saved budget event', { exact: true })).toBeVisible();
+    await expect(page.getByTestId('smart-input-textarea')).toHaveAttribute('contenteditable', 'true');
+    await expect(page.getByRole('button', { name: 'Transform content to events' })).toBeDisabled();
+  });
+
+  test('preserves an edited input across an unavailable visit and restores it ready to transform', async ({ page }) => {
+    let usage: unknown = BASE_USAGE;
+    let status = 200;
+    await page.route('**/api/usage', (route) => route.fulfill({ status, json: usage }));
+    await page.goto('/');
+
+    const editor = page.getByTestId('smart-input-textarea');
+    await expect(editor).toHaveAttribute('contenteditable', 'true');
+    await editor.fill('Original saved draft');
+    await expect.poll(() => page.evaluate(async () => new Promise<string | null>((resolve) => {
+      const opened = indexedDB.open('summon-input', 2);
+      opened.onerror = () => resolve(null);
+      opened.onsuccess = () => {
+        const request = opened.result.transaction('draft', 'readonly').objectStore('draft').get('current');
+        request.onerror = () => resolve(null);
+        request.onsuccess = () => resolve(typeof request.result?.text === 'string' ? request.result.text : null);
+      };
+    }))).toBe('Original saved draft');
+
+    usage = { error: 'Owner budget unavailable.', code: 'owner_budget_unavailable' };
+    status = 503;
+    await page.reload();
+    await expect(page.getByTestId('owner-budget-screen')).toBeVisible();
+    await page.getByRole('button', { name: 'View my events' }).click();
+    await expect(editor).toHaveText('Original saved draft');
+    await expect(page.getByRole('button', { name: 'Transform content to events' })).toBeDisabled();
+
+    await editor.fill('Edited while processing was unavailable');
+    await expect.poll(() => page.evaluate(async () => new Promise<string | null>((resolve) => {
+      const opened = indexedDB.open('summon-input', 2);
+      opened.onerror = () => resolve(null);
+      opened.onsuccess = () => {
+        const request = opened.result.transaction('draft', 'readonly').objectStore('draft').get('current');
+        request.onerror = () => resolve(null);
+        request.onsuccess = () => resolve(typeof request.result?.text === 'string' ? request.result.text : null);
+      };
+    }))).toBe('Edited while processing was unavailable');
+
+    usage = BASE_USAGE;
+    status = 200;
+    await page.reload();
+    await expect(editor).toHaveText('Edited while processing was unavailable');
+    await expect(page.getByRole('button', { name: 'Transform content to events' })).toBeEnabled();
+  });
+
+  test('stops waiting for an unavailable budget response after three seconds', async ({ page }) => {
+    let markRequested!: () => void;
+    const requested = new Promise<void>((resolve) => { markRequested = resolve; });
+    await page.route('**/api/usage', async (route) => {
+      markRequested();
+      await new Promise((resolve) => setTimeout(resolve, 6_000));
+      await route.fulfill({ status: 200, json: BASE_USAGE }).catch(() => undefined);
+    });
+    await page.goto('/');
+    await requested;
+    await expect(page.getByTestId('owner-budget-screen')).toBeVisible({ timeout: 4_500 });
+  });
+
+  test('reads only the usage endpoint and renders only the safe events action', async ({ page }) => {
     const requested: string[] = [];
     page.on('request', (request) => {
       const pathname = new URL(request.url()).pathname;
@@ -73,7 +161,8 @@ test.describe('owner budget boundary', () => {
     await expect(page.getByTestId('owner-budget-screen')).toBeVisible();
     expect(requested.filter((path) => path === '/api/usage')).toHaveLength(1);
     expect(requested).not.toContain('/api/waitlist');
-    await expect(page.getByRole('button')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'View my events' })).toHaveCount(1);
+    await expect(page.getByRole('button')).toHaveCount(1);
     await expect(page.getByRole('link')).toHaveCount(0);
   });
 });
