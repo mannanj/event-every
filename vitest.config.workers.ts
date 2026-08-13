@@ -20,6 +20,7 @@ export default defineConfig(async () => {
         'test/worker/admission.integration.test.ts',
         'test/worker/resolver.integration.test.ts',
         'test/worker/deny-egress.integration.test.ts',
+        'test/worker/owner-budget-authority.integration.test.ts',
       ],
       setupFiles: ['./test/worker/deny-egress.setup.ts'],
     },

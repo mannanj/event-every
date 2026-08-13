@@ -7,6 +7,7 @@ import { cloudflareTrustedEdgeAddress } from '../src/platform/identity';
 export { DailyCounter } from '../src/platform/cloudflare/daily-counter';
 export { IdentityDayPolicy } from '../src/platform/cloudflare/identity-day-policy';
 export { ResolverRequestAuthority } from '../src/platform/cloudflare/resolver-request-authority';
+export { OwnerBudgetAuthority } from '../src/platform/cloudflare/owner-budget-authority';
 
 type ExportedHandler<Env> = Readonly<{
   fetch(request: Request, env: Env, ctx: unknown): Response | Promise<Response>;

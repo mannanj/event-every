@@ -1,3 +1,5 @@
+import type { CostOutcome, ProviderVariant } from './provider/contracts';
+
 export type EdgeIdentity = Readonly<{ kind: 'known' | 'unknown'; keyVersion: string; hmac: string }>;
 export type ProviderRoute = 'scan' | 'resolve-timezone' | 'summarize';
 export type StateAuthorityMode = 'legacy' | 'shadow' | 'cloudflare';
@@ -28,9 +30,55 @@ export type SqlStorageLike = Readonly<{ exec<Row = Record<string, unknown>>(quer
 export type DurableStorageLike = Readonly<{
   sql: SqlStorageLike;
   transactionSync<Value>(callback: () => Value): Value;
+  getAlarm(): Promise<number | null>;
   setAlarm(timestamp: number): Promise<void>;
+  deleteAlarm(): Promise<void>;
 }>;
 export type DurableObjectStateLike = Readonly<{
   storage: DurableStorageLike;
   blockConcurrencyWhile(callback: () => Promise<void>): Promise<void>;
 }>;
+
+export type OwnerBudgetBinding = Readonly<{
+  executionId: string;
+  requestAuthorityName: string;
+  authorityDay: string;
+  route: ProviderRoute;
+  variant: ProviderVariant;
+  policyVersion: string;
+  reservationNanodollars: number;
+}>;
+export type OwnerBudgetReserveResult =
+  | Readonly<{ status: 'reserved'; reservedUntilMs: number }>
+  | Readonly<{ status: 'exhausted'; resetAt: string }>
+  | Readonly<{ status: 'released' | 'settled' | 'settled_full' | 'conflict' | 'day-mismatch' }>;
+export type OwnerBudgetCommitResult =
+  | Readonly<{ status: 'committed'; transportDeadlineMs: number; committedUntilMs: number }>
+  | Readonly<{ status: 'released' | 'settled' | 'settled_full' | 'conflict' | 'day-mismatch' }>;
+export type OwnerBudgetReleaseResult = Readonly<{
+  status: 'released' | 'committed' | 'settled' | 'settled_full' | 'conflict' | 'day-mismatch';
+}>;
+export type OwnerBudgetBreachClass = 'primary_breach' | 'primary_overflow' | 'secondary_breach';
+export type OwnerBudgetFrozenCode = 'accounting_policy_breach' | 'accounting_cost_overflow';
+export type OwnerBudgetSettleResult =
+  | Readonly<{
+    status: 'settled' | 'settled_full';
+    breachClass?: OwnerBudgetBreachClass;
+    frozenCode?: OwnerBudgetFrozenCode;
+  }>
+  | Readonly<{ status: 'conflict' | 'day-mismatch' }>;
+export type OwnerBudgetSettlementInput = OwnerBudgetBinding & Readonly<{ costOutcome: CostOutcome }>;
+export type OwnerBudgetStatusResult =
+  | Readonly<{
+    status: 'available';
+    policyVersion: string;
+    authorityDay: string;
+    limitNanodollars: number;
+    spentNanodollars: number;
+    reservedNanodollars: number;
+    remainingNanodollars: number;
+    exhausted: boolean;
+    frozen: boolean;
+    resetAt: string;
+  }>
+  | Readonly<{ status: 'day-mismatch' }>;

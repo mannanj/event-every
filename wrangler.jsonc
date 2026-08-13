@@ -22,13 +22,18 @@
     "bindings": [
       { "name": "IDENTITY_DAY_POLICY", "class_name": "IdentityDayPolicy" },
       { "name": "RESOLVER_REQUEST_AUTHORITY", "class_name": "ResolverRequestAuthority" },
-      { "name": "RESOLVER_DAILY_COUNTER", "class_name": "DailyCounter" }
+      { "name": "RESOLVER_DAILY_COUNTER", "class_name": "DailyCounter" },
+      { "name": "OWNER_BUDGET_AUTHORITY", "class_name": "OwnerBudgetAuthority" }
     ]
   },
   "migrations": [
     {
       "tag": "c1-a-v1",
       "new_sqlite_classes": ["IdentityDayPolicy", "ResolverRequestAuthority", "DailyCounter"]
+    },
+    {
+      "tag": "c1-b-budget-v1",
+      "new_sqlite_classes": ["OwnerBudgetAuthority"]
     }
   ],
   "vars": {
