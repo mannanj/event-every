@@ -18,20 +18,29 @@ import { useProcessingQueue } from '@/hooks/useProcessingQueue';
 import { useEventSelection } from '@/hooks/useEventSelection';
 import { buildEnrichedUrlText, detectURLs } from '@/services/urlDetector';
 import { summarizeInput } from '@/services/summarizer';
+import {
+  acknowledgeProviderOperation,
+  beginProviderOperation,
+  cancelProviderOperation,
+  listProviderOperations,
+  recoverProviderOperations,
+  type ProviderOperationRecord,
+} from '@/services/providerOperation';
+import { createHistoryEntryId } from '@/services/requestId';
 import { scrapeURLsBatch } from '@/services/webScraper';
 import { QueueItem } from '@/services/processingQueue';
 import { eventStorage } from '@/services/storage';
+import { inputStorage } from '@/services/inputStorage';
 import { parseICSFile } from '@/services/icsParser';
 import { exportAllEvents } from '@/services/exportAll';
 import { convertRawToDate } from '@/utils/timeConversion';
-import { COMMUNITY_LIMIT_CODE, emitCommunityLimit } from '@/utils/communityLimit';
 import { ProcessingEvent, ImageProcessingStatus, BatchProcessing, URLProcessingStatus } from '@/types/processing';
-import { scan, ScanClientError } from '@/services/scanClient';
+import { scan } from '@/services/scanClient';
 import { createReviewDrafts, editReviewDraft } from '@/services/scannerDraft';
 import { createBrowserDownloadEffects, createScannerExporter } from '@/services/scannerExporter';
 import { reviewStorage, type ReviewDraftLoadResult } from '@/services/reviewStorage';
 import type { ReviewDraft, ReviewFieldEdit } from '@/types/review';
-import type { ScanRequest } from '@/types/scannerHttp';
+import { ScanResponseSchema, type ScanRequest } from '@/types/scannerHttp';
 import AuthWrapper from '@/components/AuthWrapper';
 
 type ReviewDraftLoadStatus = ReviewDraftLoadResult['status'];
@@ -45,11 +54,26 @@ function resolveReviewDraftHydrationState(status: ReviewDraftLoadStatus): { hydr
   }
 }
 
+function providerScanDrafts(response: ReturnType<typeof ScanResponseSchema.parse>, operation: ProviderOperationRecord): ReviewDraft[] {
+  const createdAt = new Date(operation.createdAtMs).toISOString();
+  return createReviewDrafts(response, (candidate) => ({
+    id: candidate.candidateId,
+    exportUid: `${candidate.candidateId}@event-every`,
+    createdAt,
+  }));
+}
+
+function mergeReviewDrafts(previous: ReviewDraft[], incoming: ReviewDraft[]): ReviewDraft[] {
+  const incomingIds = new Set(incoming.map((draft) => draft.id));
+  return [...previous.filter((draft) => !incomingIds.has(draft.id)), ...incoming];
+}
+
 function Home() {
   const [processingEvents, setProcessingEvents] = useState<ProcessingEvent[]>([]);
   const [batchProcessing, setBatchProcessing] = useState<BatchProcessing | null>(null);
   const [unsavedEvents, setUnsavedEvents] = useState<CalendarEvent[]>([]);
   const [reviewDrafts, setReviewDrafts] = useState<ReviewDraft[]>([]);
+  const reviewDraftsRef = useRef<ReviewDraft[]>([]);
   const [reviewDraftLoadStatus, setReviewDraftLoadStatus] = useState<'pending' | ReviewDraftLoadStatus>('pending');
   const [, setUserTouchedTimezones] = useState<Set<string>>(new Set());
   const [tzSuggestions, setTzSuggestions] = useState<Record<string, { timezone: string; confidence: number }>>({});
@@ -67,9 +91,32 @@ function Home() {
   const { addToQueue, updateProgress } = useProcessingQueue();
   const smartInputRef = useRef<SmartInputHandle>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
-  const { entries: inputHistory, addEntry: addInputHistory, setSummary: setInputSummary } = useInputHistory();
+  const { entries: inputHistory, addEntry: addInputHistory, refresh: refreshInputHistory } = useInputHistory();
   const [pendingSummaryIds, setPendingSummaryIds] = useState<Set<string>>(new Set());
+  const [providerOperationsReady, setProviderOperationsReady] = useState(false);
+  const [restoringProviderOperations, setRestoringProviderOperations] = useState<ProviderOperationRecord[]>([]);
+  const [providerStorageUnavailable, setProviderStorageUnavailable] = useState(false);
   const scannerExporter = useMemo(() => createScannerExporter(createBrowserDownloadEffects()), []);
+  const activeProviderRequestIdsRef = useRef<Set<string>>(new Set());
+  const providerAbortControllersRef = useRef<Map<string, AbortController>>(new Map());
+  const recoveryAbortRef = useRef<AbortController | null>(null);
+
+  const acceptProviderSummary = useCallback(async (entryId: string, summary: string): Promise<void> => {
+    if (!await inputStorage.updateHistoryEntry(entryId, { summary })) {
+      throw new Error('Summary consumer is unavailable.');
+    }
+    await refreshInputHistory();
+  }, [refreshInputHistory]);
+
+  const acceptProviderScan = useCallback((response: ReturnType<typeof ScanResponseSchema.parse>, operation: ProviderOperationRecord): ReviewDraft[] => {
+    const incoming = providerScanDrafts(response, operation);
+    const next = mergeReviewDrafts(reviewDraftsRef.current, incoming);
+    const stored = reviewStorage.save(next);
+    if (!stored.success) throw new Error('Review consumer is unavailable.');
+    reviewDraftsRef.current = next;
+    setReviewDrafts(next);
+    return incoming;
+  }, []);
 
   const markSummaryPending = (id: string, pending: boolean) =>
     setPendingSummaryIds(prev => {
@@ -86,9 +133,41 @@ function Home() {
     const eventTitles = events.map(e => e.title).filter(t => !!t && t.trim().length > 0);
     if (!text.trim() && eventTitles.length === 0) return;
     markSummaryPending(entryId, true);
-    summarizeInput({ text: text.trim(), eventTitles })
-      .then(summary => { if (summary) setInputSummary(entryId, summary); })
-      .finally(() => markSummaryPending(entryId, false));
+    void (async () => {
+      let operation: ProviderOperationRecord | undefined;
+      const controller = new AbortController();
+      let providerCompleted = false;
+      let keepPendingRecord = false;
+      try {
+        operation = await beginProviderOperation({
+          route: '/api/summarize', consumerKind: 'summarize', consumerRef: entryId,
+        });
+        activeProviderRequestIdsRef.current.add(operation.requestId);
+        providerAbortControllersRef.current.set(operation.requestId, controller);
+        setRestoringProviderOperations([operation]);
+        setProviderOperationsReady(false);
+        const summary = await summarizeInput({ text: text.trim(), eventTitles }, operation, controller.signal);
+        providerCompleted = true;
+        if (summary && !controller.signal.aborted) await acceptProviderSummary(entryId, summary);
+        if (!controller.signal.aborted) await acknowledgeProviderOperation(operation.requestId);
+      } catch {
+        if (operation && !controller.signal.aborted) {
+          if (providerCompleted) {
+            keepPendingRecord = true;
+          } else {
+            try { await acknowledgeProviderOperation(operation.requestId); } catch { keepPendingRecord = true; }
+          }
+        }
+      } finally {
+        if (operation) {
+          activeProviderRequestIdsRef.current.delete(operation.requestId);
+          providerAbortControllersRef.current.delete(operation.requestId);
+        }
+        setRestoringProviderOperations(keepPendingRecord && operation ? [operation] : []);
+        setProviderOperationsReady(!keepPendingRecord);
+        markSummaryPending(entryId, false);
+      }
+    })();
   };
   const abortRef = useRef<AbortController | null>(null);
   const activeSubmissionRef = useRef<string | null>(null);
@@ -103,13 +182,53 @@ function Home() {
   const [exportAllError, setExportAllError] = useState<string | null>(null);
   const [exportCooldownRemaining, setExportCooldownRemaining] = useState(0);
 
-  useEffect(() => () => abortRef.current?.abort(), []);
+  useEffect(() => () => {
+    abortRef.current?.abort();
+    recoveryAbortRef.current?.abort();
+    providerAbortControllersRef.current.forEach((controller) => controller.abort());
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    recoveryAbortRef.current = controller;
+    void (async () => {
+      const pending = await listProviderOperations();
+      if (controller.signal.aborted) return;
+      setRestoringProviderOperations(pending);
+      await recoverProviderOperations(async (operation, replay) => {
+        if (operation.consumerKind === 'summarize') {
+          const summary = typeof replay === 'object' && replay !== null && 'summary' in replay
+            ? (replay as { summary?: unknown }).summary
+            : undefined;
+          if (typeof summary !== 'string') throw new Error('Invalid restored summary.');
+          await acceptProviderSummary(operation.consumerRef, summary);
+          return;
+        }
+        if (operation.consumerKind === 'scan_text' || operation.consumerKind === 'scan_image') {
+          const response = ScanResponseSchema.parse(replay);
+          acceptProviderScan(response, operation);
+        }
+      }, controller.signal);
+      if (!controller.signal.aborted) {
+        setRestoringProviderOperations([]);
+        setProviderStorageUnavailable(false);
+        setProviderOperationsReady(true);
+      }
+    })().catch(() => {
+      if (!controller.signal.aborted) {
+        setProviderStorageUnavailable(true);
+        setProviderOperationsReady(false);
+      }
+    });
+    return () => controller.abort();
+  }, [acceptProviderScan, acceptProviderSummary]);
 
   useEffect(() => {
     const reviewResult = reviewHydrationRef.current ?? reviewStorage.load();
     reviewHydrationRef.current = reviewResult;
     const reviewHydration = resolveReviewDraftHydrationState(reviewResult.status);
     if (reviewHydration.hydrationComplete && reviewResult.status !== 'unavailable') {
+      reviewDraftsRef.current = reviewResult.drafts;
       setReviewDrafts(reviewResult.drafts);
     }
     setReviewDraftLoadStatus(reviewResult.status);
@@ -153,6 +272,7 @@ function Home() {
 
   useEffect(() => {
     if (reviewDraftLoadStatus === 'pending' || reviewDraftLoadStatus === 'unavailable') return;
+    reviewDraftsRef.current = reviewDrafts;
     if (reviewDrafts.length === 0) {
       reviewStorage.clear();
     } else {
@@ -160,22 +280,46 @@ function Home() {
     }
   }, [reviewDraftLoadStatus, reviewDrafts]);
 
-  const runScan = useCallback(async (request: ScanRequest, signal: AbortSignal): Promise<ReviewDraft[]> => {
-    const response = await scan(request, signal);
-    if (signal.aborted) return [];
+  const runScan = useCallback(async (
+    request: ScanRequest,
+    signal: AbortSignal,
+    consumerRef: string,
+  ): Promise<ReviewDraft[]> => {
+    let operation: ProviderOperationRecord | undefined;
+    let providerCompleted = false;
+    let keepPendingRecord = false;
+    try {
+      operation = await beginProviderOperation({
+        route: '/api/scan',
+        consumerKind: request.kind === 'text' ? 'scan_text' : 'scan_image',
+        consumerRef,
+      });
+      activeProviderRequestIdsRef.current.add(operation.requestId);
+      setRestoringProviderOperations([operation]);
+      setProviderOperationsReady(false);
+      const response = await scan(request, operation, signal);
+      providerCompleted = true;
+      if (signal.aborted) return [];
 
-    const createdAt = new Date().toISOString();
-    const drafts = createReviewDrafts(response, () => ({
-      id: crypto.randomUUID(),
-      exportUid: `${crypto.randomUUID()}@event-every`,
-      createdAt,
-    }));
+      const drafts = acceptProviderScan(response, operation);
 
-    if (!signal.aborted) {
-      setReviewDrafts((previous) => [...previous, ...drafts]);
+      if (!signal.aborted) {
+        await acknowledgeProviderOperation(operation.requestId);
+      }
+      return drafts;
+    } catch (error) {
+      if (operation && !signal.aborted && !providerCompleted) {
+        try { await acknowledgeProviderOperation(operation.requestId); } catch { keepPendingRecord = true; }
+      } else if (operation && !signal.aborted && providerCompleted) {
+        keepPendingRecord = true;
+      }
+      throw error;
+    } finally {
+      if (operation) activeProviderRequestIdsRef.current.delete(operation.requestId);
+      setRestoringProviderOperations(keepPendingRecord && operation ? [operation] : []);
+      setProviderOperationsReady(!keepPendingRecord);
     }
-    return drafts;
-  }, []);
+  }, [acceptProviderScan]);
 
   const fileToDataUrl = (file: File): Promise<string> => new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -185,9 +329,6 @@ function Home() {
   });
 
   const pushProcessingError = (type: 'image' | 'text', error: unknown) => {
-    if (error instanceof ScanClientError && error.code === COMMUNITY_LIMIT_CODE) {
-      emitCommunityLimit(error.resetAt ?? undefined);
-    }
     const id = `error-${Date.now()}`;
     const message = error instanceof Error ? error.message : 'Unable to scan this input.';
     setProcessingEvents((previous) => [...previous, { id, type, status: 'error', error: message }]);
@@ -199,7 +340,7 @@ function Home() {
     addToQueue('image', files, undefined, async (queueItem: QueueItem) => {
       const imageFiles = queueItem.payload as File[];
       const controller = new AbortController();
-      abortRef.current?.abort();
+      if (abortRef.current) throw new Error('A provider operation is already pending.');
       abortRef.current = controller;
       const batchId = crypto.randomUUID();
       activeSubmissionRef.current = batchId;
@@ -223,7 +364,7 @@ function Home() {
           updateProgress(queueItem.id, Math.round((index / imageFiles.length) * 100));
           const dataUrl = await fileToDataUrl(imageFiles[index]);
           if (controller.signal.aborted || activeSubmissionRef.current !== batchId) break;
-          const drafts = await runScan({ kind: 'image', dataUrl }, controller.signal);
+          const drafts = await runScan({ kind: 'image', dataUrl }, controller.signal, batchId);
           if (controller.signal.aborted || activeSubmissionRef.current !== batchId) break;
           titles.push(...drafts.map((draft) => draft.candidate.title.value).filter((title): title is string => title !== null));
           setImageProcessingStatuses((previous) => previous.map((item) =>
@@ -251,7 +392,7 @@ function Home() {
     addToQueue('text', text, undefined, async (queueItem: QueueItem) => {
       const inputText = queueItem.payload as string;
       const controller = new AbortController();
-      abortRef.current?.abort();
+      if (abortRef.current) throw new Error('A provider operation is already pending.');
       if (activeImageBatchRef.current !== null) setImageProcessingStatuses([]);
       abortRef.current = controller;
       const batchId = crypto.randomUUID();
@@ -281,7 +422,7 @@ function Home() {
 
         setUrlProcessingStatus({ phase: 'extracting', message: 'Extracting events...' });
         updateProgress(queueItem.id, 50);
-        const drafts = await runScan({ kind: 'text', text: combinedText }, controller.signal);
+        const drafts = await runScan({ kind: 'text', text: combinedText }, controller.signal, batchId);
         if (controller.signal.aborted || activeSubmissionRef.current !== batchId) return [];
         const titles = drafts.map((draft) => draft.candidate.title.value).filter((title): title is string => title !== null);
         summarizeAndStore(summaryEntryId, inputText, titles.map((title) => ({ title })));
@@ -308,13 +449,13 @@ function Home() {
     ...calendarFiles.map(file => ({ id: `f-${Date.now()}-${Math.random().toString(36).slice(2)}`, file, kind: 'calendar' as const, name: file.name, mimeType: file.type || 'text/calendar', size: file.size })),
   ];
 
-  const saveInputToHistory = (text: string, images: File[], calendarFiles: File[]): string | undefined => {
+  const saveInputToHistory = async (text: string, images: File[], calendarFiles: File[]): Promise<string | undefined> => {
     const trimmed = text.trim();
     if (!trimmed && images.length === 0 && calendarFiles.length === 0) return undefined;
     const hasFiles = images.length + calendarFiles.length > 0;
     const source: InputSource = trimmed && hasFiles ? 'mixed' : hasFiles ? 'image' : 'text';
-    const id = `ih-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    addInputHistory({
+    const id = createHistoryEntryId();
+    await addInputHistory({
       id,
       createdAt: Date.now(),
       text: trimmed,
@@ -331,7 +472,7 @@ function Home() {
       (current.text.trim() || current.images.length > 0 || current.calendarFiles.length > 0) &&
       inputSignature(current.text, current.images, current.calendarFiles) !== loadedSigRef.current
     ) {
-      saveInputToHistory(current.text, current.images, current.calendarFiles);
+      await saveInputToHistory(current.text, current.images, current.calendarFiles);
     }
     const entryImages = entry.files.filter(f => f.kind === 'image').map(f => f.file);
     const entryCalendars = entry.files.filter(f => f.kind === 'calendar').map(f => f.file);
@@ -342,6 +483,20 @@ function Home() {
 
   const handleSmartInputSubmit = async (data: { text: string; images: File[]; calendarFiles: File[] }) => {
     const { text, images, calendarFiles } = data;
+
+    let pendingProviderOperations: ProviderOperationRecord[];
+    try {
+      pendingProviderOperations = await listProviderOperations();
+    } catch {
+      setProviderStorageUnavailable(true);
+      setProviderOperationsReady(false);
+      handleError('Browser storage is unavailable, so private provider requests are disabled.');
+      return;
+    }
+    if (!providerOperationsReady || pendingProviderOperations.length > 0) {
+      handleError('Finish or cancel the pending request before starting another.');
+      return;
+    }
 
     if (text.trim().length > 0 && images.length > 0) {
       const id = `error-${Date.now()}`;
@@ -369,7 +524,7 @@ function Home() {
     }
 
     // Transform always records to Recent — re-saving a loaded entry is fine.
-    const entryId = saveInputToHistory(text, images, calendarFiles);
+    const entryId = await saveInputToHistory(text, images, calendarFiles);
     loadedSigRef.current = null;
 
     // Exactly one handler "owns" the 2-3 word summary for this submit, so a mixed
@@ -504,6 +659,22 @@ function Home() {
 
   const handleCancelBatch = () => {
     abortRef.current?.abort();
+    recoveryAbortRef.current?.abort();
+    providerAbortControllersRef.current.forEach((controller) => controller.abort());
+    const requestIds = new Set([
+      ...activeProviderRequestIdsRef.current,
+      ...restoringProviderOperations.map((operation) => operation.requestId),
+    ]);
+    void Promise.all([...requestIds].map(cancelProviderOperation)).then(() => {
+      activeProviderRequestIdsRef.current.clear();
+      providerAbortControllersRef.current.clear();
+      setRestoringProviderOperations([]);
+      setProviderStorageUnavailable(false);
+      setProviderOperationsReady(true);
+    }).catch(() => {
+      setProviderStorageUnavailable(true);
+      setProviderOperationsReady(false);
+    });
     abortRef.current = null;
     setBatchProcessing(null);
     setImageProcessingStatuses([]);
@@ -681,13 +852,28 @@ function Home() {
           className="rise rise-3 border-2 border-black bg-white p-[5px] h-[400px] offset-shadow"
           data-testid="input-box"
         >
-          <SmartInput
-            ref={smartInputRef}
-            onSubmit={handleSmartInputSubmit}
-            onError={handleError}
-            onOpenHistory={() => setHistoryOpen(true)}
-            hasHistory={inputHistory.length > 0}
-          />
+          {providerOperationsReady ? (
+            <SmartInput
+              ref={smartInputRef}
+              onSubmit={handleSmartInputSubmit}
+              onError={handleError}
+              onOpenHistory={() => setHistoryOpen(true)}
+              hasHistory={inputHistory.length > 0}
+            />
+          ) : (
+            <div className="flex h-full flex-col items-center justify-center gap-4 p-8 text-center" data-testid="provider-operation-recovery">
+              <p className="font-semibold text-black">
+                {providerStorageUnavailable
+                  ? 'Browser storage is unavailable. Provider requests are disabled.'
+                  : 'Restoring your pending request…'}
+              </p>
+              {restoringProviderOperations.length > 0 && (
+                <button type="button" className="border-2 border-black bg-white px-4 py-2 font-semibold" onClick={handleCancelBatch}>
+                  Cancel pending request
+                </button>
+              )}
+            </div>
+          )}
         </div>
         <p className="rise rise-4 mt-4 mb-10 text-center eyebrow text-black/40">
           Works with Apple · Google · Outlook

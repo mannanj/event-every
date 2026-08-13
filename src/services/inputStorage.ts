@@ -4,13 +4,15 @@ import type { StoredInputFile } from '@/types/input';
 // Internal IndexedDB name. Kept stable across the Event Every ↔ Summon renames so existing
 // users keep their drafts and input history — renaming the store would orphan their data.
 const DB_NAME = 'summon-input';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const DRAFT_STORE = 'draft';
 const HISTORY_STORE = 'history';
+const PROVIDER_OPERATION_STORE = 'provider-operations';
 const DRAFT_KEY = 'current';
 const HISTORY_LIMIT = 200;
 
 let dbPromise: Promise<IDBDatabase | null> | null = null;
+let injectedDatabase: IDBDatabase | undefined;
 
 type PersistedStoredInputFile = Omit<StoredInputFile, 'file'> & {
   bytes: ArrayBuffer;
@@ -93,6 +95,7 @@ function hydrateHistoryEntry(
 }
 
 function openDB(): Promise<IDBDatabase | null> {
+  if (injectedDatabase) return Promise.resolve(injectedDatabase);
   if (typeof indexedDB === 'undefined') return Promise.resolve(null);
   if (!dbPromise) {
     dbPromise = new Promise<IDBDatabase | null>((resolve) => {
@@ -106,12 +109,62 @@ function openDB(): Promise<IDBDatabase | null> {
           const store = db.createObjectStore(HISTORY_STORE, { keyPath: 'id' });
           store.createIndex('createdAt', 'createdAt');
         }
+        if (!db.objectStoreNames.contains(PROVIDER_OPERATION_STORE)) {
+          db.createObjectStore(PROVIDER_OPERATION_STORE, { keyPath: 'requestId' });
+        }
       };
       req.onsuccess = () => resolve(req.result);
       req.onerror = () => resolve(null);
     });
   }
   return dbPromise;
+}
+
+export function setInputStorageDatabaseForTests(database: IDBDatabase | undefined): void {
+  injectedDatabase = database;
+}
+
+function runWrite(
+  storeName: string,
+  op: (store: IDBObjectStore) => IDBRequest,
+): Promise<void> {
+  return openDB().then((db) => new Promise<void>((resolve, reject) => {
+    if (!db) {
+      reject(new Error('Browser storage unavailable.'));
+      return;
+    }
+    try {
+      const transaction = db.transaction(storeName, 'readwrite');
+      transaction.oncomplete = () => resolve();
+      transaction.onabort = () => reject(transaction.error ?? new Error('Browser storage transaction aborted.'));
+      transaction.onerror = () => reject(transaction.error ?? new Error('Browser storage transaction failed.'));
+      op(transaction.objectStore(storeName));
+    } catch (error) {
+      reject(error);
+    }
+  }));
+}
+
+function runReadStrict<T>(
+  storeName: string,
+  op: (store: IDBObjectStore) => IDBRequest,
+): Promise<T> {
+  return openDB().then((db) => new Promise<T>((resolve, reject) => {
+    if (!db) {
+      reject(new Error('Browser storage unavailable.'));
+      return;
+    }
+    try {
+      const transaction = db.transaction(storeName, 'readonly');
+      const request = op(transaction.objectStore(storeName));
+      request.onsuccess = () => resolve(request.result as T);
+      request.onerror = () => reject(request.error ?? new Error('Browser storage read failed.'));
+      transaction.onabort = () => reject(transaction.error ?? new Error('Browser storage transaction aborted.'));
+      transaction.onerror = () => reject(transaction.error ?? new Error('Browser storage transaction failed.'));
+    } catch (error) {
+      reject(error);
+    }
+  }));
 }
 
 // Runs a single-store request and resolves null on any failure so that
@@ -172,7 +225,7 @@ export const inputStorage = {
 
   async addHistoryEntry(entry: InputHistoryEntry): Promise<void> {
     const persisted = await persistHistoryEntry(entry);
-    await run(HISTORY_STORE, 'readwrite', (s) => s.put(persisted));
+    await runWrite(HISTORY_STORE, (store) => store.put(persisted));
     const all = await inputStorage.getAllHistory();
     if (all.length > HISTORY_LIMIT) {
       const stale = all.slice(HISTORY_LIMIT);
@@ -180,16 +233,17 @@ export const inputStorage = {
     }
   },
 
-  async updateHistoryEntry(id: string, patch: Partial<InputHistoryEntry>): Promise<void> {
+  async updateHistoryEntry(id: string, patch: Partial<InputHistoryEntry>): Promise<boolean> {
     const stored = await run<PersistedInputHistoryEntry | InputHistoryEntry>(
       HISTORY_STORE,
       'readonly',
       (s) => s.get(id)
     );
-    if (!stored) return; // evicted or never stored — nothing to patch
+    if (!stored) return false; // evicted or never stored — nothing to patch
     const updated = { ...hydrateHistoryEntry(stored), ...patch };
     const persisted = await persistHistoryEntry(updated);
-    await run(HISTORY_STORE, 'readwrite', (s) => s.put(persisted));
+    await runWrite(HISTORY_STORE, (store) => store.put(persisted));
+    return true;
   },
 
   deleteHistoryEntry(id: string): Promise<unknown> {
@@ -198,5 +252,17 @@ export const inputStorage = {
 
   clearHistory(): Promise<unknown> {
     return run(HISTORY_STORE, 'readwrite', (s) => s.clear());
+  },
+
+  saveProviderOperationRecord(record: unknown): Promise<void> {
+    return runWrite(PROVIDER_OPERATION_STORE, (store) => store.put(record));
+  },
+
+  async getAllProviderOperationRecords(): Promise<unknown[]> {
+    return runReadStrict<unknown[]>(PROVIDER_OPERATION_STORE, (store) => store.getAll());
+  },
+
+  deleteProviderOperationRecord(requestId: string): Promise<void> {
+    return runWrite(PROVIDER_OPERATION_STORE, (store) => store.delete(requestId));
   },
 };

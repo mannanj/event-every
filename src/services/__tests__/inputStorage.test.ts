@@ -1,8 +1,12 @@
-import { describe, expect, test } from 'bun:test';
+import { afterEach, describe, expect, test } from 'bun:test';
+import { readFileSync } from 'node:fs';
 import {
   hydrateInputFiles,
+  inputStorage,
   persistInputFiles,
+  setInputStorageDatabaseForTests,
 } from '@/services/inputStorage';
+import { createHistoryEntryId } from '@/services/requestId';
 import type { StoredInputFile } from '@/types/input';
 
 function storedFile(overrides: Partial<StoredInputFile> = {}): StoredInputFile {
@@ -59,4 +63,76 @@ describe('input storage file DTO', () => {
     expect(hydrated?.eventCount).toBe(1);
     expect(await hydrated?.file.text()).toBe('BEGIN:VCALENDAR');
   });
+});
+
+afterEach(() => setInputStorageDatabaseForTests(undefined));
+
+test('upgrades the stable database with the provider operation store', () => {
+  const source = readFileSync('src/services/inputStorage.ts', 'utf8');
+  expect(source).toContain("const DB_VERSION = 2");
+  expect(source).toContain("const PROVIDER_OPERATION_STORE = 'provider-operations'");
+  expect(source).toContain("createObjectStore(PROVIDER_OPERATION_STORE, { keyPath: 'requestId' })");
+});
+
+test('provider operation writes resolve only after transaction completion', async () => {
+  const request = {} as IDBRequest;
+  const transaction = {
+    oncomplete: null as ((event: Event) => void) | null,
+    onabort: null as ((event: Event) => void) | null,
+    onerror: null as ((event: Event) => void) | null,
+    error: null,
+    objectStore: () => ({ put: () => request }),
+  };
+  const database = { transaction: () => transaction } as unknown as IDBDatabase;
+  setInputStorageDatabaseForTests(database);
+  let settled = false;
+  const pending = inputStorage.saveProviderOperationRecord({ requestId: 'one' }).then(() => { settled = true; });
+  await Promise.resolve();
+  expect(settled).toBe(false);
+  const transactionComplete = () => transaction.oncomplete?.(new Event('complete'));
+  transactionComplete();
+  await pending;
+  expect(settled).toBe(true);
+});
+
+test('provider operation transaction abort rejects', async () => {
+  const request = {} as IDBRequest;
+  const transaction = {
+    oncomplete: null as ((event: Event) => void) | null,
+    onabort: null as ((event: Event) => void) | null,
+    onerror: null as ((event: Event) => void) | null,
+    error: new DOMException('quota', 'AbortError'),
+    objectStore: () => ({ put: () => request }),
+  };
+  setInputStorageDatabaseForTests({ transaction: () => transaction } as unknown as IDBDatabase);
+  const pending = inputStorage.saveProviderOperationRecord({ requestId: 'one' });
+  await Promise.resolve();
+  transaction.onabort?.(new Event('abort'));
+  await expect(pending).rejects.toThrow();
+});
+
+test('provider operation reads fail closed when storage cannot be opened', async () => {
+  setInputStorageDatabaseForTests({
+    transaction: () => { throw new DOMException('blocked', 'InvalidStateError'); },
+  } as unknown as IDBDatabase);
+  await expect(inputStorage.getAllProviderOperationRecords()).rejects.toThrow('blocked');
+});
+
+test('new history IDs are UUIDs while legacy IDs remain readable', async () => {
+  expect(createHistoryEntryId()).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+  const request = {
+    result: [{ id: 'ih-legacy-timestamp-id', createdAt: 1, text: 'Legacy', files: [], source: 'text' }],
+    onsuccess: null as ((event: Event) => void) | null,
+    onerror: null as ((event: Event) => void) | null,
+  };
+  const database = {
+    transaction: () => ({ objectStore: () => ({ getAll: () => {
+      queueMicrotask(() => request.onsuccess?.(new Event('success')));
+      return request;
+    } }) }),
+  } as unknown as IDBDatabase;
+  setInputStorageDatabaseForTests(database);
+  await expect(inputStorage.getAllHistory()).resolves.toEqual([
+    { id: 'ih-legacy-timestamp-id', createdAt: 1, text: 'Legacy', files: [], source: 'text' },
+  ]);
 });

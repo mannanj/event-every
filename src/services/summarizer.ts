@@ -1,9 +1,11 @@
-import { emitIfCommunityLimited } from '@/utils/communityLimit';
-import { createProviderRequestId } from '@/services/requestId';
+import { z } from 'zod';
+import {
+  parseProviderOperation,
+  resumeProviderOperation,
+  type ProviderOperationRecord,
+} from '@/services/providerOperation';
 
-interface SummarizeResult {
-  summary: string;
-}
+const SummarizeResultSchema = z.object({ summary: z.string() }).strict();
 
 // Best-effort 2-3 word label for a saved input. Never throws and never rejects —
 // a failed/slow summary must never disrupt event extraction, so the caller simply
@@ -11,23 +13,35 @@ interface SummarizeResult {
 export async function summarizeInput(params: {
   text?: string;
   eventTitles?: string[];
-}): Promise<string> {
+}, providerOperation: ProviderOperationRecord, signal?: AbortSignal): Promise<string> {
   try {
-    const requestId = createProviderRequestId();
-    const response = await fetch('/api/summarize', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Event-Every-Request-Id': requestId },
-      body: JSON.stringify({
-        text: params.text ?? '',
-        eventTitles: params.eventTitles ?? [],
-      }),
-    });
+    const operation = parseProviderOperation(providerOperation);
+    if (operation.route !== '/api/summarize' || operation.consumerKind !== 'summarize') return '';
+    let response: Response;
+    try {
+      response = await fetch('/api/summarize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Event-Every-Request-Id': operation.requestId },
+        body: JSON.stringify({
+          text: params.text ?? '',
+          eventTitles: params.eventTitles ?? [],
+        }),
+        signal,
+      });
+    } catch {
+      if (signal?.aborted) return '';
+      const replay = await resumeProviderOperation(operation, (value) => SummarizeResultSchema.parse(value), signal);
+      return replay.summary;
+    }
     if (!response.ok) {
-      await emitIfCommunityLimited(response);
+      const body = await response.clone().json().catch(() => undefined) as { code?: unknown } | undefined;
+      if (response.status === 409 && body?.code === 'provider_request_pending') {
+        const replay = await resumeProviderOperation(operation, (value) => SummarizeResultSchema.parse(value), signal);
+        return replay.summary;
+      }
       return '';
     }
-    const data = (await response.json()) as SummarizeResult;
-    return typeof data.summary === 'string' ? data.summary : '';
+    return SummarizeResultSchema.parse(await response.json()).summary;
   } catch {
     return '';
   }
