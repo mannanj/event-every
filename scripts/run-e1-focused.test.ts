@@ -53,7 +53,8 @@ describe('run-e1-focused argument and discovery seam', () => {
     expect(layout).not.toContain("import AuthWrapper from '@/components/AuthWrapper'");
     expect(layout).not.toMatch(/<AuthWrapper[\s\S]*<\/AuthWrapper>/);
     expect(page).toContain("import AuthWrapper from '@/components/AuthWrapper'");
-    expect(page).toMatch(/<AuthWrapper>\s*<main\b[\s\S]*<\/main>\s*<\/AuthWrapper>/);
+    expect(page).toMatch(/function Page\(\)[\s\S]*<AuthWrapper>\s*\{\(\{ processingDisabled \}\) => <Home processingDisabled=\{processingDisabled\} \/>\}\s*<\/AuthWrapper>/);
+    expect(page).toMatch(/function Home\(\{ processingDisabled \}[\s\S]*<main\b[\s\S]*<\/main>/);
   });
 
   test('serializes real Playwright config workers only for offline mode', async () => {
