@@ -23,7 +23,8 @@
       { "name": "IDENTITY_DAY_POLICY", "class_name": "IdentityDayPolicy" },
       { "name": "RESOLVER_REQUEST_AUTHORITY", "class_name": "ResolverRequestAuthority" },
       { "name": "RESOLVER_DAILY_COUNTER", "class_name": "DailyCounter" },
-      { "name": "OWNER_BUDGET_AUTHORITY", "class_name": "OwnerBudgetAuthority" }
+      { "name": "OWNER_BUDGET_AUTHORITY", "class_name": "OwnerBudgetAuthority" },
+      { "name": "PROVIDER_REQUEST_AUTHORITY", "class_name": "ProviderRequestAuthority" }
     ]
   },
   "migrations": [
@@ -34,6 +35,10 @@
     {
       "tag": "c1-b-budget-v1",
       "new_sqlite_classes": ["OwnerBudgetAuthority"]
+    },
+    {
+      "tag": "c1-b-request-v1",
+      "new_sqlite_classes": ["ProviderRequestAuthority"]
     }
   ],
   "vars": {

@@ -82,3 +82,79 @@ export type OwnerBudgetStatusResult =
     resetAt: string;
   }>
   | Readonly<{ status: 'day-mismatch' }>;
+
+export type ProviderRequestPhase =
+  | 'prepared'
+  | 'reserved'
+  | 'budget_committed'
+  | 'provider_inflight'
+  | 'completed'
+  | 'failed'
+  | 'unknown'
+  | 'expired';
+export type ProviderRequestSettlementState = 'settlement_pending' | 'settlement_complete';
+export type ProviderBindingCandidate = Readonly<{ version: string; digest: string }>;
+export type ProviderRequestBeginInput = Readonly<{
+  requestDigest: string;
+  route: ProviderRoute;
+  variant: ProviderVariant;
+  bindingCandidates: readonly ProviderBindingCandidate[];
+  proposedAuthorityDay: string;
+  policyVersion: string;
+  reservationNanodollars: number;
+}>;
+export type ProviderRequestPendingResult = Readonly<{
+  status: 'pending';
+  phase: 'prepared' | 'reserved' | 'budget_committed' | 'provider_inflight';
+  executionId: string;
+  authorityDay: string;
+  shapeKeyVersion: string;
+  reservedUntilMs?: number;
+  transportDeadlineMs?: number;
+}>;
+export type ProviderRequestCompletedResult = Readonly<{
+  status: 'completed';
+  replay: unknown;
+  settlement: ProviderRequestSettlementState;
+}>;
+export type ProviderRequestFailedResult = Readonly<{
+  status: 'failed';
+  code: import('./provider/contracts').StoredProviderFailure['code'];
+  httpStatus: 502 | 503 | 504;
+  settlement: ProviderRequestSettlementState;
+}>;
+export type ProviderRequestUnknownResult = Readonly<{
+  status: 'unknown';
+  code: 'provider_outcome_unknown';
+  httpStatus: 502;
+  settlement: ProviderRequestSettlementState;
+}>;
+export type ProviderRequestExpiredResult = Readonly<{
+  status: 'expired';
+  executionId: string;
+  terminalClass: 'completed' | 'failed' | 'unknown' | 'expired';
+}>;
+export type ProviderRequestObservedResult =
+  | ProviderRequestPendingResult
+  | ProviderRequestCompletedResult
+  | ProviderRequestFailedResult
+  | ProviderRequestUnknownResult
+  | ProviderRequestExpiredResult;
+export type ProviderRequestBeginResult = ProviderRequestObservedResult | Readonly<{ status: 'conflict' }>;
+export type ProviderRequestRecordResult =
+  | Readonly<{
+    status: 'recorded';
+    phase: 'reserved' | 'budget_committed';
+    transportDeadlineMs?: number;
+    committedUntilMs?: number;
+  }>
+  | Readonly<{ status: 'conflict' }>;
+export type ProviderRequestClaimResult =
+  | Readonly<{ status: 'permit'; nonce: string; transportDeadlineMs: number }>
+  | ProviderRequestObservedResult
+  | Readonly<{ status: 'conflict' }>;
+export type ProviderRequestCompletionResult =
+  | Readonly<{ status: 'stored'; outcome: ProviderRequestCompletedResult | ProviderRequestFailedResult | ProviderRequestUnknownResult }>
+  | Readonly<{ status: 'late'; outcome: ProviderRequestUnknownResult }>
+  | Readonly<{ status: 'rejected' }>;
+export type ProviderRequestStatusResult = ProviderRequestObservedResult | Readonly<{ status: 'not-found' | 'unavailable' }>;
