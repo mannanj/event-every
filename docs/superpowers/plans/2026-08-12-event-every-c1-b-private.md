@@ -541,7 +541,10 @@ Expected: all named tests PASS, types PASS, and no provider fetch is possible wi
 - Modify: `src/platform/__tests__/route-manifest.test.ts`
 - Modify: `src/platform/route-manifest.ts`
 - Modify: `src/platform/runtime.ts`
+- Modify: `src/platform/__tests__/admission.test.ts`
 - Modify: `src/platform/__tests__/runtime.test.ts`
+- Modify: `src/server/scanner/job.ts`
+- Modify: `src/server/scanner/__tests__/scan.test.ts`
 - Delete: `src/platform/legacy/provider.ts`
 - Delete: `src/platform/legacy/usage.ts`
 - Delete: `src/platform/legacy/waitlist.ts`

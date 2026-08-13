@@ -1,36 +1,35 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { bindLegacyUsageRequest } from '@/platform/legacy';
-import { getUsagePort } from '@/platform/runtime';
+import { z } from 'zod';
+import { getPlatformRuntime } from '@/platform/runtime';
 
-const round = (value: number) => Math.round(value * 10000) / 10000;
+const NO_STORE = { 'Cache-Control': 'no-store' } as const;
+const amount = z.number().int().safe().nonnegative();
+const UsageResponseSchema = z.object({
+  status: z.literal('available'),
+  policyVersion: z.literal('owner-v1'),
+  authorityDay: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  limitNanodollars: amount,
+  spentNanodollars: amount,
+  reservedNanodollars: amount,
+  remainingNanodollars: amount,
+  exhausted: z.boolean(),
+  frozen: z.boolean(),
+  resetAt: z.string().datetime(),
+}).strict().superRefine((value, context) => {
+  const remaining = Math.max(0, value.limitNanodollars - value.spentNanodollars - value.reservedNanodollars);
+  if (value.remainingNanodollars !== remaining) context.addIssue({ code: 'custom', message: 'invalid remaining amount' });
+  if (value.exhausted !== (remaining < 500_000)) context.addIssue({ code: 'custom', message: 'invalid exhaustion state' });
+});
 
-export async function GET(request: NextRequest) {
-  const selectedPort = getUsagePort();
-  if ('status' in selectedPort) {
-    return NextResponse.json({ error: 'State is not ready.', code: 'c1_state_not_ready' }, { status: 503 });
+export async function GET(_request: NextRequest): Promise<Response> {
+  const authorityDay = new Date().toISOString().slice(0, 10);
+  const result = await getPlatformRuntime().ownerBudgetStatus(authorityDay);
+  const parsed = UsageResponseSchema.safeParse(result);
+  if (!parsed.success || parsed.data.authorityDay !== authorityDay) {
+    return NextResponse.json(
+      { error: 'Owner budget unavailable.', code: 'owner_budget_unavailable' },
+      { status: 503, headers: NO_STORE },
+    );
   }
-
-  const port = bindLegacyUsageRequest(selectedPort, request);
-  const result = await port.read({ identity: { kind: 'unknown', keyVersion: '', hmac: '' } });
-  if (result.status !== 'available') {
-    return NextResponse.json({ error: 'Usage unavailable.' }, { status: 503 });
-  }
-  const limits = result.value;
-  const budget = limits.budget;
-
-  return NextResponse.json(
-    {
-      isAdmin: limits.isAdmin,
-      exhausted: budget?.exhausted ?? false,
-      resetAt: limits.resetAt,
-      limitUsd: budget?.limitUsd ?? 0,
-      spentUsd: round(budget?.spentUsd ?? 0),
-      remainingUsd: round(budget?.remainingUsd ?? 0),
-      allowed: limits.allowed,
-      reason: limits.reason,
-      budget: budget ? { ...budget, spentUsd: round(budget.spentUsd), remainingUsd: round(budget.remainingUsd) } : null,
-      ipRate: limits.ipRate,
-    },
-    { headers: { 'Cache-Control': 'no-store' } },
-  );
+  return NextResponse.json(parsed.data, { headers: NO_STORE });
 }

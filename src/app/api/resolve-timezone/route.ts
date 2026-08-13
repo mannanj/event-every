@@ -1,99 +1,93 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { sanitizeResolvedTimezone } from '@/utils/timezone';
-import {
-  bindLegacyProviderRequest,
-  legacyCommunityLimitResponse,
-  legacyIpLimitResponse,
-} from '@/platform/legacy';
-import { getProviderPort } from '@/platform/runtime';
+import { createBindingCandidates, normalizeRequestUuid } from '@/platform/provider/request-binding';
+import { DurableTimezoneReplaySchema, toDurableTimezoneReplay } from '@/platform/provider/replay';
+import { fixedProviderHttp, getPlatformRuntime } from '@/platform/runtime';
 
-const TZ_RESOLVE_MODEL = process.env.OPENROUTER_TZ_MODEL || 'deepseek/deepseek-chat-v3-0324';
-const STRICT_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const TimezoneRequestSchema = z.object({
+  rawTimezone: z.string().trim().min(1),
+  rawStartDate: z.string().optional(),
+  rawEndDate: z.string().optional(),
+  eventTitle: z.string().optional(),
+  eventLocation: z.string().optional(),
+}).strict();
 
-export async function POST(request: NextRequest) {
-  const providerPort = getProviderPort();
-  if ('status' in providerPort) {
-    return NextResponse.json({ error: 'State is not ready.', code: 'c1_state_not_ready' }, { status: 503 });
-  }
+function fixed(result: Parameters<typeof fixedProviderHttp>[0]): Response {
+  const mapped = fixedProviderHttp(result);
+  return NextResponse.json(mapped.body, { status: mapped.status });
+}
 
-  const requestId = request.headers.get('x-event-every-request-id');
-  if (!requestId || !STRICT_UUID.test(requestId)) {
+export async function POST(request: NextRequest): Promise<Response> {
+  let requestId: string;
+  try { requestId = normalizeRequestUuid(request.headers.get('x-event-every-request-id') ?? ''); } catch {
     return NextResponse.json({ error: 'Invalid request id.' }, { status: 400 });
   }
 
-  const legacy = bindLegacyProviderRequest(request);
+  let raw: unknown;
+  try { raw = await request.json(); } catch {
+    return NextResponse.json({ error: 'Invalid timezone request.' }, { status: 400 });
+  }
+  const parsed = TimezoneRequestSchema.safeParse(raw);
+  if (!parsed.success) return NextResponse.json({ error: 'Invalid timezone request.' }, { status: 400 });
+  const normalized = {
+    rawTimezone: parsed.data.rawTimezone,
+    rawStartDate: parsed.data.rawStartDate ?? null,
+    rawEndDate: parsed.data.rawEndDate ?? null,
+    eventTitle: parsed.data.eventTitle ?? null,
+    eventLocation: parsed.data.eventLocation ?? null,
+  };
+
   try {
-    if (!legacy.auth().key) {
-      return NextResponse.json({ error: 'OPENROUTER_API_KEY not configured' }, { status: 500 });
-    }
-
-    const limits = await legacy.evaluateLimits();
-    if (!limits.allowed) {
-      return limits.reason === 'community-budget'
-        ? legacyCommunityLimitResponse(limits.resetAt)
-        : legacyIpLimitResponse(limits.resetAt);
-    }
-
-    const { rawTimezone, rawStartDate, rawEndDate, eventTitle, eventLocation } = await request.json();
-    if (!rawTimezone) return NextResponse.json({ error: 'rawTimezone is required' }, { status: 400 });
-
-    const contextParts = [
-      `Timezone text: "${rawTimezone}"`,
-      rawStartDate && `Event start: ${rawStartDate}`,
-      rawEndDate && `Event end: ${rawEndDate}`,
-      eventTitle && `Event title: ${eventTitle}`,
-      eventLocation && `Event location: ${eventLocation}`,
-    ].filter(Boolean).join('\n');
-
-    const dispatch = providerPort.dispatch({
-      route: 'resolve-timezone',
-      requestId,
-      identity: { kind: 'unknown', keyVersion: '', hmac: '' },
-      signal: request.signal,
-      charge: legacy.charge,
-      provider: () => legacy.chat({
-        model: TZ_RESOLVE_MODEL,
-        messages: [{
-          role: 'user',
-          content: `Given the following event context, determine the IANA timezone identifier.\n\n${contextParts}\n\nReturn the most likely IANA timezone (e.g. "America/New_York", "UTC", "Europe/London").`,
-        }],
-        tools: [{
-          type: 'function',
-          function: {
-            name: 'resolve_timezone',
-            description: 'Return the resolved IANA timezone',
-            parameters: {
-              type: 'object',
-              properties: {
-                timezone: { type: 'string', description: 'IANA timezone identifier' },
-                confidence: { type: 'number', description: 'Confidence 0-1', minimum: 0, maximum: 1 },
-              },
-              required: ['timezone', 'confidence'],
-            },
-          },
-        }],
-        tool_choice: { type: 'function', function: { name: 'resolve_timezone' } },
-      }),
+    const runtime = getPlatformRuntime();
+    const bindingCandidates = await createBindingCandidates({
+      route: 'resolve-timezone', variant: 'resolve-timezone', canonicalJson: JSON.stringify(normalized), ...runtime.shapeKeys(),
     });
-
-    if (dispatch.status === 'aborted-before-dispatch') {
-      return NextResponse.json({ error: 'LLM API error' }, { status: 408 });
-    }
-    const provider = await dispatch.provider;
-    if (provider.status !== 'success') {
-      const failure = legacy.failure();
-      return failure?.kind === 'community-limit'
-        ? legacyCommunityLimitResponse(failure.resetAt)
-        : NextResponse.json({ error: 'LLM API error' }, { status: 502 });
-    }
-
-    const toolCalls = provider.value.choices?.[0]?.message?.tool_calls;
-    if (!toolCalls || toolCalls.length === 0) {
-      return NextResponse.json({ error: 'No timezone resolution from LLM' }, { status: 502 });
-    }
-    const result = JSON.parse(toolCalls[0].function.arguments);
-    return NextResponse.json(sanitizeResolvedTimezone(result.timezone, result.confidence));
+    const context = [
+      `Timezone text: "${normalized.rawTimezone}"`,
+      normalized.rawStartDate && `Event start: ${normalized.rawStartDate}`,
+      normalized.rawEndDate && `Event end: ${normalized.rawEndDate}`,
+      normalized.eventTitle && `Event title: ${normalized.eventTitle}`,
+      normalized.eventLocation && `Event location: ${normalized.eventLocation}`,
+    ].filter(Boolean).join('\n');
+    const result = await runtime.runProviderOperation({
+      requestId,
+      variant: 'resolve-timezone',
+      bindingCandidates,
+      signal: request.signal,
+      execute: async (invoke) => {
+        const transport = await invoke({
+          messages: [{ role: 'user', content: `Given the following event context, determine the IANA timezone identifier.\n\n${context}\n\nReturn the most likely IANA timezone.` }],
+          tools: [{
+            type: 'function',
+            function: {
+              name: 'resolve_timezone',
+              description: 'Return the resolved IANA timezone',
+              parameters: {
+                type: 'object',
+                properties: {
+                  timezone: { type: 'string', description: 'IANA timezone identifier' },
+                  confidence: { type: 'number', description: 'Confidence 0-1', minimum: 0, maximum: 1 },
+                },
+                required: ['timezone', 'confidence'],
+              },
+            },
+          }],
+          tool_choice: { type: 'function', function: { name: 'resolve_timezone' } },
+        });
+        if (transport.status !== 'success') throw new Error('provider_failed');
+        const calls = (transport.value as { choices?: Array<{ message?: { tool_calls?: Array<{ function?: { arguments?: unknown } }> } }> }).choices?.[0]?.message?.tool_calls;
+        const argumentsText = calls?.[0]?.function?.arguments;
+        if (typeof argumentsText !== 'string') throw new Error('provider_invalid_response');
+        const value = JSON.parse(argumentsText) as { timezone?: unknown; confidence?: unknown };
+        return toDurableTimezoneReplay(sanitizeResolvedTimezone(value.timezone, value.confidence));
+      },
+    });
+    if (result.status !== 'completed') return fixed(result);
+    const replay = DurableTimezoneReplaySchema.safeParse(result.replay);
+    if (!replay.success) return fixed({ status: 'unavailable' });
+    return NextResponse.json(replay.data);
   } catch {
-    return NextResponse.json({ error: 'Unknown error' }, { status: 500 });
+    return fixed({ status: 'unavailable' });
   }
 }

@@ -159,6 +159,7 @@ describe('edge admission policy', () => {
   test.each([
     ['/api/auth/verify', 'POST'],
     ['/api/keep-alive', 'GET'],
+    ['/api/waitlist', 'POST'],
   ])('retires %s with fixed 410 before identity or body read', async (path, method) => {
     const probe = probedStream([new TextEncoder().encode('retired-route-canary')]);
     const request = new Request(`https://event-every.test${path}`, {
@@ -242,21 +243,21 @@ describe('edge admission policy', () => {
   ])('accepts JSON media %s with content encoding %s', async (contentType, encoding) => {
     const headers: Record<string, string> = { 'content-type': contentType };
     if (encoding) headers['content-encoding'] = encoding;
-    const result = await admitEdgeRequest(postRequest('/api/waitlist', '{}', headers), env, {}, trustedEdge);
+    const result = await admitEdgeRequest(postRequest('/api/provider-status', '{}', headers), env, {}, trustedEdge);
     expect(result.status).toBe('success');
   });
 
   test('exact byte ceiling is accepted', async () => {
-    const body = new Uint8Array(4 * 1024);
-    const result = await admitEdgeRequest(postRequest('/api/waitlist', body), env, {}, trustedEdge);
+    const body = new Uint8Array(1024);
+    const result = await admitEdgeRequest(postRequest('/api/provider-status', body), env, {}, trustedEdge);
     expect(result.status).toBe('success');
     if (result.status === 'failure') throw new Error('expected admission');
-    expect((await result.request.arrayBuffer()).byteLength).toBe(4 * 1024);
+    expect((await result.request.arrayBuffer()).byteLength).toBe(1024);
   });
 
   test('chunked overflow cancels the stream', async () => {
-    const probe = probedStream([new Uint8Array(4 * 1024), new Uint8Array([1]), new Uint8Array([2])]);
-    const request = postRequest('/api/waitlist', probe.stream, { 'content-length': '1' });
+    const probe = probedStream([new Uint8Array(1024), new Uint8Array([1]), new Uint8Array([2])]);
+    const request = postRequest('/api/provider-status', probe.stream, { 'content-length': '1' });
     const result = await admitEdgeRequest(request, env, {}, trustedEdge);
     expect(result.status).toBe('failure');
     if (result.status === 'success') throw new Error('expected rejection');
@@ -266,7 +267,7 @@ describe('edge admission policy', () => {
   });
 
   test('counts real bytes when Content-Length falsely claims an oversized body', async () => {
-    const result = await admitEdgeRequest(postRequest('/api/waitlist', '{}', { 'content-length': '999999' }), env, {}, trustedEdge);
+    const result = await admitEdgeRequest(postRequest('/api/provider-status', '{}', { 'content-length': '999999' }), env, {}, trustedEdge);
     expect(result.status).toBe('success');
     if (result.status === 'failure') throw new Error('expected admission');
     expect(await result.request.text()).toBe('{}');
@@ -275,7 +276,7 @@ describe('edge admission policy', () => {
   test('abort during stream cancels the reader and returns a fixed response', async () => {
     const controller = new AbortController();
     const probe = probedStream([new Uint8Array([1]), new Uint8Array([2])], () => controller.abort('abort-canary'));
-    const result = await admitEdgeRequest(postRequest('/api/waitlist', probe.stream, {}, controller.signal), env, {}, trustedEdge);
+    const result = await admitEdgeRequest(postRequest('/api/provider-status', probe.stream, {}, controller.signal), env, {}, trustedEdge);
     expect(result.status).toBe('failure');
     if (result.status === 'success') throw new Error('expected rejection');
     await expectFixedError(result.response, 400, 'request_aborted', 'abort-canary');

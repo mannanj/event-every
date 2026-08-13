@@ -12,12 +12,6 @@ import {
   type ProviderOperationInput,
   type ProviderOperationResult,
 } from '@/platform/cloudflare/provider-operation';
-import {
-  CommunityLimitError,
-  OpenRouterUpstreamError,
-  openRouterChat,
-  type LlmCallAuth,
-} from '@/lib/llm';
 import { materializeScanReplay, toDurableScanReplay } from '@/platform/provider/replay';
 import { createEventEveryOpenRouterTransport } from '@/server/scanner/transport';
 import { scanSource, type HostScanJob } from '@/server/scanner/scan';
@@ -69,52 +63,6 @@ function scanJobWithTransport(
       },
     }),
   };
-}
-
-function legacyCompatibilityTransport(auth: LlmCallAuth, signal: AbortSignal): OpenRouterTransport {
-  return createEventEveryOpenRouterTransport({
-    signal,
-    invoke: async (providerBody) => {
-      try {
-        const body = await openRouterChat(providerBody as Parameters<typeof openRouterChat>[0], auth, { signal });
-        return { status: 'success', value: body, costOutcome: { kind: 'missing' } };
-      } catch (error) {
-        if (error instanceof CommunityLimitError) {
-          return {
-            status: 'failed',
-            failure: { code: 'owner_provider_credit_unavailable', httpStatus: 503 },
-            providerStatus: 402,
-            costOutcome: { kind: 'missing' },
-          };
-        }
-        if (error instanceof OpenRouterUpstreamError) {
-          return {
-            status: 'failed',
-            failure: error.status === 408
-              ? { code: 'provider_timeout', httpStatus: 504 }
-              : { code: 'provider_unavailable', httpStatus: 502 },
-            providerStatus: error.status,
-            costOutcome: { kind: 'missing' },
-          };
-        }
-        return { status: 'unknown', failure: { code: 'provider_outcome_unknown', httpStatus: 502 } };
-      }
-    },
-  });
-}
-
-/**
- * Transitional legacy constructor retained until the Task 5 route cutover.
- * New owner-only work must use runCoordinatedScanJob below.
- */
-export function createScanJob(
-  request: ScanRequest,
-  source: E1SourceHandle,
-  auth: LlmCallAuth,
-  signal: AbortSignal,
-  transport: OpenRouterTransport = legacyCompatibilityTransport(auth, signal),
-): HostScanJob {
-  return scanJobWithTransport(request, source, transport);
 }
 
 export type CoordinatedScanResult =

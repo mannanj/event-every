@@ -1,102 +1,82 @@
 import { NextRequest, NextResponse } from 'next/server';
-import {
-  bindLegacyProviderRequest,
-  legacyCommunityLimitResponse,
-  legacyIpLimitResponse,
-} from '@/platform/legacy';
-import { getProviderPort } from '@/platform/runtime';
+import { z } from 'zod';
+import { createBindingCandidates, normalizeRequestUuid } from '@/platform/provider/request-binding';
+import { DurableSummaryReplaySchema, toDurableSummaryReplay } from '@/platform/provider/replay';
+import { fixedProviderHttp, getPlatformRuntime } from '@/platform/runtime';
 
-const OPENROUTER_SUMMARY_MODEL = process.env.OPENROUTER_SUMMARY_MODEL || 'mistralai/ministral-8b-2512';
-const STRICT_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const SUMMARY_PROMPT = `You write ultra-short labels for saved calendar inputs.
 Reply with ONLY a 2-3 word label in Title Case, words separated by single spaces.
 No punctuation, no quotes, no preamble, no explanation.
 Example reply: Team Lunch`;
+const SummaryRequestSchema = z.object({
+  text: z.string().optional().default(''),
+  eventTitles: z.array(z.string()).optional().default([]),
+}).strict();
 
 function cleanLabel(raw: string): string {
   let value = (raw || '').split('\n')[0].trim();
   value = value.replace(/^["'`*]+|["'`*]+$/g, '').replace(/[.,;:!?]+$/g, '').trim();
-  if (!/\s/.test(value) && /[a-z][A-Z]/.test(value)) {
-    value = value.replace(/([a-z0-9])([A-Z])/g, '$1 $2');
-  }
+  if (!/\s/.test(value) && /[a-z][A-Z]/.test(value)) value = value.replace(/([a-z0-9])([A-Z])/g, '$1 $2');
   return value.split(/\s+/).filter(Boolean).slice(0, 3)
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ');
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
 }
 
-export async function POST(request: NextRequest) {
-  const providerPort = getProviderPort();
-  if ('status' in providerPort) {
-    return NextResponse.json({ error: 'State is not ready.', code: 'c1_state_not_ready' }, { status: 503 });
-  }
+function fixed(result: Parameters<typeof fixedProviderHttp>[0]): Response {
+  const mapped = fixedProviderHttp(result);
+  return NextResponse.json(mapped.body, { status: mapped.status });
+}
 
-  const requestId = request.headers.get('x-event-every-request-id');
-  if (!requestId || !STRICT_UUID.test(requestId)) {
+export async function POST(request: NextRequest): Promise<Response> {
+  let requestId: string;
+  try { requestId = normalizeRequestUuid(request.headers.get('x-event-every-request-id') ?? ''); } catch {
     return NextResponse.json({ error: 'Invalid request id.' }, { status: 400 });
   }
 
-  const legacy = bindLegacyProviderRequest(request);
+  let raw: unknown;
+  try { raw = await request.json(); } catch {
+    return NextResponse.json({ error: 'Invalid summarize request.' }, { status: 400 });
+  }
+  const parsed = SummaryRequestSchema.safeParse(raw);
+  if (!parsed.success) return NextResponse.json({ error: 'Invalid summarize request.' }, { status: 400 });
+  const normalized = {
+    text: parsed.data.text.trim().slice(0, 600),
+    eventTitles: parsed.data.eventTitles.map((value) => value.trim()).filter(Boolean).slice(0, 8),
+  };
+  if (!normalized.text && normalized.eventTitles.length === 0) {
+    return NextResponse.json({ error: 'Invalid summarize request.' }, { status: 400 });
+  }
+
   try {
-    if (!legacy.auth().key) {
-      return NextResponse.json({ error: 'OPENROUTER_API_KEY environment variable is not set' }, { status: 500 });
-    }
-
-    const limits = await legacy.evaluateLimits();
-    if (!limits.allowed) {
-      return limits.reason === 'community-budget'
-        ? legacyCommunityLimitResponse(limits.resetAt)
-        : legacyIpLimitResponse(limits.resetAt);
-    }
-
-    let body: { text?: unknown; eventTitles?: unknown };
-    try {
-      body = await request.json();
-    } catch {
-      return NextResponse.json({ error: 'invalid JSON body' }, { status: 400 });
-    }
-    const text = typeof body.text === 'string' ? body.text : '';
-    const eventTitles = Array.isArray(body.eventTitles)
-      ? body.eventTitles.filter((title: unknown): title is string => typeof title === 'string' && title.trim().length > 0)
-      : [];
-    if (!text.trim() && eventTitles.length === 0) {
-      return NextResponse.json({ error: 'text or eventTitles required' }, { status: 400 });
-    }
-
-    const context = [
-      text.trim() ? `Input text: ${text.trim().slice(0, 600)}` : 'Input text: (none, image only)',
-      eventTitles.length ? `Event titles: ${eventTitles.slice(0, 8).join('; ')}` : '',
-    ].filter(Boolean).join('\n');
-
-    const dispatch = providerPort.dispatch({
-      route: 'summarize',
-      requestId,
-      identity: { kind: 'unknown', keyVersion: '', hmac: '' },
-      signal: request.signal,
-      charge: legacy.charge,
-      provider: () => legacy.chat({
-        model: OPENROUTER_SUMMARY_MODEL,
-        messages: [
-          { role: 'system', content: SUMMARY_PROMPT },
-          { role: 'user', content: context },
-        ],
-        max_tokens: 16,
-        temperature: 0.2,
-      }),
+    const runtime = getPlatformRuntime();
+    const bindingCandidates = await createBindingCandidates({
+      route: 'summarize', variant: 'summarize', canonicalJson: JSON.stringify(normalized), ...runtime.shapeKeys(),
     });
-
-    if (dispatch.status === 'aborted-before-dispatch') {
-      return NextResponse.json({ error: 'Failed to summarize input' }, { status: 408 });
-    }
-    const provider = await dispatch.provider;
-    if (provider.status !== 'success') {
-      const failure = legacy.failure();
-      return failure?.kind === 'community-limit'
-        ? legacyCommunityLimitResponse(failure.resetAt)
-        : NextResponse.json({ error: 'Failed to summarize input' }, { status: 500 });
-    }
-
-    return NextResponse.json({ summary: cleanLabel(provider.value.choices?.[0]?.message?.content || '') });
+    const context = [
+      normalized.text ? `Input text: ${normalized.text}` : 'Input text: (none, image only)',
+      normalized.eventTitles.length ? `Event titles: ${normalized.eventTitles.join('; ')}` : '',
+    ].filter(Boolean).join('\n');
+    const result = await runtime.runProviderOperation({
+      requestId,
+      variant: 'summarize',
+      bindingCandidates,
+      signal: request.signal,
+      execute: async (invoke) => {
+        const transport = await invoke({
+          messages: [
+            { role: 'system', content: SUMMARY_PROMPT },
+            { role: 'user', content: context },
+          ],
+        });
+        if (transport.status !== 'success') throw new Error('provider_failed');
+        const content = (transport.value as { choices?: Array<{ message?: { content?: unknown } }> }).choices?.[0]?.message?.content;
+        return toDurableSummaryReplay(cleanLabel(typeof content === 'string' ? content : ''));
+      },
+    });
+    if (result.status !== 'completed') return fixed(result);
+    const replay = DurableSummaryReplaySchema.safeParse(result.replay);
+    if (!replay.success) return fixed({ status: 'unavailable' });
+    return NextResponse.json(replay.data);
   } catch {
-    return NextResponse.json({ error: 'Failed to summarize input' }, { status: 500 });
+    return fixed({ status: 'unavailable' });
   }
 }

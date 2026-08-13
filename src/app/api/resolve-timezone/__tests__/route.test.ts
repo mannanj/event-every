@@ -1,97 +1,84 @@
 import { afterEach, beforeEach, expect, mock, test } from 'bun:test';
 import { NextRequest } from 'next/server';
-import type { LegacyProviderInput, LegacyProviderPort } from '@/platform/contracts';
+import type { ProviderOperationInput, ProviderOperationResult } from '@/platform/cloudflare/provider-operation';
 import { setPlatformRuntimeForTests } from '@/platform/runtime';
 
-const calls = { key: 0, limits: 0, charge: 0, transport: 0 };
-const transportState = { kind: 'success' as 'success' | 'community-limit' | 'failure' };
+const REQUEST_ID = '11111111-1111-4111-8111-111111111111';
+const OTHER_ID = '22222222-2222-4222-8222-222222222222';
+let received: ProviderOperationInput | undefined;
+let nextOutcome: ProviderOperationResult | undefined;
+const providerBodies: unknown[] = [];
 
-class FakeCommunityLimitError extends Error {
-  constructor(readonly resetAt: string) { super('community limit'); }
-}
-
-mock.module('@/lib/llm', () => ({
-  getLlmMode: () => 'community',
-  getLlmKey: () => { calls.key++; return 'synthetic-key'; },
-  openRouterChat: async () => {
-    calls.transport++;
-    if (transportState.kind === 'community-limit') throw new FakeCommunityLimitError('2026-08-03T00:00:00.000Z');
-    if (transportState.kind === 'failure') throw new Error('native upstream canary');
-    return { choices: [{ message: { tool_calls: [{ function: { arguments: JSON.stringify({ timezone: 'America/New_York', confidence: 1 }) } }] } }] };
-  },
-  CommunityLimitError: FakeCommunityLimitError,
-  communityLimitResponse: (error: FakeCommunityLimitError) => Response.json({ error: error.message, code: 'community_limit', resetAt: error.resetAt }, { status: 402 }),
-}));
-mock.module('@/lib/limits', () => ({
-  evaluateLimits: async () => {
-    calls.limits++;
-    return { allowed: true, reason: null, resetAt: '2026-08-03T00:00:00.000Z', isAdmin: false, budget: null, ipRate: { limit: 1000, remaining: 1000, exhausted: false, resetAt: '2026-08-03T00:00:00.000Z' } };
-  },
-  chargeIpRate: async () => { calls.charge++; return { success: true, remaining: 999, reset: 0 }; },
-}));
+const runProviderOperation = mock(async (input: ProviderOperationInput): Promise<ProviderOperationResult> => {
+  received = input;
+  if (nextOutcome) return nextOutcome;
+  const replay = await input.execute(async (providerBody) => {
+    providerBodies.push(providerBody);
+    return { status: 'success', value: { choices: [{ message: { tool_calls: [{ function: { arguments: JSON.stringify({ timezone: 'America/New_York', confidence: 1 }) } }] } }] }, costOutcome: { kind: 'exact', nanodollars: 5 } };
+  });
+  return { status: 'completed', replay, settlement: 'settlement_complete' };
+});
+const providerRequestStatus = mock(async () => ({ status: 'not-found' as const }));
+const ownerBudgetStatus = mock(async () => ({ status: 'day-mismatch' as const }));
+const shapeKeys = () => ({ current: { version: 'test-v1', key: 'synthetic-shape-key' } });
 
 const { POST } = await import('@/app/api/resolve-timezone/route');
-const REQUEST_ID = '018F47A0-7B5C-7CC4-9A34-123456789ABC';
 
-function request(): NextRequest {
+function request(body: unknown = { rawTimezone: 'EST' }, requestId = REQUEST_ID): NextRequest {
   return new NextRequest('http://localhost/api/resolve-timezone', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', 'x-event-every-request-id': REQUEST_ID },
-    body: JSON.stringify({ rawTimezone: 'EST' }),
+    method: 'POST', headers: { 'content-type': 'application/json', 'x-event-every-request-id': requestId }, body: JSON.stringify(body),
   });
 }
 
 beforeEach(() => {
-  calls.key = 0;
-  calls.limits = 0;
-  calls.charge = 0;
-  calls.transport = 0;
-  transportState.kind = 'success';
+  received = undefined; nextOutcome = undefined; providerBodies.length = 0; runProviderOperation.mockClear();
+  setPlatformRuntimeForTests({ runProviderOperation, providerRequestStatus, ownerBudgetStatus, shapeKeys });
 });
-
 afterEach(() => setPlatformRuntimeForTests(undefined));
 
-test('timezone rejects missing request UUID before key lookup or transport', async () => {
-  const response = await POST(new NextRequest('http://localhost/api/resolve-timezone', { method: 'POST', body: JSON.stringify({ rawTimezone: 'EST' }) }));
-  expect(response.status).toBe(400);
-  expect(calls).toEqual({ key: 0, limits: 0, charge: 0, transport: 0 });
+test.each(['', 'not-a-uuid', 'AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA'])('timezone rejects strict UUID %p before body or authority', async (requestId) => {
+  const req = request({}, requestId); const json = mock(async () => ({})); Object.defineProperty(req, 'json', { value: json });
+  expect((await POST(req)).status).toBe(400); expect(json).not.toHaveBeenCalled(); expect(runProviderOperation).not.toHaveBeenCalled();
 });
 
-test('timezone forwards the caller UUID unchanged and keeps charge outside provider transport', async () => {
-  let received: LegacyProviderInput<unknown> | undefined;
-  const provider: LegacyProviderPort = {
-    dispatch<T>(input: LegacyProviderInput<T>) {
-      received = input as LegacyProviderInput<unknown>;
-      return { status: 'started', charge: Promise.resolve({ status: 'charged' }), provider: Promise.resolve(input.provider(input.signal)) };
-    },
-  };
-  setPlatformRuntimeForTests({ mode: 'legacy', provider });
+test.each([[{}, 'missing'], [{ rawTimezone: '' }, 'blank'], [{ rawTimezone: 'EST', extra: true }, 'unknown']])(
+  'timezone rejects %s input before authority', async (body) => {
+    expect((await POST(request(body))).status).toBe(400); expect(runProviderOperation).not.toHaveBeenCalled();
+  },
+);
 
-  const response = await POST(request());
-  expect(response.status).toBe(200);
-  expect(received).toMatchObject({ route: 'resolve-timezone', requestId: REQUEST_ID, identity: { kind: 'unknown', keyVersion: '', hmac: '' } });
-  expect(calls).toEqual({ key: 1, limits: 1, charge: 0, transport: 1 });
+test('timezone binds strict input to one closed operation', async () => {
+  const response = await POST(request({ rawTimezone: 'EST', eventTitle: 'Lunch' }));
+  expect(response.status).toBe(200); expect(await response.json()).toEqual({ timezone: 'America/New_York', confidence: 1 });
+  expect(received).toMatchObject({ requestId: REQUEST_ID, variant: 'resolve-timezone', signal: expect.any(AbortSignal) });
+  expect(received?.bindingCandidates).toEqual([{ version: 'test-v1', digest: expect.stringMatching(/^[0-9a-f]{64}$/) }]);
+  expect(providerBodies).toHaveLength(1); expect(JSON.stringify(providerBodies[0])).toContain('Timezone text');
+});
+
+test('timezone returns minimized durable replay without transport', async () => {
+  nextOutcome = { status: 'completed', replay: { timezone: 'UTC', confidence: 0.9 }, settlement: 'settlement_pending' };
+  const response = await POST(request()); expect(response.status).toBe(200);
+  expect(await response.json()).toEqual({ timezone: 'UTC', confidence: 0.9 }); expect(providerBodies).toHaveLength(0);
 });
 
 test.each([
-  ['community-limit', 402, 'community_limit'],
-  ['failure', 502, undefined],
-] as const)('timezone preserves the %s provider response without native details', async (kind, status, code) => {
-  transportState.kind = kind;
-  const response = await POST(request());
-  const body = await response.json();
-  expect(response.status).toBe(status);
-  if (code) expect(body.code).toBe(code);
-  expect(JSON.stringify(body)).not.toContain('native upstream canary');
+  ['provider_rejected', 502], ['provider_unavailable', 502], ['provider_timeout', 504],
+  ['provider_rate_limited', 503], ['owner_provider_credit_unavailable', 503],
+  ['privacy_endpoint_unavailable', 503], ['provider_invalid_response', 502],
+  ['accounting_policy_breach', 502], ['accounting_cost_overflow', 502],
+] as const)('timezone maps %s to fixed status %i', async (code, status) => {
+  nextOutcome = { status: 'failed', code, httpStatus: status as 502 | 503 | 504, settlement: 'settlement_complete' };
+  const response = await POST(request({ rawTimezone: 'native canary' })); expect(response.status).toBe(status);
+  const body = await response.json(); expect(body.code).toBe(code); expect(JSON.stringify(body)).not.toContain('native canary');
 });
 
-test.each(['shadow', 'cloudflare'] as const)('%s timezone fails before body, limits, key, charging, or transport', async (mode) => {
-  setPlatformRuntimeForTests({ mode });
-  const req = request();
-  const json = mock(async () => ({ rawTimezone: 'EST' }));
-  Object.defineProperty(req, 'json', { value: json });
-  const response = await POST(req);
-  expect(response.status).toBe(503);
-  expect(json).not.toHaveBeenCalled();
-  expect(calls).toEqual({ key: 0, limits: 0, charge: 0, transport: 0 });
+test.each([
+  [{ status: 'pending', phase: 'budget_committed', executionId: OTHER_ID, authorityDay: '2026-08-13', shapeKeyVersion: 'v1', transportDeadlineMs: 1000 } as const, 409, 'provider_request_pending'],
+  [{ status: 'conflict' } as const, 409, 'provider_request_conflict'],
+  [{ status: 'expired', executionId: OTHER_ID, terminalClass: 'unknown' } as const, 409, 'provider_request_expired'],
+  [{ status: 'unknown', code: 'provider_outcome_unknown', httpStatus: 502, settlement: 'settlement_complete' } as const, 502, 'provider_outcome_unknown'],
+  [{ status: 'budget-exhausted', resetAt: '2026-08-14T00:00:00.000Z' } as const, 402, 'owner_budget_exhausted'],
+  [{ status: 'unavailable' } as const, 503, 'provider_state_unavailable'],
+])('timezone maps coordinator state %o', async (result, status, code) => {
+  nextOutcome = result; const response = await POST(request()); expect(response.status).toBe(status); expect((await response.json()).code).toBe(code);
 });

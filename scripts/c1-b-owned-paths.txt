@@ -65,6 +65,7 @@ src/lib/limits.ts
 src/lib/llm.ts
 src/lib/ratelimit.ts
 src/lib/redisClient.ts
+src/platform/__tests__/admission.test.ts
 src/platform/__tests__/route-manifest.test.ts
 src/platform/__tests__/runtime.test.ts
 src/platform/cloudflare-context.ts
@@ -90,6 +91,7 @@ src/platform/provider/request-binding.ts
 src/platform/provider/transport.ts
 src/platform/route-manifest.ts
 src/platform/runtime.ts
+src/server/scanner/__tests__/scan.test.ts
 src/server/scanner/__tests__/transport.test.ts
 src/server/scanner/job.ts
 src/server/scanner/transport.ts

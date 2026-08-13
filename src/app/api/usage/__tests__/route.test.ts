@@ -1,68 +1,67 @@
 import { afterEach, beforeEach, expect, mock, test } from 'bun:test';
 import { NextRequest } from 'next/server';
+import type { OwnerBudgetStatusResult } from '@/platform/contracts';
 import { setPlatformRuntimeForTests } from '@/platform/runtime';
 
-let evaluatedRequest: NextRequest | undefined;
-const evaluateLimits = mock(async (request: NextRequest) => {
-  evaluatedRequest = request;
-  return {
-    allowed: true,
-    reason: null,
-    resetAt: '2026-08-03T00:00:00.000Z',
-    isAdmin: false,
-    budget: { limitUsd: 5, spentUsd: 1.23456, remainingUsd: 3.76544, exhausted: false, resetAt: '2026-08-03T00:00:00.000Z' },
-    ipRate: { limit: 1000, remaining: 999, exhausted: false, resetAt: '2026-08-03T00:00:00.000Z' },
-  };
-});
+const ownerBudgetStatus = mock(async (_authorityDay: string): Promise<OwnerBudgetStatusResult> => current);
+let current: OwnerBudgetStatusResult;
 
-mock.module('@/lib/limits', () => ({ evaluateLimits }));
+const unavailableProvider = mock(async () => ({ status: 'not-found' as const }));
+const unavailableOperation = mock(async () => ({ status: 'unavailable' as const }));
+const shapeKeys = () => ({ current: { version: 'test-v1', key: 'synthetic' } });
 
 const { GET } = await import('@/app/api/usage/route');
 
 beforeEach(() => {
-  evaluatedRequest = undefined;
-  evaluateLimits.mockClear();
+  current = {
+    status: 'available',
+    policyVersion: 'owner-v1',
+    authorityDay: new Date().toISOString().slice(0, 10),
+    limitNanodollars: 5_000_000_000,
+    spentNanodollars: 1_000_000_000,
+    reservedNanodollars: 1_500_000_000,
+    remainingNanodollars: 2_500_000_000,
+    exhausted: false,
+    frozen: false,
+    resetAt: '2026-08-14T00:00:00.000Z',
+  };
+  ownerBudgetStatus.mockClear();
+  setPlatformRuntimeForTests({ runProviderOperation: unavailableOperation, providerRequestStatus: unavailableProvider, ownerBudgetStatus, shapeKeys });
 });
 
 afterEach(() => setPlatformRuntimeForTests(undefined));
 
-test('usage preserves the exact request for legacy evaluateLimits composition', async () => {
-  const request = new NextRequest('http://localhost/api/usage', { headers: { 'x-forwarded-for': '203.0.113.41' } });
-  const response = await GET(request);
+test.each([
+  [1_500_000_000, 2_500_000_000, false, false],
+  [3_999_600_000, 400_000, true, false],
+  [4_500_000_000, 0, true, true],
+] as const)('usage returns content-free integer accounting for reserved=%i', async (reserved, remaining, exhausted, frozen) => {
+  if (current.status !== 'available') throw new Error('expected available fixture');
+  current = { ...current, reservedNanodollars: reserved, remainingNanodollars: remaining, exhausted, frozen };
+  const response = await GET(new NextRequest('http://localhost/api/usage'));
   expect(response.status).toBe(200);
-  expect(evaluatedRequest).toBe(request);
-  expect(await response.json()).toMatchObject({ spentUsd: 1.2346, remainingUsd: 3.7654, allowed: true });
+  expect(response.headers.get('cache-control')).toBe('no-store');
+  expect(await response.json()).toEqual(current);
+  expect(ownerBudgetStatus).toHaveBeenCalledWith(new Date().toISOString().slice(0, 10));
+  expect(JSON.stringify(await (await GET(new NextRequest('http://localhost/api/usage'))).json())).not.toMatch(/requestId|identity|model|route|source|candidate/i);
 });
 
-test('usage passes only the closed identity input to an injected port', async () => {
-  const read = mock(async () => ({
-    status: 'available' as const,
-    value: {
-      isAdmin: false,
-      exhausted: false,
-      resetAt: '2026-08-03T00:00:00.000Z',
-      limitUsd: 0,
-      spentUsd: 0,
-      remainingUsd: 0,
-      allowed: true,
-      reason: null,
-      budget: null,
-      ipRate: { limit: 1000, remaining: 1000, exhausted: false, resetAt: '2026-08-03T00:00:00.000Z' },
-    },
-  }));
-  setPlatformRuntimeForTests({ mode: 'legacy', usage: { read } });
-
-  expect((await GET(new NextRequest('http://localhost/api/usage'))).status).toBe(200);
-  expect(read).toHaveBeenCalledWith({ identity: { kind: 'unknown', keyVersion: '', hmac: '' } });
-  expect(evaluateLimits).not.toHaveBeenCalled();
-});
-
-test.each(['shadow', 'cloudflare'] as const)('%s usage fails before legacy state access', async (mode) => {
-  const read = mock(async () => ({ status: 'unavailable' as const, code: 'legacy_usage_unavailable' as const }));
-  setPlatformRuntimeForTests({ mode, usage: { read } });
+test('usage fails closed without Redis fallback', async () => {
+  current = { status: 'day-mismatch' };
   const response = await GET(new NextRequest('http://localhost/api/usage'));
   expect(response.status).toBe(503);
-  expect(await response.json()).toEqual({ error: 'State is not ready.', code: 'c1_state_not_ready' });
-  expect(read).not.toHaveBeenCalled();
-  expect(evaluateLimits).not.toHaveBeenCalled();
+  expect(response.headers.get('cache-control')).toBe('no-store');
+  expect(await response.json()).toEqual({ error: 'Owner budget unavailable.', code: 'owner_budget_unavailable' });
+});
+
+test('usage rejects an internal result with extra or inconsistent fields', async () => {
+  current = {
+    status: 'available', policyVersion: 'owner-v1', authorityDay: new Date().toISOString().slice(0, 10),
+    limitNanodollars: 5_000_000_000, spentNanodollars: 1, reservedNanodollars: 1,
+    remainingNanodollars: 5_000_000_000, exhausted: false, frozen: false,
+    resetAt: '2026-08-14T00:00:00.000Z', requestId: 'must-not-leak',
+  } as OwnerBudgetStatusResult;
+  const response = await GET(new NextRequest('http://localhost/api/usage'));
+  expect(response.status).toBe(503);
+  expect(JSON.stringify(await response.json())).not.toContain('must-not-leak');
 });
