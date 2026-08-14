@@ -13,6 +13,11 @@ const BASE_USAGE = {
   resetAt: '2026-08-14T00:00:00.000Z',
 } as const;
 
+const KNOWN_RESET_MESSAGE = 'Event Every is powered by community support. New event processing is paused until August 14 12:00am, but your saved events are still available.';
+const UNKNOWN_RESET_MESSAGE = 'Event Every is powered by community support. New event processing is temporarily paused, but your saved events are still available.';
+
+test.use({ timezoneId: 'UTC', locale: 'en-US' });
+
 async function mockUsage(page: Page, body: unknown, status = 200) {
   await page.route('**/api/usage', (route) => route.fulfill({ status, json: body }));
 }
@@ -44,26 +49,27 @@ test.describe('owner budget boundary', () => {
     });
     await page.goto('/');
     await expect(page.getByTestId('owner-budget-screen')).toHaveAttribute('data-owner-budget-state', 'exhausted');
-    await expect(page.getByTestId('owner-budget-message')).toHaveText(
-      'Event processing is paused until the daily owner budget resets.',
-    );
-    await expect(page.getByTestId('owner-budget-screen')).not.toContainText(/request id|provider|waitlist/i);
+    await expect(page.getByRole('heading', { name: 'Event processing is paused' })).toBeVisible();
+    await expect(page.getByTestId('owner-budget-message')).toHaveText(KNOWN_RESET_MESSAGE);
+    await expect(page.getByTestId('owner-budget-screen')).not.toContainText(/owner budget|request id|provider|waitlist/i);
   });
 
   test('shows the fixed frozen state before the exhausted state', async ({ page }) => {
     await mockUsage(page, { ...BASE_USAGE, exhausted: true, frozen: true, remainingNanodollars: 0 });
     await page.goto('/');
     await expect(page.getByTestId('owner-budget-screen')).toHaveAttribute('data-owner-budget-state', 'frozen');
-    await expect(page.getByRole('heading', { name: 'Owner budget frozen' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Event processing is paused' })).toBeVisible();
+    await expect(page.getByTestId('owner-budget-message')).toHaveText(KNOWN_RESET_MESSAGE);
+    await expect(page.getByTestId('owner-budget-screen')).not.toContainText(/owner budget|request id|provider|waitlist/i);
   });
 
   test('shows the fixed unavailable state when usage fails closed', async ({ page }) => {
     await mockUsage(page, { error: 'Owner budget unavailable.', code: 'owner_budget_unavailable' }, 503);
     await page.goto('/');
     await expect(page.getByTestId('owner-budget-screen')).toHaveAttribute('data-owner-budget-state', 'unavailable');
-    await expect(page.getByTestId('owner-budget-message')).toHaveText(
-      'Event processing is temporarily unavailable. Please try again later.',
-    );
+    await expect(page.getByRole('heading', { name: 'Event processing is paused' })).toBeVisible();
+    await expect(page.getByTestId('owner-budget-message')).toHaveText(UNKNOWN_RESET_MESSAGE);
+    await expect(page.getByTestId('owner-budget-screen')).not.toContainText(/owner budget|request id|provider|waitlist/i);
   });
 
   test('treats a malformed successful usage response as unavailable', async ({ page }) => {
@@ -89,7 +95,15 @@ test.describe('owner budget boundary', () => {
     await expect(page.getByTestId('owner-budget-view-only')).toBeVisible();
     await expect(page.getByText('Saved budget event', { exact: true })).toBeVisible();
     await expect(page.getByTestId('smart-input-textarea')).toHaveAttribute('contenteditable', 'true');
-    await expect(page.getByRole('button', { name: 'Transform content to events' })).toBeDisabled();
+    const inputBox = page.getByTestId('input-box');
+    const transform = page.getByRole('button', { name: 'Transform content to events' });
+    await expect(transform).toBeDisabled();
+    const inputBounds = await inputBox.boundingBox();
+    const transformBounds = await transform.boundingBox();
+    expect(inputBounds).not.toBeNull();
+    expect(transformBounds).not.toBeNull();
+    expect(transformBounds!.x + transformBounds!.width).toBeLessThanOrEqual(inputBounds!.x + inputBounds!.width);
+    expect(transformBounds!.y + transformBounds!.height).toBeLessThanOrEqual(inputBounds!.y + inputBounds!.height);
   });
 
   test('preserves an edited input across an unavailable visit and restores it ready to transform', async ({ page }) => {

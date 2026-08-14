@@ -13,7 +13,7 @@ export const C1_A_FULL_COMMANDS = [
   ['bun', 'scripts/run-e1-offline.ts'],
   ['bun', 'scripts/run-with-open-next.ts', '--', 'node', 'node_modules/vitest/vitest.mjs', 'run', '--config', 'vitest.config.workers.ts', 'test/worker/app-worker.test.ts', 'test/worker/admission.integration.test.ts', 'test/worker/resolver.integration.test.ts', 'test/worker/deny-egress.integration.test.ts', 'test/worker/owner-budget-authority.integration.test.ts', 'test/worker/provider-request-authority.integration.test.ts'],
   ['bun', 'scripts/run-c1-a-cloudflare.ts', 'keepalive-tests'],
-  ['bun', 'scripts/assert-c1-a-e2e-inventory.ts', '59'],
+  ['bun', 'scripts/assert-c1-a-e2e-inventory.ts', '62'],
   ['bun', 'scripts/run-c1-a-worker-e2e.ts'],
   ['bun', 'scripts/assert-private-worker.ts'],
   ['bun', 'scripts/assert-e1-protected.ts'],

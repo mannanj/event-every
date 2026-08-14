@@ -424,9 +424,9 @@ const SmartInput = forwardRef<SmartInputHandle, SmartInputProps>(
     const contentDensity = calculateDensity();
 
     return (
-      <div className="w-full h-full flex flex-col">
+      <div className="flex min-h-0 w-full flex-1 flex-col">
         <div
-          className={`relative flex-1 flex flex-col transition-all duration-200 ${
+          className={`relative flex min-h-0 flex-1 flex-col transition-all duration-200 ${
             isDragging ? 'bg-gray-50' : ''
           }`}
           onDragOver={handleDragOver}

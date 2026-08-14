@@ -2,29 +2,37 @@
 
 export type OwnerBudgetScreenState = 'exhausted' | 'frozen' | 'unavailable';
 
-const CONTENT: Readonly<Record<OwnerBudgetScreenState, Readonly<{ title: string; message: string }>>> = {
-  exhausted: {
-    title: 'Owner budget reached',
-    message: 'Event processing is paused until the daily owner budget resets.',
-  },
-  frozen: {
-    title: 'Owner budget frozen',
-    message: 'Event processing is paused while the owner accounting state is checked.',
-  },
-  unavailable: {
-    title: 'Owner budget unavailable',
-    message: 'Event processing is temporarily unavailable. Please try again later.',
-  },
-};
+const UNKNOWN_RESET_MESSAGE = 'Event Every is powered by community support. New event processing is temporarily paused, but your saved events are still available.';
+
+function formatResetAt(resetAt: string | null): string | null {
+  if (resetAt === null) return null;
+  const resetDate = new Date(resetAt);
+  if (Number.isNaN(resetDate.getTime())) return null;
+  const date = new Intl.DateTimeFormat('en-US', {
+    month: 'long',
+    day: 'numeric',
+  }).format(resetDate);
+  const time = new Intl.DateTimeFormat('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  }).format(resetDate).replace(/\s/g, '').toLowerCase();
+  return `${date} ${time}`;
+}
 
 export default function OwnerBudgetScreen({
   state,
+  resetAt,
   onViewEvents,
 }: {
   state: OwnerBudgetScreenState;
+  resetAt: string | null;
   onViewEvents: () => void;
 }) {
-  const content = CONTENT[state];
+  const resetLabel = formatResetAt(resetAt);
+  const message = resetLabel === null
+    ? UNKNOWN_RESET_MESSAGE
+    : `Event Every is powered by community support. New event processing is paused until ${resetLabel}, but your saved events are still available.`;
   return (
     <main
       className="min-h-screen rainbow-gradient-bg flex items-center justify-center px-6 py-12"
@@ -33,9 +41,9 @@ export default function OwnerBudgetScreen({
     >
       <div className="bg-white border-2 border-black p-8 max-w-xl w-full">
         <h1 className="text-3xl font-black retro-rainbow-text tracking-wider text-center mb-8">Event Every</h1>
-        <h2 className="text-xl font-black text-black mb-4">{content.title}</h2>
+        <h2 className="text-xl font-black text-black mb-4">Event processing is paused</h2>
         <p className="text-black text-base leading-relaxed" data-testid="owner-budget-message">
-          {content.message}
+          {message}
         </p>
         <button
           type="button"

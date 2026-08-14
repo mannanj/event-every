@@ -72,21 +72,29 @@ Temporarily restore the pre-fix height classes, rerun the geometry test and conf
 ### Task 4: Verify and capture
 
 **Files:**
-- Modify only if a test exposes a defect in the files above.
+- Modify if the gate exposes a stale prerequisite:
+  - `scripts/assert-c1-a-e2e-inventory.ts`
+  - `scripts/assert-c1-a-e2e-inventory.test.ts`
+  - `scripts/run-c1-a-offline.ts`
+  - `scripts/run-c1-a-offline.test.ts`
 
-- [ ] **Step 1: Run the complete Event Every verification gate**
+- [ ] **Step 1: Repair the stale exact browser inventory if the full gate proves it predates the current committed suite**
+
+Keep the exact-title guard. Add the three already-committed Task 7 community-limit titles, replace its one stale renamed title, and advance the closed per-project total from 59 to 62 (59 ordinary plus three C1-A tests). Unit-test the new closed total before changing the guard.
+
+- [ ] **Step 2: Run the complete Event Every verification gate**
 
 Run `bun run verify:c1:a`. Expected: exit 0 with unit, type, lint, build, Chromium, WebKit, worker, and private-worker checks passing.
 
-- [ ] **Step 2: Capture the corrected real-browser paused flow**
+- [ ] **Step 3: Capture the corrected real-browser paused flow**
 
 Capture the processing-pause screen and the post-click editable input. Confirm visually that the approved community copy is shown and Transform remains within the input's bottom-right corner.
 
-- [ ] **Step 3: Check React and browser errors**
+- [ ] **Step 4: Check React and browser errors**
 
 Record `pageerror` and console errors during the capture. Expected: no React or hydration errors; the deliberately mocked usage failure may emit only its expected network status error.
 
-- [ ] **Step 4: Commit the implementation**
+- [ ] **Step 5: Commit the implementation**
 
 Stage only the two tests and production files listed in this plan, then commit with:
 

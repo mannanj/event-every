@@ -29,7 +29,10 @@ export const PRESERVED_E1_TITLES = [
   'owner budget boundary › shows the fixed unavailable state when usage fails closed',
   'owner budget boundary › treats a malformed successful usage response as unavailable',
   'owner budget boundary › keeps the app open when the owner budget is available',
-  'owner budget boundary › reads only the usage endpoint and renders no retired action',
+  'owner budget boundary › opens saved events while provider processing remains disabled',
+  'owner budget boundary › preserves an edited input across an unavailable visit and restores it ready to transform',
+  'owner budget boundary › stops waiting for an unavailable budget response after three seconds',
+  'owner budget boundary › reads only the usage endpoint and renders only the safe events action',
   'Event Extraction Scenarios › Scenario 4: one strict Scanner response keeps every candidate as an ordered selectable review draft',
   'Event Extraction Scenarios › Scenario 5: zero Scanner candidates leave no review drafts or processing error',
   'UI Interaction Tests › Submit button is disabled with empty input',
@@ -78,13 +81,13 @@ type Project = 'chromium' | 'webkit';
 export type ProjectInventory = Record<Project, string[]>;
 export type InventoryListing = Readonly<{ ordinary: ProjectInventory; c1a: ProjectInventory }>;
 
-function fail(kind: 'expected 57|58|59' | 'ordinary titles' | 'retired title' | 'C1-A titles' | 'playwright failed' | 'owned output collision'): never {
+function fail(kind: 'expected 60|61|62' | 'ordinary titles' | 'retired title' | 'C1-A titles' | 'playwright failed' | 'owned output collision'): never {
   throw new Error(`c1-a inventory: ${kind}`);
 }
 
-export function validateInventoryArgument(argv: readonly string[]): 57 | 58 | 59 {
-  if (argv.length !== 1 || !['57', '58', '59'].includes(argv[0]!)) fail('expected 57|58|59');
-  return Number(argv[0]) as 57 | 58 | 59;
+export function validateInventoryArgument(argv: readonly string[]): 60 | 61 | 62 {
+  if (argv.length !== 1 || !['60', '61', '62'].includes(argv[0]!)) fail('expected 60|61|62');
+  return Number(argv[0]) as 60 | 61 | 62;
 }
 
 export function parsePlaywrightList(output: string): ProjectInventory {
@@ -101,12 +104,12 @@ function sameTitles(actual: readonly string[], expected: readonly string[]): boo
   return actual.length === expected.length && [...actual].sort().every((title, index) => title === [...expected].sort()[index]);
 }
 
-export function assertC1AE2EInventory(value: InventoryListing, expectedTotal: 57 | 58 | 59, ordinaryExpected: readonly string[] = PRESERVED_E1_TITLES): void {
+export function assertC1AE2EInventory(value: InventoryListing, expectedTotal: 60 | 61 | 62, ordinaryExpected: readonly string[] = PRESERVED_E1_TITLES): void {
   for (const project of ['chromium', 'webkit'] as const) {
     const ordinary = value.ordinary[project];
     if (ordinary.some((title) => RETIRED_E1_TITLES.some((retired) => title === retired || title.endsWith(`› ${retired}`)))) fail('retired title');
     if (!sameTitles(ordinary, ordinaryExpected)) fail('ordinary titles');
-    const expectedC1A = C1_A_TITLES.slice(0, expectedTotal - 56);
+    const expectedC1A = C1_A_TITLES.slice(0, expectedTotal - 59);
     if (!sameTitles(value.c1a[project], expectedC1A)) fail('C1-A titles');
   }
 }
@@ -123,7 +126,7 @@ function runListing(root: string, env: C1AEnvironment, config: string): ProjectI
   return parsePlaywrightList(new TextDecoder().decode(child.stdout));
 }
 
-export function runInventory(root: string, expectedTotal: 57 | 58 | 59): void {
+export function runInventory(root: string, expectedTotal: 60 | 61 | 62): void {
   const suffix = '000000000000';
   const outputs = [path.join(root, `test-results-c1-a-${suffix}`), path.join(root, `playwright-report-c1-a-${suffix}`)];
   if (outputs.some(existsSync)) fail('owned output collision');

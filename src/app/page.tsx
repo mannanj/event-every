@@ -854,7 +854,7 @@ function Home({ processingDisabled }: { processingDisabled: boolean }) {
 
         {/* The input is the hero — offset shadow, staggered in */}
         <div
-          className="rise rise-3 border-2 border-black bg-white p-[5px] h-[400px] offset-shadow"
+          className="rise rise-3 flex h-[400px] flex-col border-2 border-black bg-white p-[5px] offset-shadow"
           data-testid="input-box"
         >
           {processingDisabled && (
