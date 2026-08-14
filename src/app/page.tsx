@@ -859,7 +859,7 @@ function Home({ processingDisabled }: { processingDisabled: boolean }) {
         >
           {processingDisabled && (
             <div className="border-b-2 border-black bg-white px-4 py-3 text-sm text-black" data-testid="owner-budget-view-only" role="status">
-              Event processing is paused. You can review your saved events and keep editing this draft; it saves automatically in this browser.
+              Event processing is paused. Your changes are saved and you can view your saved events below.
             </div>
           )}
           {processingDisabled || providerOperationsReady ? (

@@ -92,7 +92,9 @@ test.describe('owner budget boundary', () => {
 
     await page.getByRole('button', { name: 'View my events' }).click();
 
-    await expect(page.getByTestId('owner-budget-view-only')).toBeVisible();
+    await expect(page.getByTestId('owner-budget-view-only')).toHaveText(
+      'Event processing is paused. Your changes are saved and you can view your saved events below.',
+    );
     await expect(page.getByText('Saved budget event', { exact: true })).toBeVisible();
     await expect(page.getByTestId('smart-input-textarea')).toHaveAttribute('contenteditable', 'true');
     const inputBox = page.getByTestId('input-box');
