@@ -195,13 +195,14 @@ export function assertPrivateWorkerArtifact(root: string): void {
   }
 }
 
-function listAuthoredInputs(root: string): readonly string[] {
+export function listAuthoredInputs(root: string): readonly string[] {
   const files: string[] = [];
   const walk = (directory: string): void => {
     for (const entry of readdirSync(directory, { withFileTypes: true })) {
       if (entry.isSymbolicLink()) continue;
       if (entry.isDirectory()) {
-        if (!EXCLUDED_DIRECTORY.has(entry.name) && !entry.name.startsWith('test-results-') && !entry.name.startsWith('playwright-report-')) {
+        if (!EXCLUDED_DIRECTORY.has(entry.name) && !entry.name.startsWith('.private-privacy-')
+          && !entry.name.startsWith('test-results-') && !entry.name.startsWith('playwright-report-')) {
           walk(path.join(directory, entry.name));
         }
         continue;

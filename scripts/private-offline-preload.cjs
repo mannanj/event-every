@@ -5,9 +5,16 @@ const http = require('node:http');
 const https = require('node:https');
 const net = require('node:net');
 const tls = require('node:tls');
+const dns = require('node:dns');
+const dgram = require('node:dgram');
 
 const CREDENTIAL_NAME = /(?:OPENROUTER|ANTHROPIC|API[_-]?KEY|TOKEN|SECRET|CLOUDFLARE|RESEND|KV[_-]?REST|D1|R2|AUTH[_-]?PATTERN|PASSWORD|CREDENTIAL|(?:^|_)PAT(?:_|$)|DATABASE|DSN|CONNECTION|ACCESS[_-]?KEY|PRIVATE[_-]?KEY|GITHUB)/i;
 const LOOPBACK = new Set(['127.0.0.1', 'localhost', '::1', '[::1]']);
+const SAFE_ENVIRONMENT = new Set(['PATH', 'TMPDIR', 'TMP', 'TEMP', 'HOME', 'USER', 'LANG', 'LC_ALL', 'TERM', 'CI', 'PRIVATE_OUTPUT_SUFFIX', 'PRIVATE_PRIVACY_CANARY']);
+const DNS_METHODS = [
+  'lookup', 'lookupService', 'resolve', 'resolve4', 'resolve6', 'resolveAny', 'resolveCaa', 'resolveCname',
+  'resolveMx', 'resolveNaptr', 'resolveNs', 'resolvePtr', 'resolveSoa', 'resolveSrv', 'resolveTxt', 'reverse',
+];
 
 function blocked() {
   const error = new Error('PRIVATE_OFFLINE_EGRESS_BLOCKED');
@@ -45,7 +52,7 @@ function requireTarget(value, options, mode) {
   if (!permitted(candidate)) throw blocked();
 }
 
-for (const name of Object.keys(process.env)) if (CREDENTIAL_NAME.test(name) || !['PATH', 'TMPDIR', 'TMP', 'TEMP', 'HOME', 'USER', 'LANG', 'LC_ALL', 'TERM', 'CI'].includes(name)) delete process.env[name];
+for (const name of Object.keys(process.env)) if (CREDENTIAL_NAME.test(name) || !SAFE_ENVIRONMENT.has(name)) delete process.env[name];
 for (const name of ['BUN_OPTIONS', 'NODE_PATH', 'NODE_REPL_EXTERNAL_MODULE', 'LD_PRELOAD', 'DYLD_INSERT_LIBRARIES', 'DYLD_LIBRARY_PATH', 'HTTP_PROXY', 'HTTPS_PROXY', 'ALL_PROXY', 'NO_PROXY', 'http_proxy', 'https_proxy', 'all_proxy', 'no_proxy']) delete process.env[name];
 process.env.BUN_OPTIONS = `--preload=${__filename}`;
 process.env.NODE_OPTIONS = `--require=${__filename}`;
@@ -86,6 +93,52 @@ tls.connect = function privateOfflineTls(...args) {
   requireTarget(input, undefined, 'socket');
   return originalTlsConnect.apply(this, args);
 };
+for (const method of DNS_METHODS) {
+  const original = dns[method];
+  if (typeof original === 'function') dns[method] = function privateOfflineDns(...args) {
+    if (!loopback(args[0])) throw blocked();
+    return original.apply(this, args);
+  };
+}
+if (dns.promises) {
+  for (const method of DNS_METHODS) {
+    const original = dns.promises[method];
+    if (typeof original === 'function') dns.promises[method] = function privateOfflineDnsPromise(...args) {
+      if (!loopback(args[0])) throw blocked();
+      return original.apply(this, args);
+    };
+  }
+}
+if (dns.Resolver) {
+  const OriginalResolver = dns.Resolver;
+  dns.Resolver = function PrivateOfflineResolver(...constructorArgs) {
+    const resolver = new OriginalResolver(...constructorArgs);
+    for (const method of DNS_METHODS.filter((name) => name.startsWith('resolve') || name === 'reverse')) {
+      const original = resolver[method];
+      if (typeof original === 'function') resolver[method] = function privateOfflineResolver(...args) {
+        if (!loopback(args[0])) throw blocked();
+        return original.apply(this, args);
+      };
+    }
+    return resolver;
+  };
+  dns.Resolver.prototype = OriginalResolver.prototype;
+}
+const originalCreateSocket = dgram.createSocket;
+dgram.createSocket = function privateOfflineDgram(...args) {
+  void originalCreateSocket; void args;
+  throw blocked();
+};
+if (globalThis.Bun && typeof globalThis.Bun.connect === 'function') {
+  const originalBunConnect = globalThis.Bun.connect;
+  globalThis.Bun.connect = function privateOfflineBunConnect(options) {
+    requireTarget(options, undefined, 'socket');
+    return originalBunConnect.apply(this, arguments);
+  };
+}
+if (globalThis.Bun && typeof globalThis.Bun.udpSocket === 'function') {
+  globalThis.Bun.udpSocket = function privateOfflineBunUdp() { throw blocked(); };
+}
 if (typeof globalThis.WebSocket === 'function') {
   const OriginalWebSocket = globalThis.WebSocket;
   globalThis.WebSocket = class PrivateOfflineWebSocket extends OriginalWebSocket {

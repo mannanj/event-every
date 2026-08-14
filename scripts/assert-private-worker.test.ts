@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import {
   assertPrivateWorkerArtifact,
+  listAuthoredInputs,
   runPrivateWorkerAssertion,
   type PrivateWorkerAssertionSeams,
 } from './assert-private-worker';
@@ -112,5 +113,14 @@ describe('private Worker build lifecycle', () => {
     expect(existsSync(path.join(root, '.open-next'))).toBeFalse();
     expect(existsSync(path.join(root, '.wrangler'))).toBeFalse();
     expect(readFileSync(path.join(root, 'package.json'), 'utf8')).toBe('{"name":"after"}');
+  });
+
+  test('does not mistake the privacy canary owned temp directory for authored source', () => {
+    const root = mkdtempSync(path.join(tmpdir(), 'event-every-private-worker-inputs-'));
+    roots.push(root);
+    writeFileSync(path.join(root, 'package.json'), '{}');
+    const ownedTemp = path.join(root, '.private-privacy-abcdef123456');
+    mkdirSync(ownedTemp); writeFileSync(path.join(ownedTemp, 'tool-cache'), 'generated');
+    expect(listAuthoredInputs(root)).toEqual([path.join(root, 'package.json')]);
   });
 });

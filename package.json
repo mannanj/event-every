@@ -24,6 +24,8 @@
     "assert:c1:a-config": "bun scripts/assert-c1-a-config.ts",
     "assert:c1:a-paths": "bun scripts/assert-c1-a-paths.ts",
     "assert:private-worker": "bun scripts/assert-private-worker.ts",
+    "verify:private:privacy": "bun scripts/run-private-privacy.ts",
+    "test:e2e:private": "bun scripts/run-private-worker-e2e.ts",
     "test:e2e:c1:a": "playwright test --config playwright.c1-a.config.ts",
     "verify:c1:a": "bun scripts/run-c1-a-offline.ts"
   },

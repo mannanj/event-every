@@ -88,8 +88,22 @@ describe('private offline runner', () => {
 
   test('keeps descendant preload controls after the first preload runs', async () => {
     const root = path.resolve(import.meta.dir, '..');
-    const descendant = "if (process.env.OPENROUTER_OWNER_KEY || !process.env.BUN_OPTIONS?.includes('private-offline-preload') || !process.env.NODE_OPTIONS?.includes('private-offline-preload') || process.env.BUN_CONFIG_NO_LOAD_DOTENV !== '1') process.exit(1); try { fetch('https://example.invalid'); process.exit(2) } catch (error) { process.exit(error.code === 'PRIVATE_OFFLINE_EGRESS_BLOCKED' ? 0 : 3) }";
-    const result = await runner.spawnPrivateOffline(['bun', '-e', `const child=Bun.spawnSync(['bun','-e',${JSON.stringify(descendant)}]); process.exit(child.exitCode ?? 9);`], { cwd: root, env: { ...runner.createPrivateOfflineEnvironment({ PATH: process.env.PATH, OPENROUTER_OWNER_KEY: 'secret' }, root), OPENROUTER_OWNER_KEY: 'secret' } }, 2_000);
+    const descendant = "if (process.env.OPENROUTER_OWNER_KEY || process.env.PRIVATE_OUTPUT_SUFFIX !== 'abcdef123456' || process.env.PRIVATE_PRIVACY_CANARY !== '1' || !process.env.BUN_OPTIONS?.includes('private-offline-preload') || !process.env.NODE_OPTIONS?.includes('private-offline-preload') || process.env.BUN_CONFIG_NO_LOAD_DOTENV !== '1') process.exit(1); try { fetch('https://example.invalid'); process.exit(2) } catch (error) { process.exit(error.code === 'PRIVATE_OFFLINE_EGRESS_BLOCKED' ? 0 : 3) }";
+    const result = await runner.spawnPrivateOffline(['bun', '-e', `const child=Bun.spawnSync(['bun','-e',${JSON.stringify(descendant)}]); process.exit(child.exitCode ?? 9);`], { cwd: root, env: { ...runner.createPrivateOfflineEnvironment({ PATH: process.env.PATH, OPENROUTER_OWNER_KEY: 'secret' }, root), OPENROUTER_OWNER_KEY: 'secret', PRIVATE_OUTPUT_SUFFIX: 'abcdef123456', PRIVATE_PRIVACY_CANARY: '1' } }, 2_000);
+    expect(result.exitCode, new TextDecoder().decode(result.stderr)).toBe(0);
+  });
+
+  test('blocks DNS and UDP egress before native transports are created', async () => {
+    const root = path.resolve(import.meta.dir, '..');
+    const program = `const dns=require('node:dns'); const dgram=require('node:dgram'); let blocked=0; for (const action of [()=>dns.resolve('example.invalid',()=>{}),()=>dgram.createSocket('udp4'),()=>Bun.udpSocket({socket:{data(){}}})]) { try { action() } catch (error) { if (error.code==='PRIVATE_OFFLINE_EGRESS_BLOCKED') blocked+=1 } } process.exit(blocked===3?0:1)`;
+    const result = await runner.spawnPrivateOffline(['bun', '-e', program], { cwd: root, env: runner.createPrivateOfflineEnvironment(process.env, root) }, 2_000);
+    expect(result.exitCode, new TextDecoder().decode(result.stderr)).toBe(0);
+  });
+
+  test('blocks a custom DNS Resolver before its captured native seam', async () => {
+    const root = path.resolve(import.meta.dir, '..'); const preload = path.join(root, 'scripts', 'private-offline-preload.cjs');
+    const program = `const dns=require('node:dns'); let calls=0; class FakeResolver { resolve(){calls+=1} } dns.Resolver=FakeResolver; delete require.cache[${JSON.stringify(preload)}]; require(${JSON.stringify(preload)}); try { new dns.Resolver().resolve('example.invalid'); process.exit(2) } catch (error) { process.exit(error.code==='PRIVATE_OFFLINE_EGRESS_BLOCKED' && calls===0 ? 0 : 1) }`;
+    const result = await runner.spawnPrivateOffline(['bun', '-e', program], { cwd: root, env: { PATH: process.env.PATH } }, 2_000);
     expect(result.exitCode, new TextDecoder().decode(result.stderr)).toBe(0);
   });
 
