@@ -4,6 +4,10 @@ const https = require('node:https');
 const net = require('node:net');
 const tls = require('node:tls');
 const dns = require('node:dns');
+const fs = require('node:fs');
+const fsPromises = require('node:fs/promises');
+const path = require('node:path');
+const { fileURLToPath } = require('node:url');
 
 const CREDENTIAL_NAME = /(OPENROUTER|ANTHROPIC|API_KEY|TOKEN|SECRET|CLOUDFLARE|RESEND|KV_REST|D1|R2|AUTH_PATTERN)/i;
 const LOOPBACK = new Set(['127.0.0.1', 'localhost', '::1', '[::1]']);
@@ -11,6 +15,79 @@ const DNS_METHODS = [
   'lookup', 'lookupService', 'resolve', 'resolve4', 'resolve6', 'resolveAny', 'resolveCaa', 'resolveCname',
   'resolveMx', 'resolveNaptr', 'resolveNs', 'resolvePtr', 'resolveSoa', 'resolveSrv', 'resolveTxt', 'reverse',
 ];
+const DOTENV_NAMES = new Set([
+  '.env', '.env.local', '.env.production', '.env.production.local',
+  '.env.development', '.env.development.local', '.env.test', '.env.test.local',
+]);
+const REPOSITORY_ROOT = path.resolve(__dirname, '..');
+
+function filesystemPath(value) {
+  try {
+    if (value instanceof URL) {
+      if (value.protocol !== 'file:') return '';
+      return path.resolve(fileURLToPath(value));
+    }
+    if (Buffer.isBuffer(value)) return path.resolve(value.toString());
+    return typeof value === 'string' ? path.resolve(value) : '';
+  } catch { return ''; }
+}
+
+function projectDotenv(value) {
+  const resolved = filesystemPath(value);
+  return resolved !== '' && path.dirname(resolved) === REPOSITORY_ROOT && DOTENV_NAMES.has(path.basename(resolved));
+}
+
+function missingDotenv(value, syscall = 'open') {
+  const error = new Error(`ENOENT: no such file or directory, ${syscall} '${filesystemPath(value)}'`);
+  error.code = 'ENOENT'; error.errno = -2; error.path = filesystemPath(value); error.syscall = syscall;
+  return error;
+}
+
+const originalExistsSync = fs.existsSync;
+fs.existsSync = function c1aOfflineExistsSync(value) {
+  if (projectDotenv(value)) return false;
+  return originalExistsSync.apply(this, arguments);
+};
+
+for (const method of ['accessSync', 'lstatSync', 'openSync', 'readFileSync', 'statSync']) {
+  const original = fs[method];
+  fs[method] = function c1aOfflineDotenvSync(value) {
+    if (projectDotenv(value)) throw missingDotenv(value, method.replace(/Sync$/, ''));
+    return original.apply(this, arguments);
+  };
+}
+
+for (const method of ['access', 'lstat', 'open', 'readFile', 'stat']) {
+  const original = fs[method];
+  fs[method] = function c1aOfflineDotenvCallback(value, ...args) {
+    if (!projectDotenv(value)) return original.call(this, value, ...args);
+    const callback = [...args].reverse().find((argument) => typeof argument === 'function');
+    if (callback) { queueMicrotask(() => callback(missingDotenv(value, method))); return; }
+    throw missingDotenv(value, method);
+  };
+}
+
+const originalExists = fs.exists;
+fs.exists = function c1aOfflineExists(value, callback) {
+  if (projectDotenv(value)) { queueMicrotask(() => callback(false)); return; }
+  return originalExists.call(this, value, callback);
+};
+
+const originalCreateReadStream = fs.createReadStream;
+fs.createReadStream = function c1aOfflineCreateReadStream(value) {
+  if (projectDotenv(value)) throw missingDotenv(value, 'open');
+  return originalCreateReadStream.apply(this, arguments);
+};
+
+for (const promises of [fs.promises, fsPromises]) {
+  for (const method of ['access', 'lstat', 'open', 'readFile', 'stat']) {
+    const original = promises[method];
+    promises[method] = async function c1aOfflineDotenvPromise(value, ...args) {
+      if (projectDotenv(value)) throw missingDotenv(value, method);
+      return original.call(this, value, ...args);
+    };
+  }
+}
 const ROUTING_HOOKS = ['dispatcher', 'proxy', 'agent', 'socketPath', 'createConnection', 'lookup', 'connection', 'fd', 'handle'];
 
 function blocked() {

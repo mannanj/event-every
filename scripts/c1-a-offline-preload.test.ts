@@ -1,4 +1,7 @@
 import { describe, expect, test } from 'bun:test';
+import { copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 
 const preload = `${import.meta.dir}/c1-a-offline-preload.cjs`;
 
@@ -86,6 +89,42 @@ function websocketProbe(runtime: 'node' | 'bun'): number {
   return Bun.spawnSync([runtime, '--eval', program], { stdout: 'pipe', stderr: 'pipe' }).exitCode ?? 1;
 }
 
+function dotenvProbe(runtime: 'node' | 'bun'): number {
+  const root = mkdtempSync(path.join(tmpdir(), 'event-every-dotenv-guard-'));
+  const names = [
+    '.env', '.env.local', '.env.production', '.env.production.local',
+    '.env.development', '.env.development.local', '.env.test', '.env.test.local',
+  ];
+  try {
+    mkdirSync(path.join(root, 'scripts'));
+    const fixturePreload = path.join(root, 'scripts', 'c1-a-offline-preload.cjs');
+    copyFileSync(preload, fixturePreload);
+    for (const name of names) writeFileSync(path.join(root, name), `SECRET_${name}=canary\n`);
+    writeFileSync(path.join(root, 'ordinary.txt'), 'ordinary');
+    const program = `
+      const fs = require('node:fs');
+      require(${JSON.stringify(fixturePreload)});
+      const names = ${JSON.stringify(names)};
+      const denied = (operation) => { try { operation(); return false; } catch (error) { return error && error.code === 'ENOENT'; } };
+      const syncHidden = names.every((name) => !fs.existsSync(name)
+        && denied(() => fs.statSync(name))
+        && denied(() => fs.readFileSync(name, 'utf8')));
+      Promise.all(names.map((name) => fs.promises.readFile(name).then(
+        () => false,
+        (error) => error && error.code === 'ENOENT',
+      ))).then((results) => process.exit(
+        syncHidden
+        && results.every(Boolean)
+        && fs.existsSync('ordinary.txt')
+        && fs.readFileSync('ordinary.txt', 'utf8') === 'ordinary' ? 0 : 1
+      ));
+    `;
+    return Bun.spawnSync([runtime, '--eval', program], { cwd: root, stdout: 'pipe', stderr: 'pipe' }).exitCode ?? 1;
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
 describe('C1-A offline preload', () => {
   test('blocks all core non-loopback APIs before underlying dispatch in both Node and Bun', () => {
     const calls = [
@@ -144,5 +183,10 @@ describe('C1-A offline preload', () => {
   test('replaces the loopback WebSocket connection hook with the guarded transport', () => {
     expect(websocketProbe('node')).toBe(0);
     expect(websocketProbe('bun')).toBe(0);
+  });
+
+  test('hides every project dotenv candidate from build children without hiding ordinary files', () => {
+    expect(dotenvProbe('node')).toBe(0);
+    expect(dotenvProbe('bun')).toBe(0);
   });
 });
