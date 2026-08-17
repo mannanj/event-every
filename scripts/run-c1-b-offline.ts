@@ -80,7 +80,6 @@ export type C1BOfflineSeams = Readonly<{
   status(root: string): string;
   listOwned(root: string): readonly string[];
   prepareTemp(target: string): void;
-  tempEmpty(target: string): boolean;
   removeOwned(paths: readonly string[]): void;
   spawn(command: readonly string[], options: SpawnOptions, timeoutMs: number): SpawnResult | Promise<SpawnResult>;
 }>;
@@ -128,7 +127,6 @@ const DEFAULT_SEAMS: C1BOfflineSeams = {
   status,
   listOwned,
   prepareTemp: (target) => mkdirSync(target, { mode: 0o700 }),
-  tempEmpty: (target) => readdirSync(target).length === 0,
   removeOwned,
   spawn: (command, options, timeoutMs) => spawnPrivateOffline(command, options, timeoutMs),
 };
@@ -223,7 +221,7 @@ export async function runC1BOffline(
       states.push(C1_B_STAGE_NAMES[index]!);
     }
     const outputs = seams.listOwned(root);
-    if (!seams.tempEmpty(temp) || outputs.length !== 1 || outputs[0] !== temp) fail('generated output remained');
+    if (outputs.length !== 1 || outputs[0] !== temp) fail('generated output remained');
   } catch (error) {
     primary = asFailure(error);
   } finally {

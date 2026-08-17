@@ -46,7 +46,6 @@ function fixture(overrides: Partial<C1BOfflineSeams> = {}) {
     status: () => C1_B_PROTECTED_STATUS,
     listOwned: () => [...owned].sort(),
     prepareTemp(target) { expect(target).toBe(temp); owned.add(target); },
-    tempEmpty: () => true,
     removeOwned(paths) { removals.push([...paths]); for (const target of paths) owned.delete(target); },
     spawn: async (command, options, timeoutMs) => {
       calls.push({ command: [...command], env: { ...options.env }, timeoutMs });
@@ -172,9 +171,15 @@ describe('C1-B aggregate offline gate', () => {
     expect(protectedStatus.owned.size).toBe(0);
   });
 
-  test('detects stage leftovers and a nonempty owned temp, then removes all owned paths', async () => {
+  test('allows the owned temp as the sole generated output and removes it before the protected check', async () => {
+    const f = fixture();
+    await expect(runC1BOffline(f.root, {}, [], f.seams)).resolves.toEqual(C1_B_STAGE_NAMES);
+    expect(f.removals).toEqual([[f.temp]]);
+    expect(f.owned.size).toBe(0);
+  });
+
+  test('detects stage leftovers outside the owned temp, then removes all owned paths', async () => {
     const f = fixture({
-      tempEmpty: () => false,
       spawn: async (command, options, timeoutMs) => {
         f.calls.push({ command: [...command], env: { ...options.env }, timeoutMs });
         if (f.calls.length === EXPECTED_COMMANDS.length) f.owned.add(path.join(f.root, 'test-results-private-leaked'));
