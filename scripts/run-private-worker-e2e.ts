@@ -136,7 +136,7 @@ async function drain(stream: ReadableStream<Uint8Array> | number | undefined): P
 async function supervised(argv: readonly string[], root: string, env: PrivateOfflineEnvironment, signal: AbortSignal): Promise<void> {
   const child = spawnGrouped(argv, root, env);
   let stopping: Promise<void> | undefined;
-  const stop = () => stopping ??= stopChildDefault(child);
+  const stop = () => stopping ??= stopPrivateWorkerChild(child);
   const abort = () => { void stop(); }; signal.addEventListener('abort', abort, { once: true });
   if (signal.aborted) abort();
   const outputs = [drain(child.stdout), drain(child.stderr)];
@@ -201,11 +201,18 @@ async function startBrowserDefault(root: string, env: PrivateOfflineEnvironment,
   return spawnGrouped(argv, root, createPrivateBrowserEnvironment(env, root));
 }
 
-async function stopChildDefault(child: PrivateWorkerE2EChild): Promise<void> {
-  const done = child.exited.then(() => true, () => true); child.kill('SIGTERM');
-  const delay = new Promise<false>((resolve) => { const timer = setTimeout(() => resolve(false), 2_000); timer.unref?.(); });
-  if (await Promise.race([done, delay])) return;
-  child.kill('SIGKILL'); await child.exited.catch(() => undefined);
+export async function stopPrivateWorkerChild(
+  child: PrivateWorkerE2EChild,
+  grace: () => Promise<void> = () => new Promise((resolve) => {
+    const timer = setTimeout(resolve, 2_000);
+    timer.unref?.();
+  }),
+): Promise<void> {
+  const done = child.exited.then(() => undefined, () => undefined);
+  child.kill('SIGTERM');
+  await Promise.race([done, grace()]);
+  child.kill('SIGKILL');
+  await child.exited.catch(() => undefined);
 }
 
 function removeOwnedDefault(paths: readonly string[]): void {
@@ -224,7 +231,7 @@ function defaultSeams(root: string): PrivateWorkerE2ESeams {
     suffix: () => randomBytes(6).toString('hex'), token: () => randomBytes(32).toString('hex'), exists: existsSync, hash,
     probePort, build: (env, signal) => buildDefault(root, env, signal),
     startHarness: (env, token) => startHarnessDefault(root, env, token), waitReady: waitReadyDefault,
-    startBrowser: (env, argv) => startBrowserDefault(root, env, argv), stopChild: (child) => stopChildDefault(child),
+    startBrowser: (env, argv) => startBrowserDefault(root, env, argv), stopChild: (child) => stopPrivateWorkerChild(child),
     removeOwned: removeOwnedDefault, subscribeSignals: subscribeSignalsDefault,
     startupDeadline: () => deadline(45_000), browserDeadline: () => deadline(240_000),
   };

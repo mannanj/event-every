@@ -84,6 +84,15 @@ async function readOutput(stream: ReadableStream<Uint8Array> | number | undefine
   } finally { reader.releaseLock(); }
 }
 
+export async function terminatePrivatePrivacyProcessGroup(
+  signalGroup: (signal: 'SIGTERM' | 'SIGKILL') => void,
+  grace: () => Promise<void> = () => new Promise((resolve) => { setTimeout(resolve, 1_000); }),
+): Promise<void> {
+  signalGroup('SIGTERM');
+  await grace();
+  signalGroup('SIGKILL');
+}
+
 async function defaultSpawn(argv: readonly string[], options: SpawnOptions): Promise<SpawnResult> {
   const [command, ...args] = argv;
   if (!command) return { exitCode: 1, stdout: '', stderr: '' };
@@ -109,13 +118,9 @@ async function defaultSpawn(argv: readonly string[], options: SpawnOptions): Pro
       else child.kill(signal);
     } catch { try { child.kill(signal); } catch { /* already exited */ } }
   };
-  let killTimer: ReturnType<typeof setTimeout> | undefined;
+  let termination: Promise<void> | undefined;
   const abort = () => {
-    signalGroup('SIGTERM');
-    if (!killTimer) {
-      killTimer = setTimeout(() => { if (!exited) signalGroup('SIGKILL'); }, 1_000);
-      killTimer.unref?.();
-    }
+    termination ??= terminatePrivatePrivacyProcessGroup(signalGroup);
   };
   options.signal.addEventListener('abort', abort, { once: true });
   if (options.signal.aborted) abort();
@@ -123,14 +128,14 @@ async function defaultSpawn(argv: readonly string[], options: SpawnOptions): Pro
   const stderr = readOutput(Readable.toWeb(child.stderr) as unknown as ReadableStream<Uint8Array>);
   try {
     const [exitCode, stdoutValue, stderrValue] = await Promise.all([exit, stdout, stderr]);
+    if (termination) await termination;
     return { exitCode, stdout: stdoutValue, stderr: stderrValue };
   } catch (error) {
     abort();
     await exit;
-    await Promise.allSettled([stdout, stderr]);
+    await Promise.allSettled([stdout, stderr, termination]);
     throw error;
   } finally {
-    if (killTimer) clearTimeout(killTimer);
     options.signal.removeEventListener('abort', abort);
   }
 }

@@ -8,6 +8,7 @@ import {
   createPrivatePrivacyEnvironment,
   runPrivatePrivacy,
   scanPrivateOutputs,
+  terminatePrivatePrivacyProcessGroup,
   type PrivatePrivacySeams,
 } from './run-private-privacy';
 
@@ -128,6 +129,15 @@ describe('private privacy orchestrator', () => {
     release();
     await expect(running).rejects.toThrow('private privacy: timeout');
     expect(f.removed).toHaveLength(1);
+  });
+
+  test('escalates process-group termination even after the direct child exits', async () => {
+    const calls: string[] = [];
+    await terminatePrivatePrivacyProcessGroup(
+      (signal) => calls.push(signal),
+      async () => { calls.push('leader-exited'); },
+    );
+    expect(calls).toEqual(['SIGTERM', 'leader-exited', 'SIGKILL']);
   });
 
   test('does not let a completed stage deadline cancel a later stage', async () => {

@@ -9,6 +9,7 @@ import {
   createPrivateWorkerEnvironment,
   installPrivateHarnessEgressGuard,
   runPrivateWorkerE2E,
+  stopPrivateWorkerChild,
   type PrivateWorkerE2EChild,
   type PrivateWorkerE2ESeams,
 } from './run-private-worker-e2e';
@@ -140,6 +141,16 @@ describe('private Worker browser runner', () => {
     interrupted.sendSignal('SIGINT');
     await expect(running).rejects.toThrow('private worker e2e: aborted (SIGINT)');
     expect(interrupted.cleaned).toContain('outputs:4');
+  });
+
+  test('kills the process group after the direct child exits during shutdown', async () => {
+    const signals: string[] = [];
+    const exitedLeader: PrivateWorkerE2EChild = {
+      ...child(Promise.resolve(0)),
+      kill: (signal) => { signals.push(signal); },
+    };
+    await stopPrivateWorkerChild(exitedLeader, async () => undefined);
+    expect(signals).toEqual(['SIGTERM', 'SIGKILL']);
   });
 
   test('waits for an interrupted build to stop before removing outputs', async () => {
