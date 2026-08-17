@@ -178,10 +178,21 @@ test('network loss after the authority deadline never abandons the saved operati
 test('reload delivery is acknowledged before deletion', async () => {
   let deliver!: () => void;
   const delivered = new Promise<void>((resolve) => { deliver = resolve; });
+  let observeStatus!: () => void;
+  const statusStarted = new Promise<void>((resolve) => { observeStatus = resolve; });
   const remove = mock(async () => undefined);
+  const fetcher = mock(async (input: RequestInfo | URL, init?: RequestInit) => {
+    expect(input).toBe('/api/provider-status');
+    expect(init).toMatchObject({
+      method: 'POST',
+      body: JSON.stringify({ requestId: REQUEST_ID }),
+    });
+    observeStatus();
+    return new Response(JSON.stringify({ status: 'completed', replay: { summary: 'Recovered' } }));
+  });
   setProviderOperationDependenciesForTests({
     wait: async () => undefined,
-    fetcher: mock(async () => new Response(JSON.stringify({ status: 'completed', replay: { summary: 'Recovered' } }))),
+    fetcher,
     store: { save: async () => undefined, list: async () => [operation], delete: remove },
   });
   const recovery = recoverProviderOperations(async (record, replay) => {
@@ -189,8 +200,9 @@ test('reload delivery is acknowledged before deletion', async () => {
     expect(replay).toEqual({ summary: 'Recovered' });
     await delivered;
   });
-  await Promise.resolve();
+  await statusStarted;
   expect(remove).not.toHaveBeenCalled();
+  expect(fetcher).toHaveBeenCalledTimes(1);
   deliver();
   await recovery;
   expect(remove).toHaveBeenCalledWith(REQUEST_ID);
