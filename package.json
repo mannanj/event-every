@@ -7,7 +7,7 @@
     "dev": "next dev -p 3777",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint .",
+    "lint": "eslint . --ignore-pattern '.claude/**'",
     "type-check": "tsc --noEmit",
     "test": "bun test src --isolate",
     "test:e2e": "bunx playwright test",

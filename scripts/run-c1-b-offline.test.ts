@@ -61,6 +61,7 @@ describe('C1-B aggregate offline gate', () => {
   test('exposes only the exact aggregate package command', () => {
     const packageJson = JSON.parse(readFileSync('package.json', 'utf8')) as { scripts?: Record<string, string> };
     expect(packageJson.scripts?.['verify:c1:b']).toBe('bun scripts/run-c1-b-offline.ts');
+    expect(packageJson.scripts?.lint).toBe("eslint . --ignore-pattern '.claude/**'");
   });
 
   test('locks the exact ordered eleven-stage command list and rejects any expanded authority', () => {
@@ -185,5 +186,15 @@ describe('C1-B aggregate offline gate', () => {
       path.join(f.root, 'test-results-private-leaked'),
     ].sort());
     expect(f.owned.size).toBe(0);
+  });
+
+  test('removes owned output before the final protected status and hash check', async () => {
+    const f = fixture();
+    f.seams = {
+      ...f.seams,
+      status: () => f.owned.size === 0 ? C1_B_PROTECTED_STATUS : `${C1_B_PROTECTED_STATUS}?? owned-output\n`,
+    };
+    await expect(runC1BOffline(f.root, {}, [], f.seams)).resolves.toEqual(C1_B_STAGE_NAMES);
+    expect(f.removals).toEqual([[f.temp]]);
   });
 });

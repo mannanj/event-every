@@ -234,14 +234,14 @@ export async function runC1BOffline(
       catch { authoredChanged = true; }
     }
     if (authoredChanged) cleanup.push(new Error('c1-b offline: authored input changed'));
-    try { assertProtected(root, seams); }
-    catch (error) { cleanup.push(asFailure(error)); }
     if (ownsOutputs) {
       try { seams.removeOwned(seams.listOwned(root)); }
       catch { cleanup.push(new Error('c1-b offline: output cleanup failed')); }
       try { if (seams.listOwned(root).length !== 0) throw new Error(); }
       catch { cleanup.push(new Error('c1-b offline: post-cleanup output remained')); }
     }
+    try { assertProtected(root, seams); }
+    catch (error) { cleanup.push(asFailure(error)); }
     if (primary && cleanup.length) throw new AggregateError([primary, ...cleanup], 'c1-b offline: failed');
     if (primary) throw primary;
     if (cleanup.length === 1) throw cleanup[0];
