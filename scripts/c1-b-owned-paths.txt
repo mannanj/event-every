@@ -24,6 +24,8 @@ scripts/assert-c1-b-paths.test.ts
 scripts/assert-c1-b-paths.ts
 scripts/assert-private-worker.test.ts
 scripts/assert-private-worker.ts
+scripts/c1-a-offline-preload.cjs
+scripts/c1-a-offline-preload.test.ts
 scripts/c1-b-owned-paths.txt
 scripts/private-offline-preload.cjs
 scripts/run-c1-a-offline.test.ts
