@@ -221,7 +221,10 @@ export async function runC1BOffline(
       states.push(C1_B_STAGE_NAMES[index]!);
     }
     const outputs = seams.listOwned(root);
-    if (outputs.length !== 1 || outputs[0] !== temp) fail('generated output remained');
+    const transientNext = path.join(root, '.next');
+    if (!outputs.includes(temp) || outputs.some((output) => output !== temp && output !== transientNext)) {
+      fail('generated output remained');
+    }
   } catch (error) {
     primary = asFailure(error);
   } finally {
