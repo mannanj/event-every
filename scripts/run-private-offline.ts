@@ -4,14 +4,23 @@ import { spawn as spawnNode, type ChildProcessWithoutNullStreams } from 'node:ch
 const CREDENTIAL_NAME = /(?:OPENROUTER|ANTHROPIC|API[_-]?KEY|TOKEN|SECRET|CLOUDFLARE|RESEND|KV[_-]?REST|D1|R2|AUTH[_-]?PATTERN|PASSWORD|CREDENTIAL)/i;
 const OUTPUT_LIMIT = 65_536;
 const TIMEOUT_MS = 120_000;
+const C1_B_MUTATION_TIMEOUT_MS = 15 * 60_000;
 
 export type PrivateOfflineEnvironment = Record<string, string | undefined>;
 type SpawnResult = Readonly<{ exitCode: number | null | undefined; signalCode?: string | null; stdout: Uint8Array; stderr: Uint8Array }>;
-type Spawn = (argv: readonly string[], options: Readonly<{ cwd: string; env: PrivateOfflineEnvironment }>) => SpawnResult | Promise<SpawnResult>;
+type Spawn = (argv: readonly string[], options: Readonly<{ cwd: string; env: PrivateOfflineEnvironment }>, timeoutMs?: number) => SpawnResult | Promise<SpawnResult>;
 
 export function parsePrivateOfflineArguments(argv: readonly string[]): readonly string[] {
   if (argv.length < 2 || argv[0] !== '--') throw new Error('private offline: expected -- <command>');
   return argv.slice(1);
+}
+
+export function privateOfflineTimeoutMs(command: readonly string[]): number {
+  const isMutationLedger = command.length === 3
+    && command[0] === 'bun'
+    && command[1] === 'scripts/run-c1-b-mutations.ts'
+    && (command[2] === '--write-ledger' || command[2] === '--verify-ledger');
+  return isMutationLedger ? C1_B_MUTATION_TIMEOUT_MS : TIMEOUT_MS;
 }
 
 export function createPrivateOfflineEnvironment(source: PrivateOfflineEnvironment = process.env, root = path.resolve(import.meta.dir, '..')): PrivateOfflineEnvironment {
@@ -96,7 +105,11 @@ export async function runPrivateOffline(root: string, sourceEnv: PrivateOfflineE
   const command = parsePrivateOfflineArguments(argv);
   let result: Awaited<ReturnType<Spawn>>;
   try {
-    result = await spawn(command, { cwd: root, env: createPrivateOfflineEnvironment(sourceEnv, root) });
+    result = await spawn(
+      command,
+      { cwd: root, env: createPrivateOfflineEnvironment(sourceEnv, root) },
+      privateOfflineTimeoutMs(command),
+    );
   } catch {
     throw new Error('private offline: command failed');
   }

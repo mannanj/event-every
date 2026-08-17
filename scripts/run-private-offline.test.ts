@@ -59,6 +59,13 @@ describe('private offline runner', () => {
     expect(env.BUN_OPTIONS).toContain('private-offline-preload.cjs');
   });
 
+  test('extends the deadline only for the bounded C1-B mutation ledger commands', () => {
+    expect(runner.privateOfflineTimeoutMs(['bun', 'scripts/run-c1-b-mutations.ts', '--write-ledger'])).toBe(15 * 60_000);
+    expect(runner.privateOfflineTimeoutMs(['bun', 'scripts/run-c1-b-mutations.ts', '--verify-ledger'])).toBe(15 * 60_000);
+    expect(runner.privateOfflineTimeoutMs(['bun', 'scripts/run-c1-b-mutations.ts', '--unknown'])).toBe(120_000);
+    expect(runner.privateOfflineTimeoutMs(['bun', 'test'])).toBe(120_000);
+  });
+
   test('uses a fixed error, bounds output, and passes a scrubbed environment', async () => {
     let received: Record<string, string | undefined> | undefined;
     await expect(runner.runPrivateOffline('/work', { TOKEN: 'injected-secret' }, ['--', 'bun', 'test'], (_argv, options) => {
