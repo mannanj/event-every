@@ -1,10 +1,13 @@
 import { describe, expect, test } from 'bun:test';
-import { assertAuthorizedPaths, parseNameStatusNul, readOwnedPaths, validateOwnedPaths } from './assert-c1-b-paths';
+import { readFileSync } from 'node:fs';
+import { assertAuthorizedPaths, parseNameStatusNul, parsePlanOwnedPaths, readOwnedPaths, validateOwnedPaths } from './assert-c1-b-paths';
 
 describe('C1-B path authority', () => {
   test('pins the exact sorted manifest and accepts only its owned paths', () => {
     const owned = readOwnedPaths();
+    const plan = readFileSync('docs/superpowers/plans/2026-08-12-event-every-c1-b-private.md', 'utf8');
     expect(owned).toEqual([...owned].sort());
+    expect(parsePlanOwnedPaths(plan)).toEqual(owned);
     expect(() => validateOwnedPaths(`${owned.join('\n')}\n`)).not.toThrow();
     expect(() => validateOwnedPaths(`${owned.join('\n')}\nextra.ts\n`)).toThrow('c1-b paths: invalid manifest');
     const taskOne = ['scripts/c1-b-owned-paths.txt', 'scripts/assert-c1-b-paths.ts', 'scripts/assert-c1-b-paths.test.ts', 'scripts/private-offline-preload.cjs', 'scripts/run-private-offline.ts', 'scripts/run-private-offline.test.ts', 'src/platform/provider/contracts.ts', 'src/platform/provider/policy.ts', 'src/platform/provider/request-binding.ts', 'src/platform/provider/cost.ts', 'src/platform/provider/replay.ts', 'src/platform/provider/__tests__/policy.test.ts', 'src/platform/provider/__tests__/request-binding.test.ts', 'src/platform/provider/__tests__/cost.test.ts', 'src/platform/provider/__tests__/replay.test.ts'];

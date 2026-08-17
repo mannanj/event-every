@@ -47,17 +47,23 @@ Create `scripts/c1-b-owned-paths.txt` in Task 1 with this exact sorted allowlist
 
 ```text
 .env.example
+.gitignore
 bun.lock
 cloudflare/app-worker.ts
 docs/superpowers/plans/2026-08-12-event-every-c1-b-private.md
+docs/superpowers/plans/2026-08-13-community-processing-pause.md
 docs/superpowers/specs/2026-08-12-c1-b-private-state-design.md
+docs/superpowers/specs/2026-08-13-community-processing-pause-design.md
 docs/testing/c1-a-private-control-matrix.md
 docs/testing/c1-b-private-mutation-ledger.md
 e2e/c1-a-runtime-admission.spec.ts
 e2e/community-limit.spec.ts
+e2e/helpers.ts
 e2e/private-provider-state.spec.ts
+e2e/recent-input.spec.ts
 package.json
 playwright.c1-a.config.ts
+playwright.config.ts
 playwright.private.config.ts
 scripts/assert-c1-a-config.test.ts
 scripts/assert-c1-a-config.ts
@@ -67,6 +73,8 @@ scripts/assert-c1-b-paths.test.ts
 scripts/assert-c1-b-paths.ts
 scripts/assert-private-worker.test.ts
 scripts/assert-private-worker.ts
+scripts/c1-a-offline-preload.cjs
+scripts/c1-a-offline-preload.test.ts
 scripts/c1-b-owned-paths.txt
 scripts/private-offline-preload.cjs
 scripts/run-c1-a-offline.test.ts
@@ -77,6 +85,7 @@ scripts/run-c1-b-mutations.test.ts
 scripts/run-c1-b-mutations.ts
 scripts/run-c1-b-offline.test.ts
 scripts/run-c1-b-offline.ts
+scripts/run-e1-focused.test.ts
 scripts/run-private-offline.test.ts
 scripts/run-private-offline.ts
 scripts/run-private-privacy.test.ts
@@ -113,6 +122,7 @@ src/lib/limits.ts
 src/lib/llm.ts
 src/lib/ratelimit.ts
 src/lib/redisClient.ts
+src/platform/__tests__/admission.test.ts
 src/platform/__tests__/route-manifest.test.ts
 src/platform/__tests__/runtime.test.ts
 src/platform/cloudflare-context.ts
@@ -138,6 +148,7 @@ src/platform/provider/request-binding.ts
 src/platform/provider/transport.ts
 src/platform/route-manifest.ts
 src/platform/runtime.ts
+src/server/scanner/__tests__/scan.test.ts
 src/server/scanner/__tests__/transport.test.ts
 src/server/scanner/job.ts
 src/server/scanner/transport.ts
@@ -152,6 +163,7 @@ src/services/scanClient.ts
 src/services/summarizer.ts
 src/services/urlDetector.ts
 src/utils/communityLimit.ts
+tasks/task-198.md
 test/worker/app-worker.test.ts
 test/worker/owner-budget-authority.integration.test.ts
 test/worker/private-provider.integration.test.ts
