@@ -59,8 +59,10 @@ function fixture(overrides: Partial<C1BOfflineSeams> = {}) {
 describe('C1-B aggregate offline gate', () => {
   test('exposes only the exact aggregate package command', () => {
     const packageJson = JSON.parse(readFileSync('package.json', 'utf8')) as { scripts?: Record<string, string> };
+    const ignoredPaths = readFileSync('.gitignore', 'utf8').split('\n');
     expect(packageJson.scripts?.['verify:c1:b']).toBe('bun scripts/run-c1-b-offline.ts');
     expect(packageJson.scripts?.lint).toBe("eslint . --ignore-pattern '.claude/**'");
+    expect(ignoredPaths).toContain('.c1-b-offline-*');
   });
 
   test('locks the exact ordered eleven-stage command list and rejects any expanded authority', () => {
