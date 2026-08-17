@@ -32,6 +32,7 @@ export function createPrivateOfflineEnvironment(source: PrivateOfflineEnvironmen
   env.BUN_OPTIONS = `--preload=${preload}`;
   env.NODE_OPTIONS = `--require=${preload}`;
   env.BUN_CONFIG_NO_LOAD_DOTENV = '1';
+  env.DISABLE_V8_COMPILE_CACHE = '1';
   env.CLOUDFLARE_LOAD_DEV_VARS_FROM_DOT_ENV = 'false';
   env.CLOUDFLARE_INCLUDE_PROCESS_ENV = 'false';
   return env;

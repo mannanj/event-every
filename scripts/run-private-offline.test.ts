@@ -57,6 +57,7 @@ describe('private offline runner', () => {
     expect(env.SAFE).toBeUndefined();
     expect(env.NODE_OPTIONS).toContain('private-offline-preload.cjs');
     expect(env.BUN_OPTIONS).toContain('private-offline-preload.cjs');
+    expect(env.DISABLE_V8_COMPILE_CACHE).toBe('1');
   });
 
   test('extends the deadline only for the bounded C1-B mutation ledger commands', () => {
@@ -95,7 +96,7 @@ describe('private offline runner', () => {
 
   test('keeps descendant preload controls after the first preload runs', async () => {
     const root = path.resolve(import.meta.dir, '..');
-    const descendant = "if (process.env.OPENROUTER_OWNER_KEY || process.env.PRIVATE_OUTPUT_SUFFIX !== 'abcdef123456' || process.env.PRIVATE_PRIVACY_CANARY !== '1' || !process.env.BUN_OPTIONS?.includes('private-offline-preload') || !process.env.NODE_OPTIONS?.includes('private-offline-preload') || process.env.BUN_CONFIG_NO_LOAD_DOTENV !== '1') process.exit(1); try { fetch('https://example.invalid'); process.exit(2) } catch (error) { process.exit(error.code === 'PRIVATE_OFFLINE_EGRESS_BLOCKED' ? 0 : 3) }";
+    const descendant = "if (process.env.OPENROUTER_OWNER_KEY || process.env.PRIVATE_OUTPUT_SUFFIX !== 'abcdef123456' || process.env.PRIVATE_PRIVACY_CANARY !== '1' || !process.env.BUN_OPTIONS?.includes('private-offline-preload') || !process.env.NODE_OPTIONS?.includes('private-offline-preload') || process.env.BUN_CONFIG_NO_LOAD_DOTENV !== '1' || process.env.DISABLE_V8_COMPILE_CACHE !== '1') process.exit(1); try { fetch('https://example.invalid'); process.exit(2) } catch (error) { process.exit(error.code === 'PRIVATE_OFFLINE_EGRESS_BLOCKED' ? 0 : 3) }";
     const result = await runner.spawnPrivateOffline(['bun', '-e', `const child=Bun.spawnSync(['bun','-e',${JSON.stringify(descendant)}]); process.exit(child.exitCode ?? 9);`], { cwd: root, env: { ...runner.createPrivateOfflineEnvironment({ PATH: process.env.PATH, OPENROUTER_OWNER_KEY: 'secret' }, root), OPENROUTER_OWNER_KEY: 'secret', PRIVATE_OUTPUT_SUFFIX: 'abcdef123456', PRIVATE_PRIVACY_CANARY: '1' } }, 2_000);
     expect(result.exitCode, new TextDecoder().decode(result.stderr)).toBe(0);
   });

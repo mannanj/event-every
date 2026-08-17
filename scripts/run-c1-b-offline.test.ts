@@ -95,6 +95,7 @@ describe('C1-B aggregate offline gate', () => {
     expect(env.TEMP).toBe(f.temp);
     expect(env.NODE_OPTIONS).toBe(`--require=${path.join(f.root, 'scripts/private-offline-preload.cjs')}`);
     expect(env.BUN_OPTIONS).toBe(`--preload=${path.join(f.root, 'scripts/private-offline-preload.cjs')}`);
+    expect(env.DISABLE_V8_COMPILE_CACHE).toBe('1');
 
     await expect(runC1BOffline(f.root, { PATH: '/bin', TOKEN: 'secret' }, [], f.seams)).resolves.toEqual(C1_B_STAGE_NAMES);
     expect(f.calls.map(({ command }) => [...command])).toEqual(EXPECTED_COMMANDS.map((command) => [...command]));

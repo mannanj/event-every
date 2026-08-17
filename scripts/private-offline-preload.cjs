@@ -10,7 +10,7 @@ const dgram = require('node:dgram');
 
 const CREDENTIAL_NAME = /(?:OPENROUTER|ANTHROPIC|API[_-]?KEY|TOKEN|SECRET|CLOUDFLARE|RESEND|KV[_-]?REST|D1|R2|AUTH[_-]?PATTERN|PASSWORD|CREDENTIAL|(?:^|_)PAT(?:_|$)|DATABASE|DSN|CONNECTION|ACCESS[_-]?KEY|PRIVATE[_-]?KEY|GITHUB)/i;
 const LOOPBACK = new Set(['127.0.0.1', 'localhost', '::1', '[::1]']);
-const SAFE_ENVIRONMENT = new Set(['PATH', 'TMPDIR', 'TMP', 'TEMP', 'HOME', 'USER', 'LANG', 'LC_ALL', 'TERM', 'CI', 'PRIVATE_OUTPUT_SUFFIX', 'PRIVATE_PRIVACY_CANARY']);
+const SAFE_ENVIRONMENT = new Set(['PATH', 'TMPDIR', 'TMP', 'TEMP', 'HOME', 'USER', 'LANG', 'LC_ALL', 'TERM', 'CI', 'PRIVATE_OUTPUT_SUFFIX', 'PRIVATE_PRIVACY_CANARY', 'DISABLE_V8_COMPILE_CACHE']);
 const DNS_METHODS = [
   'lookup', 'lookupService', 'resolve', 'resolve4', 'resolve6', 'resolveAny', 'resolveCaa', 'resolveCname',
   'resolveMx', 'resolveNaptr', 'resolveNs', 'resolvePtr', 'resolveSoa', 'resolveSrv', 'resolveTxt', 'reverse',
