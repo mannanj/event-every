@@ -88,6 +88,12 @@ describe('Cloudflare-only platform runtime', () => {
     expect(readFileSync('src/platform/provider/transport.ts', 'utf8')).toContain('fetcher(OWNER_PROVIDER_URL');
   });
 
+  test('accepts only the dedicated owner key with no API-key fallback', () => {
+    const source = readFileSync('src/platform/cloudflare-context.ts', 'utf8');
+    expect(source).toContain('OPENROUTER_OWNER_KEY');
+    expect(source).not.toContain('OPENROUTER_API_KEY');
+  });
+
   test('deletes the product-reachable legacy stack and Upstash dependency', () => {
     for (const path of deleted) expect(existsSync(path), path).toBe(false);
     expect(existsSync('src/platform/legacy/dispatch.ts')).toBe(true);
