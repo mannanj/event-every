@@ -29,6 +29,7 @@ const EXCLUDED_DIRECTORY = new Set([
   'playwright-report', 'test-results', '.claude', 'tasks', 'docs',
 ]);
 const EXCLUDED_FILE = /^(?:\.env(?:\..*)?|\.dev\.vars(?:\..*)?)$/;
+const C1_B_OWNED_TEMP = /^\.c1-b-offline-[a-f0-9]{12}$/;
 
 function fail(kind: string): never {
   throw new Error(`private worker: ${kind}`);
@@ -202,6 +203,7 @@ export function listAuthoredInputs(root: string): readonly string[] {
       if (entry.isSymbolicLink()) continue;
       if (entry.isDirectory()) {
         if (!EXCLUDED_DIRECTORY.has(entry.name) && !entry.name.startsWith('.private-privacy-')
+          && !C1_B_OWNED_TEMP.test(entry.name)
           && !entry.name.startsWith('test-results-') && !entry.name.startsWith('playwright-report-')) {
           walk(path.join(directory, entry.name));
         }

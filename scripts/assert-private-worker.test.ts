@@ -115,12 +115,20 @@ describe('private Worker build lifecycle', () => {
     expect(readFileSync(path.join(root, 'package.json'), 'utf8')).toBe('{"name":"after"}');
   });
 
-  test('does not mistake the privacy canary owned temp directory for authored source', () => {
+  test('excludes exact owned temp directories while retaining C1-B lookalikes as authored source', () => {
     const root = mkdtempSync(path.join(tmpdir(), 'event-every-private-worker-inputs-'));
     roots.push(root);
     writeFileSync(path.join(root, 'package.json'), '{}');
-    const ownedTemp = path.join(root, '.private-privacy-abcdef123456');
-    mkdirSync(ownedTemp); writeFileSync(path.join(ownedTemp, 'tool-cache'), 'generated');
-    expect(listAuthoredInputs(root)).toEqual([path.join(root, 'package.json')]);
+    const privacyTemp = path.join(root, '.private-privacy-abcdef123456');
+    const c1bTemp = path.join(root, '.c1-b-offline-abcdef123456');
+    const lookalike = path.join(root, '.c1-b-offline-not-hex');
+    for (const ownedTemp of [privacyTemp, c1bTemp]) {
+      mkdirSync(ownedTemp); writeFileSync(path.join(ownedTemp, 'tool-cache'), 'generated');
+    }
+    mkdirSync(lookalike); writeFileSync(path.join(lookalike, 'authored'), 'must remain covered');
+    expect(listAuthoredInputs(root)).toEqual([
+      path.join(lookalike, 'authored'),
+      path.join(root, 'package.json'),
+    ]);
   });
 });
