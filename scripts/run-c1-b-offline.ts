@@ -55,7 +55,7 @@ const AUTHORED_INPUTS = [
   'scripts/run-c1-b-offline.ts',
   'scripts/run-c1-b-offline.test.ts',
 ] as const;
-const OUTPUT_EXACT = new Set(['.open-next', '.wrangler']);
+const OUTPUT_EXACT = new Set(['.next', '.open-next', '.wrangler']);
 const OUTPUT_PREFIXES = [
   '.c1-b-offline-', '.private-privacy-', 'dist-c1-a-',
   'test-results-c1-a-', 'playwright-report-c1-a-',
@@ -93,13 +93,13 @@ function status(root: string): string {
   return new TextDecoder().decode(result.stdout);
 }
 
-function generatedName(name: string): boolean {
+export function isC1BOwnedOutputName(name: string): boolean {
   return OUTPUT_EXACT.has(name) || OUTPUT_PREFIXES.some((prefix) => name.startsWith(prefix));
 }
 
 function listOwned(root: string): readonly string[] {
   return readdirSync(root)
-    .filter(generatedName)
+    .filter(isC1BOwnedOutputName)
     .map((name) => path.join(root, name))
     .sort();
 }

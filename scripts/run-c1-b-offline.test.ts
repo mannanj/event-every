@@ -7,6 +7,7 @@ import {
   C1_B_PROTECTED_STATUS,
   C1_B_STAGE_NAMES,
   createC1BOfflineEnvironment,
+  isC1BOwnedOutputName,
   parseC1BOfflineArguments,
   runC1BOffline,
   validateC1BOfflineCommands,
@@ -63,6 +64,11 @@ describe('C1-B aggregate offline gate', () => {
     expect(packageJson.scripts?.['verify:c1:b']).toBe('bun scripts/run-c1-b-offline.ts');
     expect(packageJson.scripts?.lint).toBe("eslint . --ignore-pattern '.claude/**'");
     expect(ignoredPaths).toContain('.c1-b-offline-*');
+  });
+
+  test('owns the default Next build directory as generated output', () => {
+    expect(isC1BOwnedOutputName('.next')).toBeTrue();
+    expect(isC1BOwnedOutputName('.next-lookalike')).toBeFalse();
   });
 
   test('locks the exact ordered eleven-stage command list and rejects any expanded authority', () => {
