@@ -7,7 +7,7 @@ const MANIFEST = path.join(ROOT, 'scripts/c1-b-owned-paths.txt');
 const PROTECTED = ['docs/testing/e1-mutation-ledger.md', '.claude', 'scripts/run-c1-a-mutations.ts', 'scripts/run-c1-a-mutations.test.ts', 'tasks/task-192.md', 'tasks/task-193.md'] as const;
 const GENERATED = /^(?:\.open-next|\.wrangler|\.next|coverage|dist|out|build|playwright-report|test-results)(?:\/|$)/;
 const CREDENTIAL = /(?:openrouter|anthropic|api[_-]?key|token|secret|resend|kv[_-]?rest|auth[_-]?pattern|password|credential)/i;
-const MANIFEST_SHA256 = 'e4219de088d889ff6b0953d50580b4bee6ae3dbcc86fe8f6b51ce980fac3df73';
+const MANIFEST_SHA256 = 'c96a3073ce945f1601ad05f98e87de3aa8f5ea76da0f02ec310463a93afb8887';
 type Observation = Readonly<{ status: string; paths: readonly string[] }>;
 const fail = (kind: 'protected path' | 'invalid manifest' | 'observed path mismatch'): never => { throw new Error(`c1-b paths: ${kind}`); };
 const protectedPath = (file: string) => file === '.claude' || file.startsWith('.claude/') || PROTECTED.slice(0, 1).includes(file as never) || PROTECTED.slice(2).includes(file as never);

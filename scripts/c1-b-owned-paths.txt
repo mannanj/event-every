@@ -2,7 +2,9 @@
 bun.lock
 cloudflare/app-worker.ts
 docs/superpowers/plans/2026-08-12-event-every-c1-b-private.md
+docs/superpowers/plans/2026-08-13-community-processing-pause.md
 docs/superpowers/specs/2026-08-12-c1-b-private-state-design.md
+docs/superpowers/specs/2026-08-13-community-processing-pause-design.md
 docs/testing/c1-a-private-control-matrix.md
 docs/testing/c1-b-private-mutation-ledger.md
 e2e/c1-a-runtime-admission.spec.ts
@@ -12,6 +14,7 @@ e2e/private-provider-state.spec.ts
 e2e/recent-input.spec.ts
 package.json
 playwright.c1-a.config.ts
+playwright.config.ts
 playwright.private.config.ts
 scripts/assert-c1-a-config.test.ts
 scripts/assert-c1-a-config.ts
@@ -109,6 +112,7 @@ src/services/scanClient.ts
 src/services/summarizer.ts
 src/services/urlDetector.ts
 src/utils/communityLimit.ts
+tasks/task-198.md
 test/worker/app-worker.test.ts
 test/worker/owner-budget-authority.integration.test.ts
 test/worker/private-provider.integration.test.ts
