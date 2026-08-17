@@ -18,7 +18,7 @@ const UsageResponseSchema = z.object({
 }).strict().superRefine((value, context) => {
   const remaining = Math.max(0, value.limitNanodollars - value.spentNanodollars - value.reservedNanodollars);
   if (value.remainingNanodollars !== remaining) context.addIssue({ code: 'custom', message: 'invalid remaining amount' });
-  if (value.exhausted !== (remaining < 500_000)) context.addIssue({ code: 'custom', message: 'invalid exhaustion state' });
+  if (value.exhausted !== (value.frozen || remaining < 500_000)) context.addIssue({ code: 'custom', message: 'invalid exhaustion state' });
 });
 
 export async function GET(_request: NextRequest): Promise<Response> {

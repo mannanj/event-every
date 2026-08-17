@@ -34,6 +34,7 @@ afterEach(() => setPlatformRuntimeForTests(undefined));
 test.each([
   [1_500_000_000, 2_500_000_000, false, false],
   [3_999_600_000, 400_000, true, false],
+  [1_500_000_000, 2_500_000_000, true, true],
   [4_500_000_000, 0, true, true],
 ] as const)('usage returns content-free integer accounting for reserved=%i', async (reserved, remaining, exhausted, frozen) => {
   if (current.status !== 'available') throw new Error('expected available fixture');
