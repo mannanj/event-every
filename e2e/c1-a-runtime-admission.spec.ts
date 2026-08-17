@@ -99,6 +99,7 @@ test('corrupt Scanner review storage recovers and persists the next scan', async
   expect(await page.evaluate(() => localStorage.getItem('event_every_history'))).toBe(legacyRecent);
 
   const textarea = page.getByTestId('smart-input-textarea');
+  await expect(textarea).toHaveAttribute('contenteditable', 'true');
   await textarea.fill('Synthetic intercepted recovery scan.');
   await textarea.press('Meta+Enter');
   const review = page.getByRole('region', { name: 'Scanner review drafts' });
