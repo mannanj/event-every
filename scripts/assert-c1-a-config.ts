@@ -30,6 +30,7 @@ const CREDENTIAL_ASSIGNMENT = /(?:OPENROUTER|ANTHROPIC|CLOUDFLARE|RESEND|KV_REST
 const DEPLOY_CAPABLE = /\b(?:deploy|publish|upload)\b/i;
 const ORDINARY_INSTALL = /\b(?:bun(?:\s+--[\w-]+(?:=\S+)?)*\s+(?:install|i|add|update)|npm\s+(?:install|i|ci)|pnpm\s+(?:install|i|add)|yarn\s+(?:install|add))\b/i;
 const OBSOLETE_TASK_11_EVIDENCE = /run-c1-a-mutations|validate-c1-a-evidence|c1-a-terminal-evidence|--write-ledger|--verify-ledger|--write-evidence/;
+const C1_B_MUTATION_SCRIPT = 'bun -- scripts/run-private-offline.ts -- bun scripts/run-c1-b-mutations.ts --verify-ledger';
 
 type SourceFileWithParseDiagnostics = ts.SourceFile & {
   readonly parseDiagnostics?: readonly ts.Diagnostic[];
@@ -424,7 +425,12 @@ export function assertC1AConfig(root = process.cwd()): void {
   for (const [name, value] of Object.entries(REQUIRED_SCRIPTS)) {
     if (packageJson.scripts?.[name] !== value) fail(`script ${name}`);
   }
-  if (OBSOLETE_TASK_11_EVIDENCE.test(JSON.stringify(packageJson.scripts ?? {}))
+  const scriptsWithoutCurrentC1BMutationProof = Object.fromEntries(
+    Object.entries(packageJson.scripts ?? {}).filter(([name, value]) => (
+      name !== 'verify:c1:b:mutations' || value !== C1_B_MUTATION_SCRIPT
+    )),
+  );
+  if (OBSOLETE_TASK_11_EVIDENCE.test(JSON.stringify(scriptsWithoutCurrentC1BMutationProof))
     || OBSOLETE_TASK_11_EVIDENCE.test(read(root, 'scripts/run-c1-a-offline.ts'))) fail('obsolete Task 11 evidence');
   for (const [name, value] of Object.entries(packageJson.scripts ?? {})) {
     if (typeof value === 'string' && (DEPLOY_CAPABLE.test(value) || ORDINARY_INSTALL.test(value))) fail(`install/deploy script ${name}`);

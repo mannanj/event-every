@@ -38,6 +38,18 @@ describe('C1-A Task 1 package/offline config boundary', () => {
         .toThrow('c1-a config: obsolete Task 11 evidence');
     }
   });
+  test('accepts the exact C1-B mutation verification command without reopening obsolete Task 11 evidence', () => {
+    expect(() => assertC1AConfig(fixture({
+      ...task2Files,
+      'package.json': JSON.stringify({
+        scripts: {
+          ...scripts,
+          'verify:c1:b:mutations': 'bun -- scripts/run-private-offline.ts -- bun scripts/run-c1-b-mutations.ts --verify-ledger',
+        },
+        devDependencies: dependencies,
+      }),
+    }))).not.toThrow();
+  });
   test('rejects every generated ignore omission independently', () => { for (const missing of ['.dev.vars', '.dev.vars.*', '.open-next/', '.wrangler/']) { const ignore = ['.dev.vars', '.dev.vars.*', '.open-next/', '.wrangler/'].filter((line) => line !== missing).join('\n'); expect(() => assertC1AConfig(fixture({ '.gitignore': ignore }))).toThrow(`c1-a config: ignore ${missing}`); } });
   test('rejects deploy/upload/publish commands, repository auth, and credential evidence independently', () => {
     for (const [files, message] of [
