@@ -68,6 +68,7 @@ describe('private Worker browser runner', () => {
     expect(env.OPENROUTER_OWNER_KEY).toBe('private-secret-marker-7e13f0');
     expect(env.PRIVATE_OUTPUT_SUFFIX).toBe('123456abcdef');
     expect(env.PRIVATE_PRIVACY_CANARY).toBeUndefined();
+    expect(env.CLOUDFLARE_CF_FETCH_ENABLED).toBe('false');
 
     const buildEnv = createPrivateBuildEnvironment(env, root);
     expect(buildEnv.OPENROUTER_OWNER_KEY).toBe('');
@@ -79,6 +80,7 @@ describe('private Worker browser runner', () => {
     expect(browserEnv.OPENROUTER_OWNER_KEY).toBeUndefined();
     expect(browserEnv.NODE_OPTIONS).toBe(`--require=${root}/scripts/private-offline-preload.cjs`);
     expect(browserEnv.BUN_OPTIONS).toBe(`--preload=${root}/scripts/private-offline-preload.cjs`);
+    expect(browserEnv.CLOUDFLARE_CF_FETCH_ENABLED).toBeUndefined();
   });
 
   test('leaves generated outputs for the outer privacy canary to scan', async () => {

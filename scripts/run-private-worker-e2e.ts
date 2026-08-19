@@ -59,6 +59,7 @@ const outputPaths = (root: string, suffix: string): OutputPaths => ({
 
 export function createPrivateWorkerEnvironment(source: PrivateOfflineEnvironment, root: string, suffix: string): PrivateOfflineEnvironment {
   const env = createPrivatePrivacyEnvironment(source, root, suffix);
+  env.CLOUDFLARE_CF_FETCH_ENABLED = 'false';
   if (source.PRIVATE_PRIVACY_CANARY === '1') return env;
   delete env.PRIVATE_PRIVACY_CANARY;
   for (const name of ['TMPDIR', 'TMP', 'TEMP'] as const) {
@@ -339,16 +340,6 @@ function providerResponse(): Response {
   return new Response(body, { headers: { 'Content-Type': 'application/json' } });
 }
 
-function privateUsageResponse(): Response {
-  const authorityDay = new Date().toISOString().slice(0, 10);
-  const resetAt = new Date(Date.parse(`${authorityDay}T00:00:00.000Z`) + 86_400_000).toISOString();
-  return Response.json({
-    status: 'available', policyVersion: 'owner-v1', authorityDay,
-    limitNanodollars: 5_000_000_000, spentNanodollars: 0, reservedNanodollars: 0,
-    remainingNanodollars: 5_000_000_000, exhausted: false, frozen: false, resetAt,
-  }, { headers: { 'Cache-Control': 'no-store' } });
-}
-
 export function installPrivateHarnessEgressGuard(): Readonly<{ close(): void }> {
   const originalNetConnect = net.connect;
   const originalNetCreateConnection = net.createConnection;
@@ -431,12 +422,6 @@ async function runInternalHarness(root: string, token: string): Promise<void> {
     if (url.pathname === '/__private-canary/resume') { resume(); return void response.end('{}'); }
     if (url.pathname === '/__private-canary/reset') { reset(); return void response.end('{}'); }
     try {
-      if (url.pathname === '/api/usage' && request.method === 'GET') {
-        const usage = privateUsageResponse();
-        response.statusCode = usage.status;
-        usage.headers.forEach((value, name) => response.setHeader(name, value));
-        return void response.end(new Uint8Array(await usage.arrayBuffer()));
-      }
       const headers = new Headers(); for (const [name, value] of Object.entries(request.headers)) if (value !== undefined) headers.set(name, Array.isArray(value) ? value.join(', ') : value);
       const method = request.method ?? 'GET'; const init: RequestInit = { method, headers };
       if (method !== 'GET' && method !== 'HEAD') Object.assign(init, { body: Readable.toWeb(request) as unknown as ReadableStream, duplex: 'half' });

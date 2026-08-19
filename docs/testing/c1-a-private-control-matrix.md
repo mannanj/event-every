@@ -7,6 +7,10 @@ privacy canary, browser recovery boundary, artifact proof, and causal mutation l
 not authorize or claim owner Access, deployment, backup/rollback, real keys, real user data, community
 access, remote resources, external legacy retirement, publication, or public release.
 
+The R1 phrase “required D1 state” does not reopen the accepted C1-B architecture decision. Provider
+requests and owner budget remain in SQLite Durable Objects; the checked-in D1 binding remains a
+nondeployable sentinel and legacy waitlist D1 code remains unreachable.
+
 ## Product controls
 
 | Private control | Production seam | Current proof | Retained causal check | Closure result |
@@ -16,6 +20,7 @@ access, remote resources, external legacy retirement, publication, or public rel
 | Emitted private Worker reachability excludes community, waitlist, Redis/Upstash, legacy dispatch, and runtime-selected provider configuration | `scripts/assert-private-worker.ts` | adversarial artifact fixtures; credential-scrubbed OpenNext build scan | ordinary GREEN | pass in Task 7 gate; owned output removed |
 | Owner exhaustion/freeze/unavailability waits at most three seconds, then offers one safe path to local events with provider processing disabled; the editable input draft remains browser-local and restorable | `src/components/OwnerBudgetBoundary.tsx`; `src/components/OwnerBudgetScreen.tsx`; `src/components/SmartInput.tsx` | owner-boundary and interruption/reload browser scenarios; C1-A runtime exhaustion scenario | ordinary GREEN | pass in Chromium and WebKit |
 | Browser-restored draft is applied only after server-identical first markup | `src/components/SmartInput.tsx` | C1-A hydration scenario captures first DOM plus React errors/warnings before navigation | ordinary GREEN | pass in Chromium and WebKit |
+| The emitted private artifact completes scan → original-UUID recovery → review → edit → reload → ICS export with one provider transport and the exact authoritative cost delta | `cloudflare/app-worker.ts`; `src/services/providerOperation.ts`; Scanner review/export seams | `e2e/private-provider-state.spec.ts` through the private workerd harness in Chromium and WebKit; `verify:private:privacy` | C1B-M14 for original-UUID recovery; retained C1-B cost/idempotency mutations | pass in `EE-PRIVATE-ARTIFACT` gate; no owner data, provider, or non-loopback call |
 | Caller forwarding headers cannot forge edge identity | `src/platform/identity.ts` | identity unit tests; app-worker workerd tests | C1A-M01 | named RED; exact restore; focused GREEN |
 | Same-origin admission rejects cross-site requests | `src/platform/admission.ts` | admission unit tests; admission workerd tests | C1A-M02 | named RED; exact restore; focused GREEN |
 | Streamed body size uses received bytes | `src/platform/admission.ts` | admission unit tests; admission workerd tests | C1A-M03 | named RED; exact restore; focused GREEN |
