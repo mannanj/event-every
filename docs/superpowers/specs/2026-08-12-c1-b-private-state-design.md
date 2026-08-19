@@ -477,3 +477,90 @@ C1-B is accepted only when all of the following are true on one committed head:
 - an independent architecture/security reviewer reports no Critical or Important finding.
 
 This acceptance still does not authorize a real owner key, real user data, Access configuration, remote resources, deployment, or provider transport. Those remain later private-artifact gates. The truthful cross-product user-data FAQ remains queued after C1-B fixes the actual stored fields and retention, and before any owner-data artifact is accepted.
+
+## R1 owner Access and application identity boundary addendum
+
+**Status:** `PLAN-ONLY`
+
+**Gate:** `EE-PRIVATE-DEPLOYED`
+
+This addendum defines what a later, explicitly authorized private deployment must prove. It does
+not authorize deployment, login, credentials, DNS, billing, owner data, provider calls, or remote
+Cloudflare mutations.
+
+## Trust chain
+
+1. The browser reaches one explicitly selected private hostname.
+2. Cloudflare Access authenticates the sole owner before the application Worker receives a request.
+3. The application independently accepts only a currently valid Access assertion for the exact
+   application audience and sole owner identity.
+4. Existing Event Every admission then enforces exact same-origin requests, body bounds, trusted
+   edge identity, fixed provider configuration, and content-free failures.
+5. The provider key remains a Worker secret and is never delivered to the browser.
+
+Access is one layer, not the application authorization decision. A request that reaches the Worker
+without a valid application-bound owner identity must fail closed before reading a body, selecting a
+route implementation, touching Durable Objects or D1, or calling a provider.
+
+## Deployment-time private record
+
+The authorized deployment task must privately record and verify all of the following without
+committing personal identity or secret values to Git:
+
+- the one canonical hostname;
+- the Access application identifier and exact audience;
+- the sole allowed owner identity;
+- the assertion issuer and key-discovery origin;
+- maximum accepted assertion age and clock-skew policy;
+- the production Worker version, bindings, migrations, and rollback artifact;
+- every preview, Workers.dev, alternate, and legacy origin and its closed result;
+- backup location, restore rehearsal result, rollback result, and recovery window.
+
+## Required application checks
+
+The application identity boundary must reject, with one fixed content-free response:
+
+- a missing assertion;
+- a malformed assertion;
+- an assertion with an invalid signature;
+- an expired or not-yet-valid assertion;
+- a stale assertion outside the accepted age;
+- a wrong issuer or audience;
+- a valid assertion for any identity other than the sole owner;
+- a duplicated or ambiguous identity claim;
+- an identity supplied only through ordinary caller-controlled forwarding headers.
+
+Authorization must occur before request-body consumption and before all owner, provider, status,
+resolver, and administrative routes. Logs may record a closed reason code and request correlation
+identifier; they must not record the assertion, owner address, raw request, provider envelope, or
+secret.
+
+## Origin closure
+
+Only the canonical Access-protected hostname may reach the private application. Workers.dev,
+preview URLs, alternate custom hostnames, direct origins, and legacy deployment origins must be
+disabled or independently return a closed response. Same-origin admission remains required after
+Access and must reject credentialed cross-origin requests.
+
+## Required deployment proof
+
+The authorized R2 task must prove all of these against the deployed candidate:
+
+| Probe | Required result |
+| --- | --- |
+| No Access session | Rejected before application body or state access |
+| Forged assertion | Rejected |
+| Expired, future, or stale assertion | Rejected |
+| Wrong audience or issuer | Rejected |
+| Valid non-owner identity | Rejected |
+| Canonical owner identity | Accepted |
+| Cross-origin request with owner session | Rejected by application admission |
+| Workers.dev, preview, alternate, direct, and legacy origin | Unreachable or rejected |
+| Owner scan | Exactly one bounded provider effect with private data absent from logs/caches/retry metadata |
+| Rollback artifact | Reads authoritative state, after which the forward artifact resumes reading it |
+
+## Authority stop
+
+`EE-PRIVATE-ARTIFACT` may inspect and test only the local synthetic application boundary. Actual
+Access policy, identity values, secrets, deployment, DNS, backup, rollback, and a live owner scan
+belong to `EE-PRIVATE-DEPLOYED` and require explicit user authority.
