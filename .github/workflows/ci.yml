@@ -19,6 +19,11 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: bun run type-check
       - run: bun run lint
+      # `bun run test` is `bun test src --parallel`. --parallel gives the same fresh-global
+      # isolation as --isolate but runs files in separate worker processes. Single-process
+      # --isolate segfaults on bun 1.3.13 (JSC "Heap Helper Thread", EXC_BAD_ACCESS) once the
+      # suite passes ~35 test files, because the concurrent GC races with per-file global
+      # teardown inside one VM. That is an upstream bun bug, not a test-order problem.
       - run: bun run test
       # Deliberately excluded from CI:
       # - Playwright e2e (test:e2e): needs a running dev server + a browser download,

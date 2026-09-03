@@ -2,12 +2,33 @@ import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test';
 import { existsSync, readFileSync } from 'node:fs';
 import { recordClosedEvent } from '@/platform/logger';
 
+// The Cloudflare context is injected the same way the real worker does it -- by setting the
+// well-known global symbol that `getCloudflareContext()` reads -- and torn down after each test.
+// A `mock.module('@opennextjs/cloudflare', ...)` here would replace the export process-wide for
+// every other test file in the run (bun's module-mock registry is global and cannot be undone),
+// which is what broke src/app/api/scrape-url's suite. See src/lib/__tests__/_redisMock.ts.
+const cloudflareContextSymbol = Symbol.for('__cloudflare-context__');
+const globalScope = globalThis as typeof globalThis & { [cloudflareContextSymbol]: unknown };
 const cloudflare = { env: {} as Record<string, unknown> };
-mock.module('@opennextjs/cloudflare', () => ({ getCloudflareContext: () => ({ env: cloudflare.env }) }));
+let previousCloudflareContext: unknown;
+
 const { getPlatformRuntime, setPlatformRuntimeForTests } = await import('@/platform/runtime');
 
-afterEach(() => setPlatformRuntimeForTests(undefined));
-beforeEach(() => { cloudflare.env = {}; });
+beforeEach(() => {
+  cloudflare.env = {};
+  previousCloudflareContext = globalScope[cloudflareContextSymbol];
+  globalScope[cloudflareContextSymbol] = {
+    get env() { return cloudflare.env; },
+    ctx: { waitUntil() {} },
+    cf: undefined,
+  };
+});
+
+afterEach(() => {
+  setPlatformRuntimeForTests(undefined);
+  if (previousCloudflareContext === undefined) delete globalScope[cloudflareContextSymbol];
+  else globalScope[cloudflareContextSymbol] = previousCloudflareContext;
+});
 
 const deleted = [
   'src/platform/legacy/provider.ts',
