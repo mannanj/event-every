@@ -51,3 +51,5 @@ pnpm-lock.yaml
 yarn.lock
 .claude/session-memory/
 .claude/handoff/
+.claude/worktrees/
+.claude/settings.local.json
