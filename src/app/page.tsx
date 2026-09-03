@@ -570,6 +570,12 @@ export default function Home() {
         const controller = new AbortController();
         abortRef.current = controller;
 
+        // Hoisted out of the try so the finally can always settle this batch. A
+        // /api/parse failure (or a broken stream) previously skipped the only
+        // isProcessing:false assignment, which lives in the isComplete branch —
+        // leaving the shimmer up and the Save button unrendered until a reload.
+        let batchId: string | null = null;
+
         try {
           setUrlProcessingStatus({
             phase: 'detecting',
@@ -635,7 +641,7 @@ export default function Home() {
             size: textSizeBytes,
           };
 
-          const batchId = `batch-${Date.now()}`;
+          batchId = `batch-${Date.now()}`;
           setBatchProcessing({
             id: batchId,
             events: [],
@@ -667,10 +673,11 @@ export default function Home() {
           const decoder = new TextDecoder();
           let buffer = '';
           const allEvents: CalendarEvent[] = [];
+          let streamComplete = false;
 
           updateProgress(queueItem.id, 70);
 
-          while (true) {
+          while (!streamComplete) {
             const { done, value } = await reader.read();
             if (done) break;
 
@@ -692,7 +699,7 @@ export default function Home() {
                 const chunk = data as StreamedEventChunk;
 
                 if (chunk.isComplete) {
-                  setBatchProcessing(prev => prev ? { ...prev, isProcessing: false } : null);
+                  streamComplete = true;
                   break;
                 }
 
@@ -747,6 +754,13 @@ export default function Home() {
           }, 5000);
 
           throw err;
+        } finally {
+          // Terminal for every exit path — success, /api/parse error, stream
+          // error, abort. Guarded on the id so a newer batch is never clobbered.
+          if (batchId !== null) {
+            setBatchProcessing(prev => (prev && prev.id === batchId ? { ...prev, isProcessing: false } : prev));
+          }
+          if (abortRef.current === controller) abortRef.current = null;
         }
       }
     );
