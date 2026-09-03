@@ -3906,3 +3906,275 @@ README, canonical pack digest, and projected artifact digest. Report:
 No mutation row changes: the accepted E1-M01–E1-M21 behavior evidence and 120-scenario browser
 matrix remain byte-bound to the separately proven Task 9 implementation at `195e9b4`. E1 is
 terminally proven; Cloudflare planning may now begin.
+
+## C1-A mutation-ledger bridge (2026-08-04)
+
+This ledger remains the authoritative causal record for the accepted E1 mutations and browser
+accounting. It does not provide credit for C1-A mutations. The closed C1-A mutation registry is
+implemented separately in `scripts/run-c1-a-mutations.ts`; its future ledger is generated only by
+the one-time `--write-ledger --all` gate after the initial C1-A unit, workerd, and browser gates
+are green. Until that gate runs, there are no C1-A mutation RED, restored-GREEN, or ledger claims
+to record here.
+
+## C1-A Task 11 mutation-runner causal redesign (2026-08-04)
+
+The final Task 11 rereview at
+`/Users/manblack/Documents/codex-agent-routing/.routed-runs/20260804T091814Z-67300-c1-a-task11-mutation-tooling-rereview-final/report.json`
+returned `VERIFIED:false` with six Important findings. The runner was redesigned within the Task 11
+three-file ownership boundary; no production mutation and no production C1-A ledger write occurred.
+
+The public process now opens the repository directory and invokes command-form `/usr/bin/lockf`
+with `-t 0`, wrapping a self-reexecuted private lifecycle. A 256-bit capability crosses only an
+inherited pipe; direct internal mode is rejected. The internal lifecycle acknowledges that
+capability only after authenticating the inherited repository descriptor and acquiring an
+independent nonblocking `flock` on it. Consequently, loss of the `lockf` wrapper cannot make an
+in-flight restoration or mutation unlocked. Actual unacknowledged status 75 is contention;
+missing `lockf`, invalid descriptor/startup, and acknowledged internal failure take distinct fixed,
+secret-free paths. There is no readiness pathname or pathname lock.
+
+Every command runs in a detached process group under a supervisor that monitors both the lock
+authority and runner. Darwin `proc_pidinfo` makes an exited-but-unreaped authority dead rather than
+letting `kill(pid, 0)` mistake a zombie for a live lock owner. Timeout and authority loss use a
+referenced 250 ms TERM grace, then SIGKILL, then poll for group extinction before returning. The
+runner records the group ID before execution so it can kill and drain the group if the supervisor
+itself dies. Tests cover a descendant that ignores TERM, a leader that exits first, lock-authority
+death, runner death, and supervisor death.
+
+Target and ledger access is rooted in retained directory descriptors. Each parent component is
+opened with `openat(O_DIRECTORY|O_NOFOLLOW)`, authenticated by device/inode, retained, and
+descriptor-relatively rechecked. The target descriptor and original device/inode stay open through
+mutation, inverse restoration, restored GREEN, final pathname identity, exact bytes, and SHA-256.
+Ledger verification reads by authenticated descriptor. One-time publication creates and fsyncs a
+descriptor-relative temporary file, then uses `linkat` for atomic no-overwrite publication,
+`unlinkat` for cleanup, directory fsync, and canonical byte verification. Adversarial tests replace
+a target parent or ledger directory at the prior check/use seam and prove no outside write; another
+competitor wins the final ledger name without byte replacement. Repeated execution proves target,
+hierarchy, and ledger descriptors are closed.
+
+Strict RED evidence:
+
+- the first new regression run retained 22 passing historical tests but failed exactly the
+  same-byte final-GREEN inode replacement, TERM-ignoring descendant extinction, and unauthenticated
+  internal-mode cases (3 failures, 66 assertions);
+- the authority-death test then failed at the intended zombie-liveness assertion with 29 other
+  tests passing; and
+- the independent lifecycle-lock test failed at its intended first acquisition before the
+  secondary kernel lock was implemented.
+
+The repaired focused suite passed **34 tests / 96 assertions**. The exact 45-row registry, owner
+mapping, inverses, commands, compile-before-RED order, distinct M22/M23 rows, restoration, canonical
+all/focused ledger comparison, credential scrubbing, offline preload, deterministic raw-free
+rendering, and fixed errors remain covered.
+
+Fresh terminal verification used a credential-free environment and the existing local Bun cache.
+All **49/49** Bun unit files passed in fresh per-file processes, totaling **624 tests / 2,346
+assertions**. This sharded form is authoritative because a corrected monolithic run passed through
+the prior failure point and then Bun 1.3.13 itself segfaulted after 196 seconds; no test failure
+preceded the runtime crash. Offline OpenNext/workerd verification passed **19/19** main-worker tests
+and **7/7** keep-alive tests. TypeScript exited 0. Full repository lint excluding the protected
+`.claude/**` worktrees exited 0 with 17 existing warnings; direct full lint is non-accepting because
+it traverses generated `.next` files inside those protected worktrees. Scoped Task 11 lint and all
+whitespace checks exited 0. The protected inventory remained exactly 53,300 records.
+
+Final absence checks found no `docs/testing/c1-a-mutation-ledger.md`, readiness temporary, pathname
+lock, ledger temporary, `.open-next`, or `.wrangler`. Status remained limited to the three Task 11
+owned paths plus the pre-existing protected `.claude/**`, `tasks/task-192.md`, and
+`tasks/task-193.md`. No browser, provider, external network, production mutation, staging, commit,
+publication, or deployment occurred.
+
+## C1-A Task 11 mutation-runner final repair (2026-08-04)
+
+The final-repair review at
+`/Users/manblack/Documents/codex-agent-routing/.routed-runs/20260804T101128Z-80505-c1-a-task11-mutation-runner-redesign-review/report.json`
+returned `VERIFIED:false` with two Important findings: an initially hard-linked production target
+could expose transient mutation through an external alias, and the public argument grammar allowed
+a focused write-mode run to publish a partial ledger.
+
+Target authentication now requires link count exactly one on the initially retained descriptor and
+on both the retained descriptor and descriptor-relative pathname probe at every subsequent identity
+check. Any link-count violation takes the fixed `c1-a mutations: target unsafe` path before the
+corresponding write. The isolated regression creates a real external hard link, observes that no
+compile or behavioral child is reached, and proves the alias retains its exact original bytes.
+
+The public grammar now accepts write mode only as the literal `--write-ledger --all`; focused IDs
+remain valid only with `--verify-ledger`. A parser regression and an isolated parse-to-run CLI
+composition regression prove `--write-ledger C1A-M01` fails with the fixed expected-arguments error
+before a child, target mutation, or ledger publication.
+
+Strict RED evidence was two failures: the hard-link regression received `compile failed` after its
+child observed the aliased mutation, and the focused CLI composition returned a completed partial
+proof instead of throwing. After the boundary repairs, those exact tests passed **2/2 with 7
+assertions**. The complete focused suite passed **36/36 with 104 assertions**, preserving all 34
+accepted redesign tests. The repository's 49 isolated `scripts/**` and `src/**` Bun unit files
+passed **626 tests / 2,354 assertions**. TypeScript exited 0; full lint excluding protected
+`.claude/**` exited 0 with the same 17 warnings; and the protected inventory remained exactly
+53,300 records.
+
+No production C1-A ledger was created, and no production mutation, `--write-ledger --all`, browser,
+provider, network, staging, commit, publication, or deployment action occurred.
+
+## C1-A Task 11 snapshot mutation repair (2026-08-04)
+
+The final rereview at
+`/Users/manblack/Documents/codex-agent-routing/.routed-runs/20260804T102857Z-85518-c1-a-task11-mutation-runner-final-rereview/report.json`
+identified two remaining Important boundaries: a hard link created after the last pre-write check
+could observe the in-place production mutation, and exported `runMutations` could still publish a
+programmatic partial ledger.
+
+The runner no longer mutates a production inode. Each accepted invocation owns a mode-0700 snapshot
+under `/private/tmp` containing only the bounded command closure from regular tracked `HEAD` blobs:
+application, runner, worker-test, Cloudflare, public, and vendored Scanner inputs plus the explicit
+root build/type configuration. Dotenv, protected task/worktree content, untracked files, and
+generated outputs are not eligible. The only external locator is an authenticated local
+`node_modules` directory symlink; command environment is a minimal deterministic allowlist with
+credential-shaped names empty, `HOME` inside the snapshot, and the snapshot offline preload.
+
+Before a proof, the production target is opened descriptor-relatively and must be clean, regular,
+single-link, byte/hash-identical to the tracked snapshot baseline, and pathname-identical to its
+retained device/inode. Mutation, OpenNext compile, named RED, inverse restoration, and restored GREEN
+operate only on the snapshot target and use the snapshot as child `cwd`. Production descriptor,
+pathname, link count, exact bytes, and SHA-256 are reauthenticated before and after every child and
+again in the innermost and outermost cleanup paths. Thus a late production hard link can only alias
+the unchanged production inode.
+
+The public lock wrapper now retains separate high-numbered descriptors for the `lockf` lock target,
+authenticated repository, and owned snapshot, because command-form `lockf` consumes its lock FD.
+The private capability process owns normal, timeout, signal, and lock-authority-loss cleanup; the
+public wrapper independently removes the same authenticated snapshot after internal-runner death or
+startup failure. All snapshot-generated `.next`, `.open-next`, `.wrangler`, logs, caches, and test
+outputs consequently disappear with the owned root. Existing process-group TERM grace, SIGKILL,
+extinction proof, independent `flock`, and fixed failure classification remain unchanged.
+
+Write mode is now closed at both boundaries. The parser accepts only literal
+`--write-ledger --all`, and exported `runMutations` rejects any partial, reordered, or duplicate ID
+set before subscription, snapshot creation, mutation, or publication. Atomic `openat`/`linkat`
+ledger adversary tests now use a lower-level publication seam with the exact ordered 45 canonical
+proof rows instead of preserving an invalid focused write.
+
+Strict RED evidence was exact: the late-link regression read
+`request.headers.get('x-forwarded-for')` through the production alias, and the programmatic one-row
+write returned a completed partial proof. After repair, both regressions passed: the alias observed
+only original bytes while the isolated target carried the mutation, and all three invalid write-set
+shapes failed before child or ledger activity. The complete focused suite passed **38/38 with 132
+assertions**, preserving all previously accepted tests. A real credential-scrubbed, offline focused
+`C1A-M01` invocation completed snapshot compile, named RED, inverse restoration, and GREEN, then
+stopped only at the expected `c1-a mutations: ledger missing` verification boundary. No production
+target byte changed and no production ledger was created.
+
+Fresh terminal verification passed **38/38 focused tests / 132 assertions**, TypeScript, full
+repository lint excluding protected `.claude/**` with zero errors and the same 17 warnings, exact
+53,300-record protected inventory, and tracked/untracked whitespace checks. The production identity
+target's worktree object remained byte-identical to its `HEAD` object
+`f0d4d24f0a7805f20caa1768921b2eda3831e7ea`, with every `src/` and `cloudflare/` target clean in both
+index and worktree. The production ledger, pathname lock, readiness files, snapshot roots,
+snapshot-created `Library/`, ledger temporaries, `.open-next`, and `.wrangler` were absent. The
+ignored `.next` created on 2026-08-03 predates this repair and was preserved. Status remained only
+the three owned Task 11 paths plus pre-existing protected `.claude/**` and task files. No production
+mutation, production ledger write, browser, provider, external network, staging, or commit occurred.
+
+## C1-A Task 11 provenance and public-startup signal repair (2026-08-04)
+
+The independent rereview at
+`/Users/manblack/Documents/codex-agent-routing/.routed-runs/20260804T111332Z-98871-c1-a-task11-snapshot-mutation-rereview/report.json`
+identified two Important residual seams. Snapshot blob reads and dirty checks inherited ambient Git
+repository/object/index/config selectors, and public `SIGINT`/`SIGTERM` ownership began only after
+the public wrapper had allocated its snapshot.
+
+Strict RED was run after adding the two causal regressions and before this repair. The focused
+suite failed at module load with `Export named 'defaultDirtyTarget' not found`; this was the expected
+missing provenance seam, so no GREEN claim was made. After exposing and repairing the seam, one
+test-fixture expectation initially failed because its trusted fixture had committed the default
+identity bytes rather than the supplied trusted bytes; that was corrected before the accepted GREEN
+run. The public-startup regression also initially inspected the system temporary directory while the
+runner intentionally allocates under `/private/tmp`; it was corrected to observe the actual owned
+snapshot parent. Neither setup failure is claimed as causal RED evidence.
+
+Git provenance now uses an explicitly bound absolute `/usr/bin/git`, a canonical authenticated
+repository root and non-symlink `.git` directory, explicit `--git-dir` and `--work-tree`, a fixed
+verified `HEAD^{commit}`, and `--no-replace-objects`. Git runs from `/private/tmp`, never from the
+repository cwd. Its environment is a closed, credential-free offline/no-prompt allowlist: it does
+not inherit any `GIT_*`, object, alternate, namespace, replace-ref, index, config-injection,
+executable, SSH, or hook selector. The causal regression sets hostile `GIT_DIR`, `GIT_WORK_TREE`,
+`GIT_INDEX_FILE`, `GIT_OBJECT_DIRECTORY`, `GIT_ALTERNATE_OBJECT_DIRECTORIES`, `GIT_COMMON_DIR`,
+`GIT_NAMESPACE`, `GIT_REPLACE_REF_BASE`, `GIT_CONFIG_COUNT`/key/value injection, `GIT_EXEC_PATH`,
+and SSH/askpass selectors. It proves snapshot bytes remain the requested repository's committed
+bytes, a local target edit remains dirty, and the attacker repository remains untouched.
+
+Public signal ownership is now installed before argument handling and before any snapshot
+allocation, is removed in the public wrapper's `finally`, and preserves pre-existing listeners.
+An interrupt marks the invocation interrupted, terminates the detached lockf process group when it
+exists, bounds TERM/KILL draining, then closes descriptors and removes the authenticated snapshot.
+The real CLI-process regression uses the test-only `NODE_ENV=test` startup checkpoint after public
+allocation and before lifecycle spawn/ACK, sends `SIGINT` only after observing the owned snapshot,
+and receives exactly `c1-a mutations: interrupted` with exit status 1. It proves the CLI PID is
+gone, no new `/private/tmp` snapshot or readiness artifact survives, and the repository lock is
+immediately reacquirable; no child, lock, or process artifact remains.
+
+GREEN evidence: `bun test scripts/run-c1-a-mutations.test.ts --isolate` passed **40/40 with 142
+assertions** after the repair. No `--write-ledger --all`, browser, provider, external network,
+credential, production mutation, production ledger write, staging, or commit occurred.
+
+## C1-A Task 11 topology, Git binding, and proof-publication repair (2026-08-04)
+
+The high-judgment rereview at
+`/Users/manblack/Documents/codex-agent-routing/.routed-runs/20260804T113549Z-6806-c1-a-task11-provenance-signal-rereview/report.json`
+identified three Important residual boundaries: a public signal could kill only the lockf lifecycle
+group while a mutation command remained in its separate process group; repository and `.git`
+identity were authenticated only before a series of pathname-based Git children; and the exported
+low-level ledger publisher accepted fabricated full-length proof arrays after checking only count
+and ordered IDs.
+
+Public interruption now combines two independent sources of topology authority. Each supervisor
+reports the detached command group over the already authenticated ACK/control descriptor, and the
+public wrapper snapshots the live descendant ancestry with `libproc` before terminating anything.
+`SIGINT` or `SIGTERM` starts a bounded public cleanup immediately: TERM reaches the lockf lifecycle
+and every authenticated detached group, a referenced 250 ms grace expires, SIGKILL is applied, and
+both lifecycle and command groups must be extinct before the snapshot descriptor is closed and the
+authenticated snapshot is removed. The real derived-CLI regression reaches an active post-ACK
+detached command, pauses the internal runner to prevent it from helping, signals only the public
+wrapper, and proves exact production bytes, extinct public/lockf/internal/supervisor/command PIDs,
+removed snapshot, absent late outside write, and immediate lock reacquisition.
+
+Git now runs by descriptor rather than repository path. The runner retains authenticated root and
+`.git` directory descriptors, duplicates them for each child, and execs the fixed `/usr/bin/git`
+only after `fchdir` to the retained `.git` descriptor. Object operations therefore use `--git-dir=.`
+from the authenticated directory object, never a reopenable `.git` pathname. Dirty detection reads
+the authenticated index blob and compares it with the descriptor-relative production target; the
+cached-index check is likewise rooted in the retained Git directory. Before/after identity checks
+remain around every child and results are not consumed before the post-check. Root and `.git`
+replacement adversaries between operations deterministically fail closed, cannot redirect returned
+blobs, cannot report a dirty target clean, do not write the attacker repository, and close every
+retained and per-child descriptor.
+
+Ledger publication is private to `runMutations`. Every causal proof is frozen and registered in a
+module-private `WeakMap` with an unexported invocation nonce and the restored production hash
+authenticated by that run. Before the one-shot path opens the ledger directory, it requires the
+exact 45 proof object identities from that invocation, the exact ordered registry fields (`id`,
+owner, target, old/new mutator and inverse, command, and RED assertion), and the authentic 64-character
+restored hash. Altered owner, target, mutator, inverse, assertion, command, or hash values, copied
+objects, and wholly fabricated arrays all fail with `c1-a mutations: proof provenance` before the
+ledger is consumed. Atomic no-overwrite tests now reach the private publisher only through complete
+45-row causal runs in isolated fixtures. The exact-all fixture also exposed and repaired the prior
+anchor rule for inverses necessarily nested inside their mutators, preserving the 45-row contract.
+
+Honest RED evidence:
+
+- the first combined run passed 40 historical tests but had three failures; only the Git
+  replacement failure was causal. The proof case stopped earlier at the pre-existing nested-inverse
+  anchor defect, and the topology case initially used sandbox-denied `ps`, so neither setup failure
+  is claimed as mutation evidence;
+- after replacing `ps` with `libproc`, the nested-inverse regression failed exactly with
+  `c1-a mutations: anchor`, while the root/`.git` replacement regression still accepted the
+  unauthenticated continuation;
+- after pausing the internal runner in the real post-ACK topology, the old public wrapper failed to
+  terminate within the bounded three-second assertion and left cleanup dependent on the test; and
+- a post-implementation mutation restoring the former count/ordered-ID-only proof validator made
+  the counterfeit test publish altered owner data (`message: ""` instead of the required fixed
+  provenance error). Restoring invocation provenance made the same test pass **1/1 with 27
+  assertions**.
+
+Fresh GREEN evidence: `bun test scripts/run-c1-a-mutations.test.ts --isolate` passed **44/44 with
+200 assertions**. TypeScript and scoped ESLint both exited 0. No production target or production
+ledger was written; the complete write-path tests used only isolated temporary repositories. No
+`--write-ledger --all`, browser, provider, external network, credential, staging, commit,
+publication, or deployment action occurred.
