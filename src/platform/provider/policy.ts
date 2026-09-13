@@ -1,7 +1,12 @@
 import type { ProviderRoute, ProviderVariant } from './contracts';
 
 export const OWNER_POLICY_VERSION = 'owner-v1' as const;
-export const OWNER_DAILY_LIMIT_NANODOLLARS = 5_000_000_000 as const;
+// $1/day, matched to the ceiling the OpenRouter key itself carries. The app
+// must not plan to spend past what the key will actually allow, or the budget
+// stops being the thing that says no and OpenRouter's 402 becomes the control.
+// A day's policy row stores the limit it was opened under, so a change here
+// conflicts with an already-open day and takes effect at the next UTC rollover.
+export const OWNER_DAILY_LIMIT_NANODOLLARS = 1_000_000_000 as const;
 export const OWNER_PROVIDER_URL = 'https://openrouter.ai/api/v1/chat/completions' as const;
 export const PRE_PERMIT_LEASE_MS = 2 * 60_000;
 export const TRANSPORT_LEASE_MS = 14 * 60_000;
