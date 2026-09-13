@@ -28,6 +28,9 @@ export interface AccountsEnv {
   /** Master key for envelope encryption. 32 bytes, base64. */
   ACCOUNT_DATA_KEK?: string;
 
+  /** Keys the rate-limit bucket hashes, so the table is not a log of people. */
+  RATE_LIMIT_HASH_SECRET?: string;
+
   /** Absolute origin, used to build the magic link that goes in the email. */
   APP_ORIGIN?: string;
 }

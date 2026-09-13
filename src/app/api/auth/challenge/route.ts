@@ -3,8 +3,8 @@ import { NextResponse } from 'next/server';
 import { createLoginToken, normaliseEmail } from '@/server/accounts/auth';
 import { getEmailSender, signInEmail } from '@/server/accounts/email';
 import { accountsDb, accountsEnv, appOrigin } from '@/server/accounts/env';
-import { SIGN_IN_LIMITS, spend } from '@/server/accounts/rate-limit';
-import { clientIp, verifyTurnstile } from '@/server/accounts/turnstile';
+import { SIGN_IN_LIMITS, bucketKey, spend } from '@/server/accounts/rate-limit';
+import { clientHandle, verifyTurnstile } from '@/server/accounts/turnstile';
 import type { D1Like } from '@/server/accounts/d1';
 
 export const dynamic = 'force-dynamic';
@@ -54,7 +54,7 @@ export async function POST(request: Request) {
     return json({ error: 'Type an email address, like you@example.com.' }, 400);
   }
 
-  const ip = clientIp(request);
+  const handle = clientHandle(request);
 
   // Only enforced when a secret is configured. A deployment without Turnstile
   // still rate limits, rather than refusing every sign-in with a bot-check
@@ -63,7 +63,7 @@ export async function POST(request: Request) {
     const human = await verifyTurnstile({
       secret: env.TURNSTILE_SECRET,
       token: fields.turnstileToken,
-      remoteIp: ip,
+      remoteIp: null,
     });
     if (!human) {
       return json({ error: 'That bot check did not pass. Reload the page and try again.' }, 403);
@@ -77,8 +77,24 @@ export async function POST(request: Request) {
   // app being used to mailbomb somebody who never signed up. The IP one stops a
   // single source working through a list of addresses, which the address bucket
   // cannot see.
-  const byEmail = await spend(db, `email:${normaliseEmail(email)}`, SIGN_IN_LIMITS.perEmail);
-  const byIp = ip ? await spend(db, `ip:${ip}`, SIGN_IN_LIMITS.perIp) : null;
+  let byEmail;
+  let byIp;
+  try {
+    byEmail = await spend(
+      db,
+      await bucketKey('email', normaliseEmail(email), env.RATE_LIMIT_HASH_SECRET),
+      SIGN_IN_LIMITS.perEmail,
+    );
+    byIp = handle
+      ? await spend(db, await bucketKey('ip', handle, env.RATE_LIMIT_HASH_SECRET), SIGN_IN_LIMITS.perIp)
+      : null;
+  } catch {
+    // bucketKey refuses without a secret. Failing closed is the only safe
+    // answer: sending mail with no limit is the abuse this endpoint exists to
+    // prevent.
+    console.error('rate limit unavailable; refusing to send');
+    return json({ error: 'We could not send that email. Try again in a moment.' }, 503);
+  }
 
   if (!byEmail.allowed || (byIp && !byIp.allowed)) {
     const retryAfter = Math.max(byEmail.retryAfter, byIp?.retryAfter ?? 0);

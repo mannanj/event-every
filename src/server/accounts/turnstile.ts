@@ -32,21 +32,31 @@ export async function verifyTurnstile(args: {
 }
 
 /**
- * The visitor's IP, and only from Cloudflare.
+ * A stable, trusted handle for "who sent this", for the second rate-limit
+ * bucket.
  *
- * The skeleton falls back to `x-forwarded-for`; this deliberately does not.
- * That header is caller-controlled, so falling back to it would let anyone mint
- * a fresh rate-limit bucket per request by varying one header — defeating the
- * IP limit that exists to stop a single source working through a list of
- * addresses. The accepted migration design records the same rule: Cloudflare is
- * the trust boundary before a value may affect state.
+ * NOT the IP, and not read from a header the caller controls. Edge admission
+ * deliberately strips `cf-connecting-ip`, `x-forwarded-for`, `true-client-ip`
+ * and the rest before a route handler ever sees the request, and substitutes
+ * `x-event-every-identity` - an HMAC of the address over a UTC day, derived
+ * where Cloudflare is still the trust boundary. That header is the only
+ * identity a route handler can believe.
  *
- * `cf` being absent means the request did not arrive through Cloudflare, so no
- * address here is trustworthy. Null is correct then, and the caller treats a
- * null as "IP bucket unavailable" rather than "unlimited".
+ * Two earlier versions of this were silently inert in production, both found by
+ * the rate_limit table holding email buckets and no ip bucket at all:
+ *   1. requiring `request.cf` to be an object - Next's Request has no `cf`
+ *   2. reading `cf-connecting-ip` - admission had already deleted it
+ * The limit looked configured and counted nothing. Hence the test that asserts
+ * a bucket is actually produced.
+ *
+ * Already a keyed hash, so unlike an address it needs no further hashing to be
+ * safe at rest - but it goes through bucketKey anyway, so one rule covers every
+ * bucket and no caller has to remember which kinds are already opaque.
  */
-export function clientIp(request: Request): string | null {
-  const cf = (request as Request & Readonly<{ cf?: unknown }>).cf;
-  if (cf === null || typeof cf !== 'object') return null;
-  return request.headers.get('cf-connecting-ip');
+export function clientHandle(request: Request): string | null {
+  const header = request.headers.get('x-event-every-identity');
+  if (!header) return null;
+  // `version:hmac`. The hmac alone is the stable part; the version changes on
+  // key rotation, which should start fresh windows rather than carry them over.
+  return header.length > 0 ? header : null;
 }

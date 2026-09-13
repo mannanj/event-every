@@ -52,6 +52,48 @@ export interface LimitVerdict {
  * is exactly the situation a limit exists to prevent, and exactly the bug that
  * only appears under the load you wrote the limit for.
  */
+/**
+ * The stored bucket key, keyed-hashed.
+ *
+ * A rate_limit table keyed on a literal `email:someone@example.com` is a log of
+ * who tried to sign in and when - including people who never completed sign-up -
+ * and it lands in every D1 export, backup and Time Travel snapshot. Hashing it
+ * keeps the counting behaviour identical and stops the table being that log.
+ *
+ * HMAC rather than a plain digest, because a plain digest of this input is
+ * reversible in practice: the whole IPv4 space is four billion SHA-256s, and
+ * addresses fall to a wordlist. A keyed hash is only reversible by someone who
+ * also holds the key, which is not in the database.
+ *
+ * The kind stays in the clear so two kinds cannot collide and a bucket is still
+ * legible as an address or an IP when debugging.
+ */
+export async function bucketKey(
+  kind: 'email' | 'ip',
+  value: string,
+  secret: string | undefined,
+): Promise<string> {
+  if (!secret) {
+    // Refuse rather than fall back to a plain key: a missing secret would
+    // quietly turn this table back into a log of people.
+    throw new Error('RATE_LIMIT_HASH_SECRET is not set; refusing to key buckets in the clear.');
+  }
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign'],
+  );
+  const mac = await crypto.subtle.sign('HMAC', key, encoder.encode(`${kind}:${value}`));
+  // Base64url keeps the row short. The full 256 bits are retained: a truncated
+  // digest would start colliding buckets across unrelated people.
+  let binary = '';
+  for (const byte of new Uint8Array(mac)) binary += String.fromCharCode(byte);
+  return `${kind}:${btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')}`;
+}
+
 export async function spend(
   db: D1Like,
   bucket: string,
