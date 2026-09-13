@@ -840,7 +840,7 @@ function Home({ processingDisabled }: { processingDisabled: boolean }) {
       <RateLimitBanner rateLimitInfo={rateLimitInfo} />
       <SiteNav showHow={showMarketing} />
 
-      <div className="flex-1 w-full max-w-2xl mx-auto px-6 pb-4">
+      <div className={`flex-1 w-full max-w-2xl mx-auto px-6 ${showMarketing ? "pb-4" : "pb-0"}`}>
         {/* Hero — the headline riffs on the name */}
         <header className="text-center pt-16 pb-9">
           <h1 className="rise rise-1 display text-[clamp(2.6rem,8vw,4.25rem)] leading-[1.04] text-black">
@@ -857,9 +857,11 @@ function Home({ processingDisabled }: { processingDisabled: boolean }) {
           className="rise rise-3 flex h-[400px] flex-col border-2 border-black bg-white p-[5px] offset-shadow"
           data-testid="input-box"
         >
+          {/* One line, no rule under it: a notice inside the input box, not a
+              second header competing with the box's own black border. */}
           {processingDisabled && (
-            <div className="border-b-2 border-black bg-white px-4 py-3 text-sm text-black" data-testid="owner-budget-view-only" role="status">
-              Event processing is paused. Your changes are saved and you can view your saved events below.
+            <div className="truncate bg-white px-4 py-2 text-sm italic text-red-400" data-testid="owner-budget-view-only" role="status">
+              Event processing is paused - try again later. Your changes are still saved.
             </div>
           )}
           {processingDisabled || providerOperationsReady ? (
@@ -1022,11 +1024,13 @@ function Home({ processingDisabled }: { processingDisabled: boolean }) {
                     </div>
                     <button
                       onClick={() => handleDeleteEvent(event.id)}
-                      className="ml-2 text-black hover:text-gray-600 focus:outline-none flex-shrink-0"
+                      className="ml-2 text-gray-400 hover:text-black focus:outline-none flex-shrink-0"
                       aria-label={`Delete ${event.title}`}
                     >
+                      {/* A bin, not a cross: this removes the event rather than
+                          closing the card, and an X reads as dismiss. */}
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                       </svg>
                     </button>
                   </div>
@@ -1057,7 +1061,7 @@ function Home({ processingDisabled }: { processingDisabled: boolean }) {
         )}
       </div>
 
-      <SiteFooter />
+      <SiteFooter tight={!showMarketing} />
 
       {deleteConfirmId && (
         <>
@@ -1066,22 +1070,33 @@ function Home({ processingDisabled }: { processingDisabled: boolean }) {
             onClick={cancelDelete}
           >
             <div
-              className="bg-white border-4 border-black pt-6 px-6 pb-4 max-w-sm mx-4"
+              className="bg-white border border-black pt-6 px-6 pb-4 max-w-xl mx-4"
               onClick={(e) => e.stopPropagation()}
             >
-              <p className="text-lg font-bold text-center mb-4">
-                Delete forever?
+              {/* Naming the event is what makes this a decision rather than a
+                  reflex - the one thing worth reading before a delete that
+                  cannot be undone. It flows as a sentence, so only the title is
+                  bold. */}
+              <p className="text-base text-black mb-4">
+                Delete{' '}
+                <span className="font-bold">
+                  {events.find((candidate) => candidate.id === deleteConfirmId)?.title || 'this event'}
+                </span>{' '}
+                forever? This can&apos;t be reversed.
               </p>
-              <div className="flex gap-3">
+              {/* Cancel is a plain blue link rather than a second bordered
+                  button: two equally weighted boxes make the destructive one
+                  easy to hit by momentum. */}
+              <div className="flex items-center justify-end gap-4">
                 <button
                   onClick={cancelDelete}
-                  className="flex-1 py-1.5 px-4 bg-white text-black border-4 border-black hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-black text-sm font-bold"
+                  className="py-1.5 px-1 text-sm text-blue-600 hover:text-blue-800 transition-colors focus:outline-none focus:underline"
                 >
-                  No
+                  Cancel
                 </button>
                 <button
                   onClick={confirmDelete}
-                  className="flex-1 py-1.5 px-4 bg-red-500 text-white border-4 border-black hover:bg-red-600 transition-colors focus:outline-none focus:ring-2 focus:ring-black text-sm font-bold"
+                  className="py-1.5 px-5 bg-red-500 text-white border border-black hover:bg-red-600 transition-colors focus:outline-none focus:ring-2 focus:ring-black text-sm font-bold"
                 >
                   Yes
                 </button>
