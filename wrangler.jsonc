@@ -4,20 +4,43 @@
   "main": "cloudflare/app-worker.ts",
   "compatibility_date": "2026-08-02",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
-  "workers_dev": false,
+  "workers_dev": true,
   "preview_urls": false,
   "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
   "services": [
     { "binding": "WORKER_SELF_REFERENCE", "service": "event-every" }
   ],
+  // Custom domains: Cloudflare owns and manages these DNS records, so the
+  // hostnames resolve to this Worker. event-every-holding deliberately holds
+  // no route — it is the page for when this Worker cannot boot at all.
+  "routes": [
+    { "pattern": "eventevery.com", "custom_domain": true },
+    { "pattern": "www.eventevery.com", "custom_domain": true }
+  ],
   "d1_databases": [
     {
       "binding": "EVENT_EVERY_DB",
-      "database_name": "event-every-local-disabled",
-      // This sentinel is deliberately nondeployable; it is not a resource identifier.
-      "database_id": "11111111-1111-4111-8111-111111111111"
+      // The database the Vercel deployment already writes through its REST
+      // proxy. Binding the same one is what lets the Worker read the existing
+      // waitlist rather than start an empty one at cutover.
+      "database_name": "spirit-hammer-waitlist",
+      "database_id": "aee71288-dc04-41f4-8230-8dbbea640a33"
+    },
+    {
+      // Accounts, sessions and encrypted event rows. Separate from the waitlist
+      // database because that one is shared across Spirit & Hammer apps, and
+      // per-app identity must not live somewhere another app's migration can
+      // reach. Matches the existing convention on this account
+      // (`sun-signal-accounts`, `greenlights_accounts`).
+      "binding": "ACCOUNTS_DB",
+      "database_name": "event-every-accounts",
+      "database_id": "2ca050c1-14ef-4168-905b-4d4b31c97e21"
     }
   ],
+  // Cloudflare Email Sending, for magic links. The domain must be onboarded
+  // (`wrangler email sending enable mail.eventevery.com`) or every send fails.
+  // A subdomain, so the Resend/SES records on send.eventevery.com are untouched.
+  "send_email": [{ "name": "EMAIL" }],
   "durable_objects": {
     "bindings": [
       { "name": "IDENTITY_DAY_POLICY", "class_name": "IdentityDayPolicy" },
@@ -42,8 +65,6 @@
     }
   ],
   "vars": {
-    // This guard deliberately keeps the local scaffold nondeployable.
-    "C1_DEPLOYMENT_DISABLED": "1",
     "STATE_AUTHORITY_MODE": "cloudflare",
     "IDENTITY_KEY_CURRENT_VERSION": "local-v1",
     "IDENTITY_KEY_NEXT_VERSION": "",
@@ -51,6 +72,14 @@
     "IDENTITY_KEY_SCHEDULE_DIGEST": "local-v1-no-rotation",
     "PROVIDER_POLICY_VERSION": "owner-v1",
     "PROVIDER_REQUEST_HMAC_CURRENT_VERSION": "c1-b-current-v1",
-    "PROVIDER_REQUEST_HMAC_PREVIOUS_VERSION": ""
+    "PROVIDER_REQUEST_HMAC_PREVIOUS_VERSION": "",
+    // 'cloudflare' sends through the EMAIL binding; 'console' writes the whole
+    // message, magic link included, to the Worker log so the sign-in flow can
+    // be tested without an inbox.
+    "EMAIL_PROVIDER": "cloudflare",
+    "EMAIL_FROM": "Event Every <no-reply@mail.eventevery.com>",
+    // Absolute, so the link in an email is never built from a request host that
+    // happened to be a preview URL.
+    "APP_ORIGIN": "https://eventevery.com"
   }
 }
