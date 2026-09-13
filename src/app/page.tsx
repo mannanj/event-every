@@ -860,7 +860,7 @@ function Home({ processingDisabled }: { processingDisabled: boolean }) {
           {/* One line, no rule under it: a notice inside the input box, not a
               second header competing with the box's own black border. */}
           {processingDisabled && (
-            <div className="truncate bg-white px-4 py-2 text-sm italic text-red-400" data-testid="owner-budget-view-only" role="status">
+            <div className="truncate bg-white px-4 py-2 text-center text-sm italic text-red-400" data-testid="owner-budget-view-only" role="status">
               Event processing is paused - try again later. Your changes are still saved.
             </div>
           )}
