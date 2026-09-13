@@ -134,10 +134,22 @@ export async function spend(
  * Deliberately generous. Someone who mistypes their address, then mistypes it
  * again, then gets it right, must not be locked out; three in a quarter hour
  * leaves room for that and still makes a mailbomb useless.
+ *
+ * The second bucket is an order of magnitude looser, and stays that way: it
+ * exists only to catch one source working through a list of addresses, which is
+ * a burst, not a trickle. Sixty an hour is one a minute sustained - no person
+ * approaches it, a script hits it inside a minute. Standardised across the
+ * account (skeleton, Meet Time, Green Light, mannan.is) so the number means the
+ * same thing everywhere.
+ *
+ * Note that here the second bucket keys on the admission identity rather than a
+ * raw IP, so the usual "a whole office behind one NAT address locks itself out"
+ * argument is weaker in this repo than in the others. The value is for
+ * consistency, not because that risk is load-bearing here.
  */
 export const SIGN_IN_LIMITS = {
   perEmail: { max: 3, windowSeconds: 15 * 60 },
-  perIp: { max: 10, windowSeconds: 60 * 60 },
+  perIp: { max: 60, windowSeconds: 60 * 60 },
 } as const;
 
 /**
