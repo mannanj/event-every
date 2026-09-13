@@ -5,6 +5,7 @@ import type {
   ProviderRequestObservedResult,
   ProviderRequestPendingResult,
 } from '@/platform/contracts';
+import { ownerBudgetLedgerName } from '@/platform/provider/policy';
 import {
   getProviderOperationContext,
   type DurableNamespaceLike,
@@ -129,7 +130,7 @@ export async function runProviderOperation(
   if (input.signal.aborted) return { status: 'unavailable' };
 
   const budgetAuthority = resolved.ownerBudgetAuthority.get(
-    resolved.ownerBudgetAuthority.idFromName(observed.authorityDay),
+    resolved.ownerBudgetAuthority.idFromName(ownerBudgetLedgerName(observed.authorityDay)),
   );
   const budgetBinding: OwnerBudgetBinding = {
     executionId: observed.executionId,

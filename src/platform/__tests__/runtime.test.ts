@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test';
 import { existsSync, readFileSync } from 'node:fs';
 import { recordClosedEvent } from '@/platform/logger';
+import { ownerBudgetLedgerName } from '@/platform/provider/policy';
 
 // The Cloudflare context is injected the same way the real worker does it -- by setting the
 // well-known global symbol that `getCloudflareContext()` reads -- and torn down after each test.
@@ -95,8 +96,10 @@ describe('Cloudflare-only platform runtime', () => {
     const idFromName = mock((name: string) => name);
     cloudflare.env = { OWNER_BUDGET_AUTHORITY: { idFromName, get } };
     expect(await getPlatformRuntime().ownerBudgetStatus('2026-08-13')).toEqual({ status: 'day-mismatch' });
-    expect(idFromName).toHaveBeenCalledWith('2026-08-13');
-    expect(get).toHaveBeenCalledWith('2026-08-13');
+    // Addressed by the ledger name, not the bare day, so status reads the same
+    // ledger reserve and settle use.
+    expect(idFromName).toHaveBeenCalledWith(ownerBudgetLedgerName('2026-08-13'));
+    expect(get).toHaveBeenCalledWith(ownerBudgetLedgerName('2026-08-13'));
     expect(status).toHaveBeenCalledWith({ authorityDay: '2026-08-13' });
   });
 

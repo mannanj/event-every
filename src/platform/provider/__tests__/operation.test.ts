@@ -14,6 +14,7 @@ import {
   type ProviderOperationDependencies,
   type ProviderOperationInput,
 } from '@/platform/cloudflare/provider-operation';
+import { ownerBudgetLedgerName } from '@/platform/provider/policy';
 
 const REQUEST_ID = '11111111-1111-4111-8111-111111111111';
 const EXECUTION_ID = '22222222-2222-4222-8222-222222222222';
@@ -327,7 +328,10 @@ describe('provider operation coordinator', () => {
     expect(state.providerCall).toHaveBeenCalledTimes(1);
     expect(state.requestNames).toHaveLength(1);
     expect(state.requestNames[0]).toMatch(/^[0-9a-f]{64}$/);
-    expect(state.budgetNames).toEqual([AUTHORITY_DAY]);
+    // The ledger is named by the policy it was opened under, and reserve and
+    // settle must derive it the same way or a request settles against a ledger
+    // it never reserved from.
+    expect(state.budgetNames).toEqual([ownerBudgetLedgerName(AUTHORITY_DAY)]);
   });
 
   test.each([

@@ -1,5 +1,6 @@
 // @ts-expect-error cloudflare:workers is provided by Workerd, not the Next.js type graph.
 import { DurableObject } from 'cloudflare:workers';
+import { ownerBudgetLedgerName } from '@/platform/provider/policy';
 import type {
   DurableObjectStateLike,
   OwnerBudgetBinding,
@@ -557,7 +558,7 @@ export class ProviderRequestAuthority extends DurableObject<RequestAuthorityEnv>
     const row = this.readRequest();
     if (!row || row.executionId !== outbox.executionId) throw schemaError();
     const budget = this.requestEnv.OWNER_BUDGET_AUTHORITY.get(
-      this.requestEnv.OWNER_BUDGET_AUTHORITY.idFromName(row.authorityDay),
+      this.requestEnv.OWNER_BUDGET_AUTHORITY.idFromName(ownerBudgetLedgerName(row.authorityDay)),
     );
     const binding: OwnerBudgetBinding = {
       executionId: row.executionId,

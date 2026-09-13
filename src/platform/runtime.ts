@@ -10,6 +10,7 @@ import {
 } from '@/platform/cloudflare/provider-operation';
 import { getProviderRequestShapeKeys } from '@/platform/cloudflare-context';
 import { providerRequestName, type ShapeKey } from '@/platform/provider/request-binding';
+import { ownerBudgetLedgerName } from '@/platform/provider/policy';
 
 type StatusNamespace<Stub> = Readonly<{
   idFromName(name: string): unknown;
@@ -66,7 +67,7 @@ async function ownerBudgetStatus(authorityDay: string): Promise<OwnerBudgetStatu
   try {
     const namespace = env().OWNER_BUDGET_AUTHORITY;
     if (!namespace) return { status: 'day-mismatch' };
-    return await namespace.get(namespace.idFromName(authorityDay)).status({ authorityDay });
+    return await namespace.get(namespace.idFromName(ownerBudgetLedgerName(authorityDay))).status({ authorityDay });
   } catch {
     return { status: 'day-mismatch' };
   }
