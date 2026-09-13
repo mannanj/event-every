@@ -106,6 +106,6 @@ export function Faq() {
 }
 
 /** Kept as an alias so there is one footer implementation to change. */
-export function SiteFooter() {
-  return <StandardFooter />;
+export function SiteFooter({ tight = false }: { tight?: boolean }) {
+  return <StandardFooter tight={tight} />;
 }

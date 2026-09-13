@@ -11,9 +11,13 @@ import Link from 'next/link';
  * Not used on the paused screen, which is a single short message and closes
  * itself.
  */
-export default function SiteFooter() {
+export default function SiteFooter({ tight = false }: { tight?: boolean } = {}) {
   return (
-    <footer className="mt-20 border-t border-black/10">
+    /* The roomy gap is for the landing page, where the footer closes a long
+       scroll. When the app is showing instead, content ends wherever the last
+       event card ends, and 80px of blank paper above the rule reads as the page
+       having failed to finish rather than as breathing room. */
+    <footer className={`${tight ? 'mt-[5px]' : 'mt-20'} border-t border-black/10`}>
       <div className="max-w-2xl mx-auto px-6 py-8 flex items-center justify-between text-sm">
         <Link href="/" className="wordmark text-black/80" aria-label="Event Every - home">
           Event Every
