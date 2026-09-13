@@ -115,7 +115,12 @@ function fixedProviderBody(
         json_schema: { name: 'event_scanner_observation', strict: true, schema },
       },
       temperature: 0,
-      max_completion_tokens: 8192,
+      // OpenRouter's parameter is `max_tokens`; `max_completion_tokens` is the
+      // OpenAI spelling and no provider advertises it. Paired with
+      // `require_parameters: true` below — which routes only to providers
+      // supporting every parameter sent — it matches nothing and the request
+      // 404s before reaching a model, whatever the model is.
+      max_tokens: 8192,
       reasoning: { exclude: true },
       provider: FIXED_SCANNER_PROVIDER,
       stream: false,
