@@ -65,8 +65,15 @@ async function expectFixedError(response: Response, status: number, code: string
 }
 
 describe('edge admission policy', () => {
-  test.each(['/api/auth/challenge', '/api/auth/redeem'])('%s is reserved before method, origin, body, or identity work', async (path) => {
-    const bodyCanary = 'reserved-auth-body-canary';
+  // These two were reserved placeholders returning `auth_not_available` until
+  // accounts existed. They are real routes now, so what matters is that the
+  // ordinary policy still refuses before the body is read or identity is
+  // derived — the property the reserved tests were really protecting.
+  test.each([
+    ['/api/auth/challenge', 'POST'],
+    ['/api/auth/redeem', 'GET'],
+  ])('%s refuses a wrong method and a hostile origin before reading anything', async (path, allowed) => {
+    const bodyCanary = 'auth-route-body-canary';
     const methodProbe = probedStream([new TextEncoder().encode(bodyCanary)]);
     const wrongMethod = new Request(`https://event-every.test${path}`, {
       method: 'PUT',
@@ -78,37 +85,35 @@ describe('edge admission policy', () => {
     });
 
     expect(result.status).toBe('failure');
-    if (result.status === 'success') throw new Error('expected reserved rejection');
-    await expectFixedError(result.response, 404, 'auth_not_available', bodyCanary);
+    if (result.status === 'success') throw new Error('expected method rejection');
+    await expectFixedError(result.response, 405, 'method_not_allowed', bodyCanary);
     expect(methodProbe.pulls()).toBe(0);
 
     const originProbe = probedStream([new TextEncoder().encode(bodyCanary)]);
     const hostileOrigin = new Request(`https://event-every.test${path}`, {
-      method: 'POST',
+      method: allowed,
       headers: { origin: 'https://hostile.invalid', 'content-type': 'application/json' },
-      body: originProbe.stream,
+      ...(allowed === 'POST' ? { body: originProbe.stream } : {}),
     });
     const originResult = await admitEdgeRequest(hostileOrigin, env, {}, {
       readAddress() { throw new Error('identity must not run'); },
     });
 
     expect(originResult.status).toBe('failure');
-    if (originResult.status === 'success') throw new Error('expected reserved rejection');
-    await expectFixedError(originResult.response, 404, 'auth_not_available', bodyCanary);
+    if (originResult.status === 'success') throw new Error('expected origin rejection');
+    await expectFixedError(originResult.response, 403, 'origin_not_allowed', bodyCanary);
     expect(originProbe.pulls()).toBe(0);
   });
 
   test.each([
-    ['/api/auth/challenge', 'media', { 'content-type': 'text/plain' }],
-    ['/api/auth/challenge', 'encoding', { 'content-type': 'application/json', 'content-encoding': 'gzip' }],
-    ['/api/auth/redeem', 'media', { 'content-type': 'text/plain' }],
-    ['/api/auth/redeem', 'encoding', { 'content-type': 'application/json', 'content-encoding': 'gzip' }],
-  ])('%s is reserved before invalid %s validation', async (path, kind, headers) => {
-    const bodyCanary = `reserved-auth-${kind}-body-canary`;
+    ['media', { 'content-type': 'text/plain' }, 415, 'unsupported_media_type'],
+    ['encoding', { 'content-type': 'application/json', 'content-encoding': 'gzip' }, 415, 'unsupported_content_encoding'],
+  ])('/api/auth/challenge rejects invalid %s before reading the body', async (kind, headers, status, code) => {
+    const bodyCanary = `auth-${kind}-body-canary`;
     const probe = probedStream([new TextEncoder().encode(bodyCanary)]);
-    const request = new Request(`https://event-every.test${path}`, {
+    const request = new Request('https://event-every.test/api/auth/challenge', {
       method: 'POST',
-      headers: { origin: 'https://event-every.test', ...headers },
+      headers: { origin: 'https://event-every.test', ...(headers as Record<string, string>) },
       body: probe.stream,
     });
     const result = await admitEdgeRequest(request, env, {}, {
@@ -116,8 +121,8 @@ describe('edge admission policy', () => {
     });
 
     expect(result.status).toBe('failure');
-    if (result.status === 'success') throw new Error('expected reserved rejection');
-    await expectFixedError(result.response, 404, 'auth_not_available', bodyCanary);
+    if (result.status === 'success') throw new Error('expected rejection');
+    await expectFixedError(result.response, status as number, code as string, bodyCanary);
     expect(probe.pulls()).toBe(0);
   });
 

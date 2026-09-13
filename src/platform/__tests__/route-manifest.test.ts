@@ -62,13 +62,14 @@ describe('route manifest', () => {
       '/api/summarize': { method: 'POST', maxBodyBytes: 16 * 1024, allow: 'POST' },
       '/api/usage': { method: 'GET', maxBodyBytes: 0, allow: 'GET' },
       '/api/waitlist': { method: 'POST', maxBodyBytes: 4 * 1024, allow: 'POST', retired: true },
+      '/api/auth/challenge': { method: 'POST', maxBodyBytes: 8 * 1024, allow: 'POST' },
+      '/api/auth/redeem': { method: 'GET', maxBodyBytes: 0, allow: 'GET' },
+      '/api/sync/pull': { method: 'GET', maxBodyBytes: 0, allow: 'GET' },
+      '/api/sync/push': { method: 'POST', maxBodyBytes: 4 * 1024 * 1024, allow: 'POST' },
     });
   });
 
-  test('reserves auth challenge and redeem outside the actual-route manifest', () => {
-    expect(RESERVED_ROUTE_MANIFEST).toEqual({
-      '/api/auth/challenge': { method: 'POST', maxBodyBytes: 2 * 1024, allow: 'POST' },
-      '/api/auth/redeem': { method: 'POST', maxBodyBytes: 2 * 1024, allow: 'POST' },
-    });
+  test('reserves nothing now that challenge and redeem are real routes', () => {
+    expect(RESERVED_ROUTE_MANIFEST).toEqual({});
   });
 });
