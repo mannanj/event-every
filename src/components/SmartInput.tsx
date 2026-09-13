@@ -577,7 +577,10 @@ const SmartInput = forwardRef<SmartInputHandle, SmartInputProps>(
               suppressContentEditableWarning
               suppressHydrationWarning
               spellCheck
-              data-placeholder="Drop your screenshot, image, or text here. We'll turn it into events ✨"
+              data-placeholder={processingDisabled
+                ? 'Event processing is paused - try again later. Your changes are saved'
+                : 'Drop your screenshots, images or text here ✨'}
+              data-paused={processingDisabled ? 'true' : 'false'}
               data-empty={text.trim().length === 0 ? 'true' : 'false'}
               data-has-images={images.length > 0 ? 'true' : 'false'}
               onInput={handleEditorInput}
@@ -588,7 +591,7 @@ const SmartInput = forwardRef<SmartInputHandle, SmartInputProps>(
           </div>
 
           {/* URL pills row at bottom - flex item like images */}
-          {detectedUrls.length > 0 && (
+          {detectedUrls.length > 0 && !processingDisabled && (
             <div className="flex-shrink-0 flex items-center gap-2 pl-2 pr-2 pb-2">
               <div className="flex gap-1.5 overflow-x-auto overflow-y-hidden whitespace-nowrap flex-1">
                 {detectedUrls.map((url, index) => (
@@ -611,8 +614,9 @@ const SmartInput = forwardRef<SmartInputHandle, SmartInputProps>(
             </div>
           )}
 
-          {/* Transform button when no pills - floating at bottom-right */}
-          {detectedUrls.length === 0 && (
+          {/* Transform button when no pills - floating at bottom-right. Absent
+              while paused: a button that cannot do anything is worse than none. */}
+          {detectedUrls.length === 0 && !processingDisabled && (
             <div className="absolute bottom-2 right-2 z-20">
               <ParticleButton
                 onClick={handleSubmit}

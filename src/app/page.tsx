@@ -844,7 +844,7 @@ function Home({ processingDisabled }: { processingDisabled: boolean }) {
         {/* Hero — the headline riffs on the name */}
         <header className="text-center pt-16 pb-9">
           <h1 className="rise rise-1 display text-[clamp(2.6rem,8vw,4.25rem)] leading-[1.04] text-black">
-            Event <span className="rainbow-flow brand-glow">everything</span>.
+            Event <span className="rainbow-flow brand-glow">everything</span>
           </h1>
           <p className="rise rise-2 mt-5 text-lg sm:text-xl text-gray-600 max-w-md mx-auto leading-snug">
             Turn a flyer, screenshot, email, link - into a{" "}
@@ -857,13 +857,6 @@ function Home({ processingDisabled }: { processingDisabled: boolean }) {
           className="rise rise-3 flex h-[400px] flex-col border-2 border-black bg-white p-[5px] offset-shadow"
           data-testid="input-box"
         >
-          {/* One line, no rule under it: a notice inside the input box, not a
-              second header competing with the box's own black border. */}
-          {processingDisabled && (
-            <div className="truncate bg-white px-4 py-2 text-center text-sm italic text-red-400" data-testid="owner-budget-view-only" role="status">
-              Event processing is paused - try again later. Your changes are still saved.
-            </div>
-          )}
           {processingDisabled || providerOperationsReady ? (
             <SmartInput
               ref={smartInputRef}

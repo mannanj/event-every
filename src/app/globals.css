@@ -49,6 +49,13 @@ body {
   pointer-events: none;
 }
 
+/* Paused says so in the placeholder itself rather than in a notice above the
+   box, so the one empty area carries the one message. */
+.smart-editor[data-empty="true"][data-paused="true"]::before {
+  color: #f87171;
+  font-style: italic;
+}
+
 /* Vertically center the placeholder when empty, mirroring the old textarea. */
 .smart-editor[data-empty="true"] {
   padding-top: 170px;
