@@ -3,6 +3,7 @@
 import handler from '../.open-next/worker.js';
 import { admitEdgeRequest } from '../src/platform/admission';
 import { cloudflareTrustedEdgeAddress } from '../src/platform/identity';
+import { maintenanceEnabled, statusResponse } from '../src/lib/statusPages';
 
 export { DailyCounter } from '../src/platform/cloudflare/daily-counter';
 export { IdentityDayPolicy } from '../src/platform/cloudflare/identity-day-policy';
@@ -59,6 +60,11 @@ function providerStateUnavailable(): Response {
 
 export default {
   async fetch(request: Request, env: PrivateCloudflareEnv, ctx: unknown) {
+    // Checked before admission so a maintenance window answers every route the
+    // same way, rather than admitting some and resting on others.
+    if (maintenanceEnabled(env as unknown as { MAINTENANCE_MODE?: string })) {
+      if (new URL(request.url).pathname !== '/healthz') return statusResponse('resting');
+    }
     const admitted = await admitEdgeRequest(request, env, ctx, cloudflareTrustedEdgeAddress);
     if (admitted.status === 'failure') return admitted.response;
     if (PRIVATE_PROVIDER_PATHS.has(new URL(admitted.request.url).pathname)
