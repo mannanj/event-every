@@ -1,0 +1,13 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "event-every-holding",
+  "main": "worker.ts",
+  "compatibility_date": "2026-08-02",
+  // The review URL, and the address to point DNS at if the app ever needs covering.
+  "workers_dev": true,
+  // No routes: the app Worker owns the public hostnames. This Worker stays
+  // deployed on its workers.dev URL as the page that can still answer when the
+  // app itself cannot boot — the one failure the app's own error pages cannot
+  // cover. Ordinary 404/500/429 now come from the app via src/lib/statusPages.
+  "preview_urls": false
+}
