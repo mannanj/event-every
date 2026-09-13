@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { useAccount } from '@/components/AccountProvider';
 import SiteFooter from '@/components/SiteFooter';
@@ -47,6 +47,63 @@ export default function SignInPage() {
   const [sent, setSent] = useState(false);
   const [sending, setSending] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
+  // The bot check. Its sitekey is FETCHED, not compiled in: NEXT_PUBLIC_ is
+  // inlined at build time and would be empty here, where the key lives on the
+  // deployed Worker. A null sitekey means the check is off and this form
+  // behaves exactly as it did before it existed.
+  const [turnstileSitekey, setTurnstileSitekey] = useState<string | null>(null);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const turnstileBox = useRef<HTMLDivElement>(null);
+  const turnstileWidget = useRef<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    fetch('/api/auth/config', { cache: 'no-store' })
+      .then((res) => res.json() as Promise<{ turnstile?: { enabled?: boolean; sitekey?: string | null } }>)
+      .then((config) => {
+        if (!active || !config.turnstile?.enabled || !config.turnstile.sitekey) return;
+        setTurnstileSitekey(config.turnstile.sitekey);
+        if (!document.getElementById('cf-turnstile-script')) {
+          const script = document.createElement('script');
+          script.id = 'cf-turnstile-script';
+          script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js';
+          script.async = true;
+          script.defer = true;
+          document.head.appendChild(script);
+        }
+      })
+      .catch(() => {
+        // Leave it off rather than blocking sign-in on a config fetch.
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  // Explicit render, not the implicit class scan: the scan runs when the script
+  // loads and can miss an element React has not mounted yet.
+  useEffect(() => {
+    if (!turnstileSitekey || sent) return;
+    let cancelled = false;
+    const render = () => {
+      const api = (window as unknown as { turnstile?: { render: (el: HTMLElement, o: Record<string, unknown>) => string } }).turnstile;
+      if (cancelled || !turnstileBox.current || !api || turnstileWidget.current) return;
+      turnstileWidget.current = api.render(turnstileBox.current, {
+        sitekey: turnstileSitekey,
+        action: 'signin',
+        theme: 'light',
+        callback: (token: string) => setTurnstileToken(token),
+        'expired-callback': () => setTurnstileToken(null),
+        'error-callback': () => setTurnstileToken(null),
+      });
+    };
+    render();
+    const timer = window.setInterval(render, 200);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [turnstileSitekey, sent]);
 
   async function submit(formEvent: React.FormEvent) {
     formEvent.preventDefault();
@@ -57,7 +114,7 @@ export default function SignInPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'same-origin',
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email, ...(turnstileToken ? { turnstileToken } : {}) }),
       });
       if (!response.ok) {
         const body = (await response.json().catch(() => null)) as { error?: string } | null;
@@ -137,13 +194,19 @@ export default function SignInPage() {
                 className="w-full border-2 border-black px-3 py-3 text-base"
                 data-testid="signin-email"
               />
+              {/* Usually invisible: a managed widget only draws a challenge
+                  when it wants one. It keeps its own element so that, when it
+                  does, the button is pushed down rather than covered. */}
+              {turnstileSitekey && <div ref={turnstileBox} className="mt-3" data-testid="signin-turnstile" />}
               <button
                 type="submit"
-                disabled={sending}
+                disabled={sending || Boolean(turnstileSitekey && !turnstileToken)}
                 className="mt-3 w-full border-2 border-black bg-black px-4 py-3 font-semibold text-white transition-colors hover:bg-white hover:text-black disabled:opacity-50"
                 data-testid="signin-submit"
               >
-                {sending ? 'Just a moment...' : 'Continue with email'}
+                {sending || (turnstileSitekey && !turnstileToken)
+                  ? 'Just a moment...'
+                  : 'Continue with email'}
               </button>
               <p className="mt-3 text-xs text-gray-500 leading-snug text-center">
                 By continuing, you acknowledge usage of Event Every comes with no guarantees,

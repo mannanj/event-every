@@ -12,6 +12,10 @@ export const ROUTE_MANIFEST: Readonly<Record<string, RoutePolicy>> = {
   // what spends the link is a person clicking it in their mail client, which is
   // a navigation, not a form post.
   '/api/auth/challenge': policy('POST', 8 * 1024), '/api/auth/redeem': policy('GET', 0),
+  // Whether the sign-in bot check is on, and the sitekey to render it with.
+  // Served at runtime rather than inlined as a NEXT_PUBLIC_ constant, which is
+  // baked at build time and empty when the key lives on the deployed Worker.
+  '/api/auth/config': policy('GET', 0),
   // Encrypted event sync. Split by method because a policy pins exactly one.
   '/api/sync/pull': policy('GET', 0), '/api/sync/push': policy('POST', 4 * MiB),
 };

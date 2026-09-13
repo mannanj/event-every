@@ -63,6 +63,7 @@ describe('route manifest', () => {
       '/api/usage': { method: 'GET', maxBodyBytes: 0, allow: 'GET' },
       '/api/waitlist': { method: 'POST', maxBodyBytes: 4 * 1024, allow: 'POST', retired: true },
       '/api/auth/challenge': { method: 'POST', maxBodyBytes: 8 * 1024, allow: 'POST' },
+      '/api/auth/config': { method: 'GET', maxBodyBytes: 0, allow: 'GET' },
       '/api/auth/redeem': { method: 'GET', maxBodyBytes: 0, allow: 'GET' },
       '/api/sync/pull': { method: 'GET', maxBodyBytes: 0, allow: 'GET' },
       '/api/sync/push': { method: 'POST', maxBodyBytes: 4 * 1024 * 1024, allow: 'POST' },
