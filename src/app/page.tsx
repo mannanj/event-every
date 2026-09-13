@@ -847,7 +847,7 @@ function Home({ processingDisabled }: { processingDisabled: boolean }) {
             Event <span className="rainbow-flow brand-glow">everything</span>.
           </h1>
           <p className="rise rise-2 mt-5 text-lg sm:text-xl text-gray-600 max-w-md mx-auto leading-snug">
-            Turn a flyer, screenshot, email, link — into a{" "}
+            Turn a flyer, screenshot, email, link - into a{" "}
             <span className="text-black">calendar event.</span>
           </p>
         </header>

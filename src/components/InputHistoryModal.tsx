@@ -169,7 +169,7 @@ export default function InputHistoryModal({
         <div className="p-6">
           {entries.length === 0 ? (
             <div className="py-16 text-center text-gray-500" data-testid="input-history-empty">
-              Nothing here yet — your inputs show up here.
+              Nothing here yet - your inputs show up here.
             </div>
           ) : filtered.length === 0 ? (
             <div className="py-16 text-center text-gray-500" data-testid="input-history-no-results">

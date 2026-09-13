@@ -1,11 +1,13 @@
 "use client";
+import SiteHeader from '@/components/SiteHeader';
+import StandardFooter from '@/components/SiteFooter';
 
 const STEPS: { n: string; verb: string; desc: string }[] = [
   { n: "01", verb: "Drop it.", desc: "Images, some text, or a link." },
   {
     n: "02",
     verb: "Scan it.",
-    desc: "Title, time, and place — pulled out for you.",
+    desc: "Title, time, and place - pulled out for you.",
   },
   { n: "03", verb: "Keep it.", desc: "One or more files. Every calendar." },
 ];
@@ -22,7 +24,7 @@ const TRUST: { head: string; sub: string }[] = [
 const FAQ: { q: string; a: string }[] = [
   {
     q: "Which calendars?",
-    a: "All of them. It’s a standard .ics file — Apple, Google, Outlook, anything.",
+    a: "All of them. It’s a standard .ics file - Apple, Google, Outlook, anything.",
   },
   {
     q: "What can it read?",
@@ -30,7 +32,7 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: "Where does my data go?",
-    a: "Nowhere. Your history stays on your device, in your browser — nothing is kept on our servers. Anonymized data is sent to processors.",
+    a: "Nowhere. Your history stays on your device, in your browser - nothing is kept on our servers. Anonymized data is sent to processors.",
   },
   {
     q: "What does it cost?",
@@ -38,28 +40,12 @@ const FAQ: { q: string; a: string }[] = [
   },
 ];
 
+/**
+ * Kept as a thin alias so the landing page keeps its own name for the bar,
+ * while there is exactly one header implementation to change.
+ */
 export function SiteNav({ showHow }: { showHow: boolean }) {
-  return (
-    <nav className="sticky top-0 z-40 backdrop-blur-md bg-white/55 border-b border-black/10">
-      <div className="max-w-2xl mx-auto px-6 h-14 flex items-center justify-between">
-        <a
-          href="#top"
-          className="wordmark text-lg"
-          aria-label="Event Every — back to top"
-        >
-          Event Every
-        </a>
-        {showHow && (
-          <a
-            href="#how"
-            className="eyebrow text-black/45 hover:text-black transition-colors"
-          >
-            How it works
-          </a>
-        )}
-      </div>
-    </nav>
-  );
+  return <SiteHeader showHow={showHow} />;
 }
 
 export function HowItWorks() {
@@ -119,21 +105,7 @@ export function Faq() {
   );
 }
 
+/** Kept as an alias so there is one footer implementation to change. */
 export function SiteFooter() {
-  return (
-    <footer className="mt-20 border-t border-black/10">
-      <div className="max-w-2xl mx-auto px-6 py-8 flex items-center justify-between text-sm">
-        <span className="wordmark text-black/80">Event Every</span>
-        <span className="text-gray-500">
-          made by{" "}
-          <a
-            href="https://mannan.is"
-            className="text-black underline-offset-4 hover:underline"
-          >
-            Mannan
-          </a>
-        </span>
-      </div>
-    </footer>
-  );
+  return <StandardFooter />;
 }

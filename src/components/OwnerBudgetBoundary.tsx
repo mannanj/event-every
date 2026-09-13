@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import OwnerBudgetScreen, { type OwnerBudgetScreenState } from './OwnerBudgetScreen';
+import { useAccount } from './AccountProvider';
 
 type LoadedBudgetState =
   | Readonly<{ state: 'available'; resetAt: null }>
@@ -53,6 +54,7 @@ export default function OwnerBudgetBoundary({
 }: {
   children: (access: OwnerBudgetAccess) => React.ReactNode;
 }) {
+  const account = useAccount();
   const [budget, setBudget] = useState<BoundaryState>({ state: 'checking', resetAt: null });
   const [viewEvents, setViewEvents] = useState(false);
 
@@ -70,13 +72,19 @@ export default function OwnerBudgetBoundary({
     };
   }, []);
 
-  if (budget.state === 'checking') {
+  // Wait for the account answer too, so a signed-in visitor never sees the
+  // paused screen flash before being let through.
+  if (budget.state === 'checking' || account.signedIn === undefined) {
     return <div className="min-h-screen" aria-busy="true" data-testid="owner-budget-checking" />;
   }
   if (budget.state === 'available') {
     return children({ processingDisabled: false, state: budget.state });
   }
-  return viewEvents
-    ? children({ processingDisabled: true, state: budget.state })
-    : <OwnerBudgetScreen state={budget.state} resetAt={budget.resetAt} onViewEvents={() => setViewEvents(true)} />;
+  // The paused screen is for guests. Someone signed in goes straight to their
+  // own page — their events are the reason they signed in — and finds the input
+  // disabled there rather than being stopped at a door.
+  if (account.signedIn || viewEvents) {
+    return children({ processingDisabled: true, state: budget.state });
+  }
+  return <OwnerBudgetScreen state={budget.state} resetAt={budget.resetAt} onViewEvents={() => setViewEvents(true)} />;
 }

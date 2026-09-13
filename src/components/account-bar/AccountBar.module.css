@@ -1,0 +1,176 @@
+/*
+ * Ported from ~/Documents/skeletons/signup-cloudflare (app/globals.css:
+ * .appbar__right, .account*, .mcp*). Kept as a CSS module rather than Tailwind
+ * so the component carries its own look into an app that does not use Tailwind
+ * - the whole point of it being portable. This is the one deliberate exception
+ * to the repo's Tailwind-only rule, and it is scoped, so it cannot leak.
+ *
+ * Every colour reads a variable with a fallback. A host app that already
+ * defines --ab-link and friends gets its own palette; one that defines nothing
+ * gets the skeleton's.
+ */
+
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.link {
+  font-size: 0.875rem;
+  color: var(--ab-link, #1a56db);
+  text-decoration: none;
+}
+
+.link:hover {
+  color: var(--ab-link-hover, #143fa8);
+}
+
+.busy {
+  font-size: 0.75rem;
+  color: var(--ab-muted, #6f6f6f);
+}
+
+/* ── Account ─────────────────────────────────────────────────── */
+
+.account {
+  position: relative;
+}
+
+.accountButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 0.875rem;
+  color: var(--ab-link, #1a56db);
+  cursor: pointer;
+}
+
+.accountButton:hover,
+.accountButton[aria-expanded='true'] {
+  color: var(--ab-link-hover, #143fa8);
+}
+
+/* An address is longer than a label, and the bar is not. */
+.email {
+  display: block;
+  max-width: 15rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 560px) {
+  .email {
+    max-width: 8rem;
+  }
+}
+
+.menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 10px;
+  min-width: 13rem;
+  max-width: min(20rem, calc(100vw - 32px));
+  background: var(--ab-paper, #ffffff);
+  border: 1px solid var(--ab-rule-strong, #a8a8a8);
+  border-radius: var(--ab-radius, 9px);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.09);
+  z-index: 50;
+}
+
+.item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 5px;
+  background: none;
+  font: inherit;
+  font-size: 0.9375rem;
+  color: var(--ab-ink, #0b0b0b);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.item:hover {
+  background: var(--ab-ground, #f3f3f3);
+}
+
+.itemNote {
+  padding: 6px 10px 8px;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: var(--ab-muted, #6f6f6f);
+}
+
+/* ── Connect your AI ─────────────────────────────────────────── */
+
+.mcp {
+  position: relative;
+  display: flex;
+}
+
+.mcpButton {
+  display: block;
+  padding: 4px;
+  border: 0;
+  background: none;
+  color: var(--ab-muted, #6f6f6f);
+  cursor: pointer;
+  transition: color 120ms ease;
+}
+
+.mcpButton:hover,
+.mcpButton[aria-expanded='true'] {
+  color: var(--ab-ink, #0b0b0b);
+}
+
+/* Disabled still gets the tooltip - that is the only thing it has to say. */
+.mcpButton:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.mcpButton:disabled:hover {
+  color: var(--ab-muted, #6f6f6f);
+}
+
+/* Says what it is on hover, and nothing the rest of the time. */
+.tip {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 6px;
+  padding: 4px 8px;
+  background: var(--ab-ink, #0b0b0b);
+  color: var(--ab-paper, #ffffff);
+  font-family: var(--ab-font-mono, ui-monospace, SFMono-Regular, monospace);
+  font-size: 0.625rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  border-radius: 5px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+  z-index: 50;
+}
+
+.mcpButton:hover .tip,
+.mcpButton:focus-visible .tip {
+  opacity: 1;
+}
+
+.mcpButton[aria-expanded='true'] .tip {
+  opacity: 0;
+}
