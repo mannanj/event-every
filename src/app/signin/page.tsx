@@ -141,10 +141,13 @@ export default function SignInPage() {
             <span className="inline-flex flex-none text-black">
               <SignInMark />
             </span>
-            {signedIn ? "You're signed in" : 'Sign in once, stay signed in'}
+            {signedIn ? "You're signed in" : 'Event faster, plan better'}
           </h1>
 
-          {/* Three lines, each quieter than the one above it. */}
+          {/* Three lines, each quieter than the one above it. The title follows
+              the house pattern - Green Light's "Go faster, travel better", Meet
+              Time's "Meet faster, time better" - and verbs the product name the
+              way the landing hero already does in "Event everything". */}
           <p className="text-sm text-black">
             {signedIn
               ? 'Your events are kept on this account, on any device you sign in on.'
