@@ -882,16 +882,17 @@ function Home({ processingDisabled }: { processingDisabled: boolean }) {
             </div>
           )}
         </div>
-        {/* The claim people actually want before they paste something in, then
-            the calendars it lands in - marks rather than a list of names, since
-            the point is recognition at a glance. */}
-        <div className="rise rise-4 mt-4 mb-10 flex flex-col items-center gap-2">
-          <p className="eyebrow text-black/40">We never collect your data</p>
+        {/* The claim people want before pasting something in, then the
+            calendars it lands in - marks rather than names, since the point is
+            recognition at a glance. One row, wrapping rather than overflowing
+            on a narrow screen. */}
+        <div className="rise rise-4 mt-4 mb-10 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-sm text-gray-500">
+          <p>We never collect your data</p>
           <div className="flex items-center gap-2.5">
             <AppleCalendarMark />
             <GoogleCalendarMark />
             <OutlookCalendarMark />
-            <span className="text-xs text-black/40">+1 others</span>
+            <span>+1 others</span>
           </div>
         </div>
 
