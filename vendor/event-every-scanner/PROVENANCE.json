@@ -1,12 +1,12 @@
 {
   "schemaVersion": 2,
   "packageName": "@event-every/scanner",
-  "sourceCommit": "c03cf1a79d0d1f2151ee602d67aa0a2eede673e4",
+  "sourceCommit": "6687118e22eccbafc3e565be2365a9886f8fab39",
   "pack": {
     "filename": "event-every-scanner-0.0.0.tgz",
-    "integrity": "sha512-e7SSq/sZm9PhQhps/RhoUYKaXHxTJFz2sm58fRivAstBrMeZx5UmZWmurfDVyUyskNw8nDEVFzsnb/IzLVPl7Q==",
+    "integrity": "sha512-ATnHtxIuftX4+ym7wQVJsuQuK8+59Dw6rf3aj08tt49ic4goWxkXpW0cdV18/lZ9ldrvkhK5zc83roUmrpOE3Q==",
     "entryCount": 138,
-    "sha256": "1f3d909e17c71706fd6c41a4e16a094dd4ef577a933ca58b9219cc38e60a27e8"
+    "sha256": "44c80d6890ce5c90cadd3c55b47d4c4621fb8d448f7f25f89a64af1d00affb27"
   },
   "tools": {
     "node": "v25.2.1",
@@ -19,7 +19,7 @@
     "audit": false,
     "fund": false
   },
-  "artifactSha256": "f5b7af00b5d0bdd938c9392057b8f43b50876ca833da5084f24e5c3fdbb9d4f8",
+  "artifactSha256": "cd7781da1080e89324e0f9b69ed946b5fb366c0e6efd53d97ac744a606d3b4ef",
   "files": [
     {
       "path": "README.md",
@@ -511,15 +511,15 @@
     },
     {
       "path": "dist/openrouter/wire-schema.d.ts.map",
-      "sha256": "46f24c7d2b18f5adffdbaf0df5ed89ce17496a5d9de967f2f98ca929cd394572"
+      "sha256": "655710987065aded667da4359175af113b7face3bfa63b530ee7b10d1ef75450"
     },
     {
       "path": "dist/openrouter/wire-schema.js",
-      "sha256": "5bebbc18688110e90bfffb4e63dc3911cbb0f6c3c4f49d53b2a6e1a87ceeb959"
+      "sha256": "1a161b362c5a1d14931aabfa960cfb5286d6fc553f4eec632c753221f431b3bd"
     },
     {
       "path": "dist/openrouter/wire-schema.js.map",
-      "sha256": "895aebec9658bbaf96064ef408d9ff4df78587d50f0567927bff233b1b12855b"
+      "sha256": "460d18afb99c4b76e9ea22d137b132c6b068e5b8265da1d45f3aa9607fd8d1c0"
     },
     {
       "path": "dist/provider-ports.d.ts",

@@ -111,27 +111,26 @@ export function observationFromWire(input, sources) {
                 ]);
             }
         }
-        else {
-            // Text/link evidence offsets must be both null or within bounds
-            if (ev.startOffset !== null && ev.endOffset !== null) {
-                if (ev.endOffset > source.text.length) {
-                    throw new z.ZodError([
-                        {
-                            code: "custom",
-                            message: `Text evidence endOffset ${ev.endOffset} exceeds source text length ${source.text.length}`,
-                            path: [candidateLabel, "evidence", ev.sourceId, "endOffset"],
-                        },
-                    ]);
-                }
+        else if (ev.startOffset !== null && ev.endOffset !== null) {
+            // Text/link offsets must be within bounds - but an offset is a citation,
+            // not the value. It says WHERE a value was read from. Models get the value
+            // right and miscount the position, and rejecting the observation for that
+            // throws away a correct extraction over a bad footnote.
+            //
+            // So an out-of-range position is dropped rather than fatal. Both offsets
+            // go to null together, which the wire schema requires and which reads as
+            // "location unknown"; clamping to the source length would instead assert a
+            // position the model never claimed.
+            if (ev.endOffset > source.text.length) {
+                return { ...ev, startOffset: null, endOffset: null };
             }
         }
+        return ev;
     }
     // Step 4: Validate all evidence across candidates and scan-level issues
     function collectAndValidateIssues(wireIssues, label) {
         return wireIssues.map((wi) => {
-            for (const ev of wi.evidence) {
-                validateEvidence(ev, label);
-            }
+            const issueEvidence = wi.evidence.map((ev) => validateEvidence(ev, label));
             const traits = ISSUE_TRAITS[wi.code];
             const scannerIssue = {
                 code: wi.code,
@@ -139,32 +138,23 @@ export function observationFromWire(input, sources) {
                 severity: traits.severity,
                 field: wi.field,
                 message: wi.message,
-                evidence: wi.evidence,
+                evidence: issueEvidence,
             };
             return scannerIssue;
         });
     }
     // Step 5: Convert wire candidates to runtime candidates
     const candidates = wire.candidates.map((wc, ci) => {
-        for (const ev of [
-            ...wc.title.evidence,
-            ...wc.description.evidence,
-            ...wc.location.evidence,
-            ...wc.url.evidence,
-            ...wc.temporal.evidence,
-            ...wc.recurrence.evidence,
-        ]) {
-            validateEvidence(ev, `candidates[${ci}]`);
-        }
+        const checked = (refs) => refs.map((ev) => validateEvidence(ev, `candidates[${ci}]`));
         const candidateIssues = collectAndValidateIssues(wc.issues, `candidates[${ci}]`);
         return {
             sourceUid: wc.sourceUid,
-            title: { ...wc.title, evidence: [...wc.title.evidence] },
-            description: { ...wc.description, evidence: [...wc.description.evidence] },
-            location: { ...wc.location, evidence: [...wc.location.evidence] },
-            url: { ...wc.url, evidence: [...wc.url.evidence] },
-            temporal: { ...wc.temporal, evidence: [...wc.temporal.evidence] },
-            recurrence: { ...wc.recurrence, evidence: [...wc.recurrence.evidence] },
+            title: { ...wc.title, evidence: checked(wc.title.evidence) },
+            description: { ...wc.description, evidence: checked(wc.description.evidence) },
+            location: { ...wc.location, evidence: checked(wc.location.evidence) },
+            url: { ...wc.url, evidence: checked(wc.url.evidence) },
+            temporal: { ...wc.temporal, evidence: checked(wc.temporal.evidence) },
+            recurrence: { ...wc.recurrence, evidence: checked(wc.recurrence.evidence) },
             issues: candidateIssues,
         };
     });
