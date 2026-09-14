@@ -31,8 +31,8 @@ export default function SiteHeader({ showHow = false }: { showHow?: boolean }) {
 
         <div className="flex items-center gap-4">
           {showHow && (
-            <a href="#how" className="eyebrow text-black/45 hover:text-black transition-colors">
-              How it works
+            <a href="#faq" className="eyebrow text-black/45 hover:text-black transition-colors">
+              FAQ
             </a>
           )}
 

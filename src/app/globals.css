@@ -45,7 +45,20 @@ body {
 
 .smart-editor[data-empty="true"]::before {
   content: attr(data-placeholder);
+  display: block;
   color: #9ca3af;
+  pointer-events: none;
+}
+
+/* The caveat, quieter and on its own line. Empty attr renders nothing, so the
+   paused state - which sets no note - simply does not draw this. */
+.smart-editor[data-empty="true"]::after {
+  content: attr(data-placeholder-note);
+  display: block;
+  margin-top: 3px;
+  font-style: italic;
+  font-size: 0.82em;
+  color: #b6bcc7;
   pointer-events: none;
 }
 
@@ -299,12 +312,15 @@ html {
 .rise-5 { animation-delay: 0.48s; }
 
 /* Hard offset shadow — neo-brutalist depth on border-2 border-black cards. */
+/* Translucent rather than solid black: the slab still reads as the same hard
+   offset shape, but the rainbow ground shows through it instead of punching a
+   black hole in the page. Deepens slightly on focus, as it always did. */
 .offset-shadow {
-  box-shadow: 7px 7px 0 0 #000;
+  box-shadow: 7px 7px 0 0 rgba(0, 0, 0, 0.42);
   transition: box-shadow 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .offset-shadow:focus-within {
-  box-shadow: 11px 11px 0 0 #000;
+  box-shadow: 11px 11px 0 0 rgba(0, 0, 0, 0.55);
 }
 
 /* Subtle lift for interactive elements. */

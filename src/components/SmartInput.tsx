@@ -579,8 +579,10 @@ const SmartInput = forwardRef<SmartInputHandle, SmartInputProps>(
               spellCheck
               data-placeholder={processingDisabled
                 ? 'Event processing is paused - try again later. Your changes are saved'
-                : 'Drop your screenshots, images or text here ✨'}
+                : 'Drop your everything ✨'}
               data-paused={processingDisabled ? 'true' : 'false'}
+              // Empty while paused: the paused line is the whole message then.
+              data-placeholder-note={processingDisabled ? '' : '* except audio, video and large files'}
               data-empty={text.trim().length === 0 ? 'true' : 'false'}
               data-has-images={images.length > 0 ? 'true' : 'false'}
               onInput={handleEditorInput}
@@ -608,7 +610,7 @@ const SmartInput = forwardRef<SmartInputHandle, SmartInputProps>(
                 onClick={handleSubmit}
                 disabled={!isButtonEnabled}
                 contentDensity={contentDensity}
-                aria-label="Transform content to events"
+                aria-label="Pop it - turn your input into events"
                 className="flex-shrink-0"
               />
             </div>
@@ -622,7 +624,7 @@ const SmartInput = forwardRef<SmartInputHandle, SmartInputProps>(
                 onClick={handleSubmit}
                 disabled={!isButtonEnabled}
                 contentDensity={contentDensity}
-                aria-label="Transform content to events"
+                aria-label="Pop it - turn your input into events"
               />
             </div>
           )}

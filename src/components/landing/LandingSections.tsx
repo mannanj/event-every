@@ -3,23 +3,11 @@ import SiteHeader from '@/components/SiteHeader';
 import StandardFooter from '@/components/SiteFooter';
 
 const STEPS: { n: string; verb: string; desc: string }[] = [
-  { n: "01", verb: "Drop it.", desc: "Images, some text, or a link." },
-  {
-    n: "02",
-    verb: "Scan it.",
-    desc: "Title, time, and place - pulled out for you.",
-  },
-  { n: "03", verb: "Keep it.", desc: "One or more files. Every calendar." },
+  { n: "1", verb: "Drop it", desc: "Add your images, text or more." },
+  { n: "2", verb: "Pop it", desc: "Click the button and download the file." },
+  { n: "3", verb: "Stop it", desc: "Stop what you're doing and enjoy the event." },
 ];
 
-const TRUST: { head: string; sub: string }[] = [
-  { head: "Review before you save.", sub: "Keep what you want." },
-  {
-    head: "Stays on your device.",
-    sub: "History never leaves your browser. We collect no data.",
-  },
-  { head: "No sign-up necessary.", sub: "Take it and go." },
-];
 
 const FAQ: { q: string; a: string }[] = [
   {
@@ -32,7 +20,7 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: "Where does my data go?",
-    a: "Nowhere. Your history stays on your device, in your browser - nothing is kept on our servers. Anonymized data is sent to processors.",
+    a: "Your data is sent to 3rd party LLM providers. If you aren't signed up, we never collect your data. With an account, your data is stored encrypted - and we never sell or access your data.",
   },
   {
     q: "What does it cost?",
@@ -52,19 +40,14 @@ export function HowItWorks() {
   return (
     <section id="how" className="pt-16">
       <p className="eyebrow text-black/40 mb-6">How it works</p>
-      <div className="border-2 border-black bg-white offset-shadow">
+      <div className="grid gap-5 sm:grid-cols-3">
         {STEPS.map((s) => (
-          <div
-            key={s.n}
-            className="flex items-baseline gap-5 p-5 border-b-2 border-black last:border-b-0"
-          >
-            <span className="eyebrow text-black/25 pt-1">{s.n}</span>
-            <div>
-              <h3 className="display text-xl text-black leading-tight">
-                {s.verb}
-              </h3>
-              <p className="text-gray-600 text-sm mt-1">{s.desc}</p>
-            </div>
+          <div key={s.n} className="border-2 border-black bg-white p-5 offset-shadow">
+            <span className="inline-flex h-7 w-7 items-center justify-center rounded-full border-2 border-black bg-white text-sm font-bold">
+              {s.n}
+            </span>
+            <h3 className="display text-xl text-black leading-tight mt-4">{s.verb}</h3>
+            <p className="text-gray-600 text-sm mt-1">{s.desc}</p>
           </div>
         ))}
       </div>
@@ -72,25 +55,10 @@ export function HowItWorks() {
   );
 }
 
-export function TrustPoints() {
-  return (
-    <section className="pt-12 grid gap-6 sm:grid-cols-3">
-      {TRUST.map((t) => (
-        <div key={t.head}>
-          <h3 className="display text-base text-black leading-tight">
-            {t.head}
-          </h3>
-          <p className="text-gray-500 text-sm mt-1">{t.sub}</p>
-        </div>
-      ))}
-    </section>
-  );
-}
-
 export function Faq() {
   return (
     <section id="faq" className="pt-16">
-      <p className="eyebrow text-black/40 mb-2">Questions</p>
+      <p className="eyebrow text-black/40 mb-2">Frequently Asked Questions</p>
       <div>
         {FAQ.map((item) => (
           <details key={item.q} className="faq-item">

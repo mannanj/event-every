@@ -8,7 +8,8 @@ import ErrorNotification from '@/components/ErrorNotification';
 import RateLimitBanner from '@/components/RateLimitBanner';
 import EventFields from '@/components/EventFields';
 import ReviewDraftSection from '@/components/review/ReviewDraftSection';
-import { SiteNav, HowItWorks, TrustPoints, Faq, SiteFooter } from '@/components/landing/LandingSections';
+import { SiteNav, HowItWorks, Faq, SiteFooter } from '@/components/landing/LandingSections';
+import { AppleCalendarMark, GoogleCalendarMark, OutlookCalendarMark } from '@/components/CalendarMarks';
 import { CalendarEvent, EventSortOption } from '@/types/event';
 import { InputHistoryEntry, StoredInputFile, InputSource } from '@/types/input';
 import { exportToICS } from '@/services/exporter';
@@ -847,8 +848,8 @@ function Home({ processingDisabled }: { processingDisabled: boolean }) {
             Event <span className="rainbow-flow brand-glow">everything</span>
           </h1>
           <p className="rise rise-2 mt-5 text-lg sm:text-xl text-gray-600 max-w-md mx-auto leading-snug">
-            Turn a flyer, screenshot, email, link - into a{" "}
-            <span className="text-black">calendar event.</span>
+            Turn a flyer, screenshot, email, link or more into a{" "}
+            <span className="text-black">calendar event</span>
           </p>
         </header>
 
@@ -881,9 +882,18 @@ function Home({ processingDisabled }: { processingDisabled: boolean }) {
             </div>
           )}
         </div>
-        <p className="rise rise-4 mt-4 mb-10 text-center eyebrow text-black/40">
-          Works with Apple · Google · Outlook
-        </p>
+        {/* The claim people actually want before they paste something in, then
+            the calendars it lands in - marks rather than a list of names, since
+            the point is recognition at a glance. */}
+        <div className="rise rise-4 mt-4 mb-10 flex flex-col items-center gap-2">
+          <p className="eyebrow text-black/40">We never collect your data</p>
+          <div className="flex items-center gap-2.5">
+            <AppleCalendarMark />
+            <GoogleCalendarMark />
+            <OutlookCalendarMark />
+            <span className="text-xs text-black/40">+1 others</span>
+          </div>
+        </div>
 
         {/* Error notifications */}
         <ErrorNotification
@@ -933,7 +943,6 @@ function Home({ processingDisabled }: { processingDisabled: boolean }) {
         <div className={`collapsible ${showMarketing ? '' : 'is-collapsed'}`}>
           <div>
             <HowItWorks />
-            <TrustPoints />
             <Faq />
           </div>
         </div>
