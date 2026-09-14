@@ -50,17 +50,6 @@ body {
   pointer-events: none;
 }
 
-/* The caveat, quieter and on its own line. Empty attr renders nothing, so the
-   paused state - which sets no note - simply does not draw this. */
-.smart-editor[data-empty="true"]::after {
-  content: attr(data-placeholder-note);
-  display: block;
-  margin-top: 3px;
-  font-style: italic;
-  font-size: 0.82em;
-  color: #b6bcc7;
-  pointer-events: none;
-}
 
 /* Paused says so in the placeholder itself rather than in a notice above the
    box, so the one empty area carries the one message. */

@@ -886,14 +886,14 @@ function Home({ processingDisabled }: { processingDisabled: boolean }) {
             calendars it lands in - marks rather than names, since the point is
             recognition at a glance. One row, wrapping rather than overflowing
             on a narrow screen. */}
-        <div className="rise rise-4 mt-4 mb-10 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-sm text-gray-500">
-          <p>We never collect your data</p>
+        <div className="rise rise-4 mt-2 mb-10 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-xs text-gray-500">
           <div className="flex items-center gap-2.5">
             <AppleCalendarMark />
             <GoogleCalendarMark />
             <OutlookCalendarMark />
-            <span>+1 others</span>
+            <span className="text-[0.6875rem]">+1 others</span>
           </div>
+          <p className="text-[0.6875rem]">We never collect your data</p>
         </div>
 
         {/* Error notifications */}
