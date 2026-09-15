@@ -579,7 +579,7 @@ const SmartInput = forwardRef<SmartInputHandle, SmartInputProps>(
               spellCheck
               data-placeholder={processingDisabled
                 ? 'Event processing is paused - try again later. Your changes are saved'
-                : 'Drop your everything - audio, video and large files are not supported'}
+                : 'Drop your everything - except audio, video and large files'}
               data-paused={processingDisabled ? 'true' : 'false'}
               data-empty={text.trim().length === 0 ? 'true' : 'false'}
               data-has-images={images.length > 0 ? 'true' : 'false'}
