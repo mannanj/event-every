@@ -56,6 +56,44 @@ describe('Event Every scanner coordinator adapter', () => {
     expect(result).toEqual({ ok: true, body: providerBody });
   });
 
+  test('inserts host context between the extraction contract and the source', async () => {
+    const invoke = mock(async () => ({
+      status: 'success' as const,
+      value: providerBody,
+      costOutcome: { kind: 'exact' as const, nanodollars: 1 },
+    }));
+    const sourced = { ...request, messages: [
+      { role: 'system' as const, content: 'extract' },
+      { role: 'user' as const, content: '[{"sourceId":"s","kind":"text","text":"Sept 22 at 7pm"}]' },
+    ] };
+
+    await createEventEveryOpenRouterTransport({
+      invoke,
+      context: { nowMs: Date.parse('2026-09-15T12:00:00.000Z'), timeZone: 'America/New_York' },
+    }).complete(sourced as typeof request);
+
+    const sent = (invoke.mock.calls as unknown as [{ messages: { role: string; content: string }[] }][])[0][0];
+    expect(sent.messages).toHaveLength(3);
+    // The Scanner's own contract stays first; the source stays last, so the
+    // context can be read as a frame and never as something to extract from.
+    expect(sent.messages[0].content).toBe('extract');
+    expect(sent.messages[1].role).toBe('system');
+    expect(sent.messages[1].content).toContain('The current date is 2026-09-15');
+    expect(sent.messages[2].content).toContain('Sept 22 at 7pm');
+  });
+
+  test('sends the Scanner request untouched when no context is supplied', async () => {
+    const invoke = mock(async () => ({
+      status: 'success' as const,
+      value: providerBody,
+      costOutcome: { kind: 'exact' as const, nanodollars: 1 },
+    }));
+
+    await createEventEveryOpenRouterTransport({ invoke }).complete(request);
+
+    expect(invoke).toHaveBeenCalledWith(request);
+  });
+
   test.each([
     [408, true],
     [429, true],

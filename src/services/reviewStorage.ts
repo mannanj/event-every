@@ -97,3 +97,14 @@ function clear(storage?: StorageLike): StorageResult<void> {
 }
 
 export const reviewStorage = { save, load, clear };
+
+/**
+ * Whether a load outcome leaves the page safe to accept new scans. Only a
+ * storage layer that never answered is a reason to hold back; a recovered
+ * corrupt key has already been cleared and starting fresh is correct.
+ */
+export function resolveReviewDraftHydration(
+  status: ReviewDraftLoadResult['status'],
+): { hydrationComplete: boolean } {
+  return { hydrationComplete: status !== 'unavailable' };
+}

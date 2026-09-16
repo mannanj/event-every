@@ -7,7 +7,6 @@ import InputHistoryModal from '@/components/InputHistoryModal';
 import ErrorNotification from '@/components/ErrorNotification';
 import RateLimitBanner from '@/components/RateLimitBanner';
 import EventFields from '@/components/EventFields';
-import ReviewDraftSection from '@/components/review/ReviewDraftSection';
 import { SiteNav, HowItWorks, Faq, SiteFooter } from '@/components/landing/LandingSections';
 import { AppleCalendarMark, GoogleCalendarMark, OutlookCalendarMark } from '@/components/CalendarMarks';
 import { CalendarEvent, EventSortOption } from '@/types/event';
@@ -37,23 +36,11 @@ import { exportAllEvents } from '@/services/exportAll';
 import { convertRawToDate } from '@/utils/timeConversion';
 import { ProcessingEvent, ImageProcessingStatus, BatchProcessing, URLProcessingStatus } from '@/types/processing';
 import { scan } from '@/services/scanClient';
-import { createReviewDrafts, editReviewDraft } from '@/services/scannerDraft';
-import { createBrowserDownloadEffects, createScannerExporter } from '@/services/scannerExporter';
-import { reviewStorage, type ReviewDraftLoadResult } from '@/services/reviewStorage';
-import type { ReviewDraft, ReviewFieldEdit } from '@/types/review';
+import { createReviewDrafts } from '@/services/scannerDraft';
+import type { ReviewDraft } from '@/types/review';
+import { reviewDraftsToCalendarEvents } from '@/services/reviewEvent';
 import { ScanResponseSchema, type ScanRequest } from '@/types/scannerHttp';
 import AuthWrapper from '@/components/AuthWrapper';
-
-type ReviewDraftLoadStatus = ReviewDraftLoadResult['status'];
-
-function resolveReviewDraftHydrationState(status: ReviewDraftLoadStatus): { hydrationComplete: boolean } {
-  switch (status) {
-    case 'loaded':
-    case 'empty': return { hydrationComplete: true };
-    case 'recovered-corrupt': return { hydrationComplete: true };
-    case 'unavailable': return { hydrationComplete: false };
-  }
-}
 
 function providerScanDrafts(response: ReturnType<typeof ScanResponseSchema.parse>, operation: ProviderOperationRecord): ReviewDraft[] {
   const createdAt = new Date(operation.createdAtMs).toISOString();
@@ -65,18 +52,17 @@ function providerScanDrafts(response: ReturnType<typeof ScanResponseSchema.parse
   });
 }
 
-function mergeReviewDrafts(previous: ReviewDraft[], incoming: ReviewDraft[]): ReviewDraft[] {
-  const incomingIds = new Set(incoming.map((draft) => draft.id));
-  return [...previous.filter((draft) => !incomingIds.has(draft.id)), ...incoming];
+/** A re-delivered scan replaces its own earlier arrival rather than duplicating it. */
+function mergeScannedEvents(previous: CalendarEvent[], incoming: CalendarEvent[]): CalendarEvent[] {
+  const incomingIds = new Set(incoming.map((event) => event.id));
+  return [...previous.filter((event) => !incomingIds.has(event.id)), ...incoming];
 }
 
 function Home({ processingDisabled }: { processingDisabled: boolean }) {
   const [processingEvents, setProcessingEvents] = useState<ProcessingEvent[]>([]);
   const [batchProcessing, setBatchProcessing] = useState<BatchProcessing | null>(null);
   const [unsavedEvents, setUnsavedEvents] = useState<CalendarEvent[]>([]);
-  const [reviewDrafts, setReviewDrafts] = useState<ReviewDraft[]>([]);
-  const reviewDraftsRef = useRef<ReviewDraft[]>([]);
-  const [reviewDraftLoadStatus, setReviewDraftLoadStatus] = useState<'pending' | ReviewDraftLoadStatus>('pending');
+  const unsavedEventsRef = useRef<CalendarEvent[]>([]);
   const [, setUserTouchedTimezones] = useState<Set<string>>(new Set());
   const [tzSuggestions, setTzSuggestions] = useState<Record<string, { timezone: string; confidence: number }>>({});
   // Selection for the unsaved batch lives here so it can outlive any single
@@ -98,7 +84,6 @@ function Home({ processingDisabled }: { processingDisabled: boolean }) {
   const [providerOperationsReady, setProviderOperationsReady] = useState(false);
   const [restoringProviderOperations, setRestoringProviderOperations] = useState<ProviderOperationRecord[]>([]);
   const [providerStorageUnavailable, setProviderStorageUnavailable] = useState(false);
-  const scannerExporter = useMemo(() => createScannerExporter(createBrowserDownloadEffects()), []);
   const activeProviderRequestIdsRef = useRef<Set<string>>(new Set());
   const providerAbortControllersRef = useRef<Map<string, AbortController>>(new Map());
   const recoveryAbortRef = useRef<AbortController | null>(null);
@@ -110,13 +95,14 @@ function Home({ processingDisabled }: { processingDisabled: boolean }) {
     await refreshInputHistory();
   }, [refreshInputHistory]);
 
-  const acceptProviderScan = useCallback((response: ReturnType<typeof ScanResponseSchema.parse>, operation: ProviderOperationRecord): ReviewDraft[] => {
-    const incoming = providerScanDrafts(response, operation);
-    const next = mergeReviewDrafts(reviewDraftsRef.current, incoming);
-    const stored = reviewStorage.save(next);
-    if (!stored.success) throw new Error('Review consumer is unavailable.');
-    reviewDraftsRef.current = next;
-    setReviewDrafts(next);
+  const acceptProviderScan = useCallback((response: ReturnType<typeof ScanResponseSchema.parse>, operation: ProviderOperationRecord): CalendarEvent[] => {
+    // The Scanner answers only what the source said. Everything a calendar
+    // additionally requires - an end, a zone, a title - is applied here, which is
+    // where it lived before the Scanner migration.
+    const incoming = reviewDraftsToCalendarEvents(providerScanDrafts(response, operation));
+    const next = mergeScannedEvents(unsavedEventsRef.current, incoming);
+    unsavedEventsRef.current = next;
+    setUnsavedEvents(next);
     return incoming;
   }, []);
 
@@ -174,7 +160,6 @@ function Home({ processingDisabled }: { processingDisabled: boolean }) {
   const activeSubmissionRef = useRef<string | null>(null);
   const activeImageBatchRef = useRef<string | null>(null);
   const loadedSigRef = useRef<string | null>(null);
-  const reviewHydrationRef = useRef<ReviewDraftLoadResult | null>(null);
   const [showDateRangePicker, setShowDateRangePicker] = useState(false);
   const [isCustomMode, setIsCustomMode] = useState(false);
   const [lastPresetDates, setLastPresetDates] = useState<{ start: Date; end: Date } | null>(null);
@@ -231,17 +216,9 @@ function Home({ processingDisabled }: { processingDisabled: boolean }) {
   }, [acceptProviderScan, acceptProviderSummary, processingDisabled]);
 
   useEffect(() => {
-    const reviewResult = reviewHydrationRef.current ?? reviewStorage.load();
-    reviewHydrationRef.current = reviewResult;
-    const reviewHydration = resolveReviewDraftHydrationState(reviewResult.status);
-    if (reviewHydration.hydrationComplete && reviewResult.status !== 'unavailable') {
-      reviewDraftsRef.current = reviewResult.drafts;
-      setReviewDrafts(reviewResult.drafts);
-    }
-    setReviewDraftLoadStatus(reviewResult.status);
-
     const result = eventStorage.getTempUnsavedEvents();
     if (result.success && result.data && result.data.length > 0) {
+      unsavedEventsRef.current = result.data;
       setUnsavedEvents(result.data);
     }
     setHasLoadedTempEvents(true);
@@ -270,6 +247,7 @@ function Home({ processingDisabled }: { processingDisabled: boolean }) {
   useEffect(() => {
     if (!hasLoadedTempEvents) return;
 
+    unsavedEventsRef.current = unsavedEvents;
     if (unsavedEvents.length > 0) {
       eventStorage.saveTempUnsavedEvents(unsavedEvents);
     } else {
@@ -277,20 +255,10 @@ function Home({ processingDisabled }: { processingDisabled: boolean }) {
     }
   }, [unsavedEvents, hasLoadedTempEvents]);
 
-  useEffect(() => {
-    if (reviewDraftLoadStatus === 'pending' || reviewDraftLoadStatus === 'unavailable') return;
-    reviewDraftsRef.current = reviewDrafts;
-    if (reviewDrafts.length === 0) {
-      reviewStorage.clear();
-    } else {
-      reviewStorage.save(reviewDrafts);
-    }
-  }, [reviewDraftLoadStatus, reviewDrafts]);
-
   const runScan = useCallback(async (
     request: ScanRequest,
     signal: AbortSignal,
-  ): Promise<ReviewDraft[]> => {
+  ): Promise<CalendarEvent[]> => {
     let operation: ProviderOperationRecord | undefined;
     let providerCompleted = false;
     let keepPendingRecord = false;
@@ -307,12 +275,20 @@ function Home({ processingDisabled }: { processingDisabled: boolean }) {
       providerCompleted = true;
       if (signal.aborted) return [];
 
-      const drafts = acceptProviderScan(response, operation);
+      const scanned = acceptProviderScan(response, operation);
+      // A scan that finds nothing used to be indistinguishable from being
+      // ignored: input cleared, no cards, no message (task-205).
+      if (scanned.length === 0 && !signal.aborted) {
+        pushProcessingNotice(
+          request.kind === 'image' ? 'image' : 'text',
+          'No event found in that. A date and a time are what it looks for.',
+        );
+      }
 
       if (!signal.aborted) {
         await acknowledgeProviderOperation(operation.requestId);
       }
-      return drafts;
+      return scanned;
     } catch (error) {
       if (operation && !signal.aborted && !providerCompleted) {
         try { await acknowledgeProviderOperation(operation.requestId); } catch { keepPendingRecord = true; }
@@ -334,11 +310,14 @@ function Home({ processingDisabled }: { processingDisabled: boolean }) {
     reader.readAsDataURL(file);
   });
 
-  const pushProcessingError = (type: 'image' | 'text', error: unknown) => {
-    const id = `error-${Date.now()}`;
-    const message = error instanceof Error ? error.message : 'Unable to scan this input.';
+  const pushProcessingNotice = (type: 'image' | 'text', message: string) => {
+    const id = `error-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     setProcessingEvents((previous) => [...previous, { id, type, status: 'error', error: message }]);
-    setTimeout(() => setProcessingEvents((previous) => previous.filter((item) => item.id !== id)), 5000);
+    setTimeout(() => setProcessingEvents((previous) => previous.filter((item) => item.id !== id)), 8000);
+  };
+
+  const pushProcessingError = (type: 'image' | 'text', error: unknown) => {
+    pushProcessingNotice(type, error instanceof Error ? error.message : 'Unable to scan this input.');
   };
 
   const handleImageSelect = async (files: File[], summaryEntryId?: string) => {
@@ -370,11 +349,11 @@ function Home({ processingDisabled }: { processingDisabled: boolean }) {
           updateProgress(queueItem.id, Math.round((index / imageFiles.length) * 100));
           const dataUrl = await fileToDataUrl(imageFiles[index]);
           if (controller.signal.aborted || activeSubmissionRef.current !== batchId) break;
-          const drafts = await runScan({ kind: 'image', dataUrl }, controller.signal);
+          const scanned = await runScan({ kind: 'image', dataUrl }, controller.signal);
           if (controller.signal.aborted || activeSubmissionRef.current !== batchId) break;
-          titles.push(...drafts.map((draft) => draft.candidate.title.value).filter((title): title is string => title !== null));
+          titles.push(...scanned.map((event) => event.title));
           setImageProcessingStatuses((previous) => previous.map((item) =>
-            item.id === status.id ? { ...item, status: 'complete' as const, eventCount: drafts.length } : item,
+            item.id === status.id ? { ...item, status: 'complete' as const, eventCount: scanned.length } : item,
           ));
         }
         if (!controller.signal.aborted) summarizeAndStore(summaryEntryId, '', titles.map((title) => ({ title })));
@@ -428,9 +407,9 @@ function Home({ processingDisabled }: { processingDisabled: boolean }) {
 
         setUrlProcessingStatus({ phase: 'extracting', message: 'Extracting events...' });
         updateProgress(queueItem.id, 50);
-        const drafts = await runScan({ kind: 'text', text: combinedText }, controller.signal);
+        const scanned = await runScan({ kind: 'text', text: combinedText }, controller.signal);
         if (controller.signal.aborted || activeSubmissionRef.current !== batchId) return [];
-        const titles = drafts.map((draft) => draft.candidate.title.value).filter((title): title is string => title !== null);
+        const titles = scanned.map((event) => event.title);
         summarizeAndStore(summaryEntryId, inputText, titles.map((title) => ({ title })));
         setUrlProcessingStatus({ phase: 'complete', message: 'Complete' });
         setTimeout(() => { if (activeSubmissionRef.current === batchId) setUrlProcessingStatus(null); }, 3000);
@@ -644,26 +623,6 @@ function Home({ processingDisabled }: { processingDisabled: boolean }) {
     exportToICS(event);
   };
 
-  const handleReviewDraftEdit = useCallback((id: string, edit: ReviewFieldEdit) => {
-    setReviewDrafts((previous) => previous.map((draft) =>
-      draft.id === id ? editReviewDraft(draft, edit) : draft,
-    ));
-  }, []);
-
-  const handleReviewDraftDelete = useCallback((id: string) => {
-    setReviewDrafts((previous) => previous.filter((draft) => draft.id !== id));
-  }, []);
-
-  // Scanner review drafts never cross into the legacy CalendarEvent exporters.
-  const handleReviewDraftExport = useCallback((drafts: readonly ReviewDraft[]) => {
-    const result = scannerExporter.exportReviewDrafts(drafts, 'scanner-reviewed-events');
-    if (result.ok) {
-      const exportedIds = new Set(drafts.map(({ id }) => id));
-      setReviewDrafts((previous) => previous.filter(({ id }) => !exportedIds.has(id)));
-    }
-    return result;
-  }, [scannerExporter]);
-
   const handleCancelBatch = () => {
     abortRef.current?.abort();
     recoveryAbortRef.current?.abort();
@@ -829,7 +788,6 @@ function Home({ processingDisabled }: { processingDisabled: boolean }) {
 
   const hasStarted =
     unsavedEvents.length > 0 ||
-    reviewDrafts.length > 0 ||
     (batchProcessing?.isProcessing ?? false) ||
     imageProcessingStatuses.length > 0 ||
     urlProcessingStatus !== null;
@@ -858,30 +816,42 @@ function Home({ processingDisabled }: { processingDisabled: boolean }) {
           className="rise rise-3 flex h-[400px] flex-col border-2 border-black bg-white p-[5px] offset-shadow"
           data-testid="input-box"
         >
-          {processingDisabled || providerOperationsReady ? (
-            <SmartInput
-              ref={smartInputRef}
-              onSubmit={handleSmartInputSubmit}
-              onError={handleError}
-              onOpenHistory={() => setHistoryOpen(true)}
-              hasHistory={inputHistory.length > 0}
-              processingDisabled={processingDisabled}
-            />
-          ) : (
-            <div className="flex h-full flex-col items-center justify-center gap-4 p-8 text-center" data-testid="provider-operation-recovery">
-              <p className="font-semibold text-black">
-                {providerStorageUnavailable
-                  ? 'Browser storage is unavailable. Provider requests are disabled.'
-                  : 'Restoring your pending request…'}
-              </p>
-              {restoringProviderOperations.length > 0 && (
-                <button type="button" className="border-2 border-black bg-white px-4 py-2 font-semibold" onClick={handleCancelBatch}>
-                  Cancel pending request
-                </button>
-              )}
-            </div>
-          )}
+          <SmartInput
+            ref={smartInputRef}
+            onSubmit={handleSmartInputSubmit}
+            onError={handleError}
+            onOpenHistory={() => setHistoryOpen(true)}
+            hasHistory={inputHistory.length > 0}
+            processingDisabled={processingDisabled}
+          />
         </div>
+        {/* Recovery is a notice, never a replacement. `providerOperationsReady`
+            starts false on every cold load, so gating the input on it took the
+            whole app away until an IndexedDB read and a status round-trip
+            finished — and left nothing at all if either threw. Submitting while
+            this is up is already refused, with a reason.
+
+            The flag also goes false for the duration of a scan the reader just
+            started. That is not a recovery, and the shimmer is already saying so,
+            so the notice stays out of the way while a batch is running. */}
+        {!processingDisabled && !providerOperationsReady && !batchProcessing?.isProcessing && (
+          <div
+            className="rise rise-4 mt-2 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 border-2 border-black bg-white px-4 py-2 text-sm"
+            data-testid="provider-operation-recovery"
+            role="status"
+          >
+            <p className="font-semibold text-black">
+              {providerStorageUnavailable
+                ? 'Browser storage is unavailable, so scanning is paused.'
+                : 'Restoring your pending request...'}
+            </p>
+            {restoringProviderOperations.length > 0 && (
+              <button type="button" className="underline" onClick={handleCancelBatch}>
+                Cancel pending request
+              </button>
+            )}
+          </div>
+        )}
         {/* The claim people want before pasting something in, then the
             calendars it lands in - marks rather than names, since the point is
             recognition at a glance. One row, wrapping rather than overflowing
@@ -905,11 +875,6 @@ function Home({ processingDisabled }: { processingDisabled: boolean }) {
           }))}
           onDismiss={handleRemoveFromQueue}
         />
-        {reviewDraftLoadStatus === 'recovered-corrupt' && (
-          <div className="mb-12 border-2 border-black bg-white p-4" data-testid="review-storage-recovery-notice" role="alert">
-            Saved Scanner drafts could not be recovered. Start a new scan to continue.
-          </div>
-        )}
 
         {/* Unified processing and unsaved events section */}
         <UnsavedEventsSection
@@ -931,13 +896,6 @@ function Home({ processingDisabled }: { processingDisabled: boolean }) {
           onTzSuggestionApply={handleTzSuggestionApply}
           onTzSuggestionDismiss={handleTzSuggestionDismiss}
           onTimezoneUserChange={handleTimezoneUserChange}
-        />
-
-        <ReviewDraftSection
-          drafts={reviewDrafts}
-          onEdit={handleReviewDraftEdit}
-          onDelete={handleReviewDraftDelete}
-          onExport={handleReviewDraftExport}
         />
 
         {/* Marketing — recedes the moment you start */}
@@ -1423,4 +1381,4 @@ function Page() {
   );
 }
 
-export default Object.assign(Page, { resolveReviewDraftHydration: resolveReviewDraftHydrationState });
+export default Page;

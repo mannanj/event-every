@@ -14,6 +14,7 @@ import {
 } from '@/platform/cloudflare/provider-operation';
 import { materializeScanReplay, toDurableScanReplay } from '@/platform/provider/replay';
 import { createEventEveryOpenRouterTransport } from '@/server/scanner/transport';
+import type { ScanContext } from '@/server/scanner/scanContext';
 import { scanSource, type HostScanJob } from '@/server/scanner/scan';
 import { ScanResponseSchema, type ScanRequest, type ScanResponse } from '@/types/scannerHttp';
 
@@ -80,6 +81,7 @@ type CoordinatedScanInput = Readonly<{
   bindingCandidates: readonly ProviderBindingCandidate[];
   signal: AbortSignal;
   candidateIdFactory: CandidateIdFactory;
+  context?: ScanContext;
 }>;
 
 type CoordinatedScanDependencies = Readonly<{
@@ -98,7 +100,7 @@ export async function runCoordinatedScanJob(
     signal: input.signal,
     execute: async (invoke) => {
       const result = await scanSource(
-        scanJobWithTransport(input.request, input.source, createEventEveryOpenRouterTransport({ invoke })),
+        scanJobWithTransport(input.request, input.source, createEventEveryOpenRouterTransport({ invoke, context: input.context })),
         { candidateIdFactory: input.candidateIdFactory },
       );
       return toDurableScanReplay({ source: input.source, ...result });

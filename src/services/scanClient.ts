@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { ScanRequestSchema, ScanResponseSchema, type ScanRequest, type ScanResponse } from '@/types/scannerHttp';
+import { getBrowserTimezone } from '@/utils/timezone';
 import {
   parseProviderOperation,
   resumeProviderOperation,
@@ -41,7 +42,13 @@ export async function scan(
   try {
     response = await fetch('/api/scan', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Event-Every-Request-Id': operation.requestId },
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Event-Every-Request-Id': operation.requestId,
+        // The reader's real zone, which the edge geo hint only approximates. The
+        // server treats it as a hint and validates it; it never reaches a source.
+        'X-Event-Every-Time-Zone': getBrowserTimezone(),
+      },
       body: JSON.stringify(admittedRequest),
       signal,
     });

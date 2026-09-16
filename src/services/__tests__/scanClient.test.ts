@@ -28,7 +28,11 @@ describe('scan client', () => {
       expect(fetchMock).toHaveBeenCalledTimes(1);
       expect(fetchMock).toHaveBeenCalledWith('/api/scan', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Event-Every-Request-Id': operation.requestId },
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Event-Every-Request-Id': operation.requestId,
+          'X-Event-Every-Time-Zone': expect.any(String),
+        },
         body: JSON.stringify({ kind: 'text', text: 'Office hours' }),
         signal: controller.signal,
       });

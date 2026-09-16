@@ -1,9 +1,8 @@
 import { beforeEach, describe, expect, test } from 'bun:test';
 import { EventCandidateSchema } from '@event-every/scanner';
 import { createReviewDraft, editReviewDraft } from '../scannerDraft';
-import { reviewStorage } from '../reviewStorage';
+import { reviewStorage, resolveReviewDraftHydration } from '../reviewStorage';
 import { eventStorage } from '../storage';
-import Home from '@/app/page';
 
 class MemoryStorage implements Storage {
   private readonly values = new Map<string, string>();
@@ -147,8 +146,8 @@ describe('review draft storage', () => {
   });
 
   test('recovered corrupt storage completes hydration', () => {
-    expect(Home.resolveReviewDraftHydration('recovered-corrupt')).toEqual({ hydrationComplete: true });
-    expect(Home.resolveReviewDraftHydration('unavailable')).toEqual({ hydrationComplete: false });
+    expect(resolveReviewDraftHydration('recovered-corrupt')).toEqual({ hydrationComplete: true });
+    expect(resolveReviewDraftHydration('unavailable')).toEqual({ hydrationComplete: false });
   });
 
   test('corrupt Scanner key is removed', () => {

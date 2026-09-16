@@ -6,6 +6,7 @@ import { validateScannerImageDataUrl } from '@/server/scanner/image';
 import { ScanRequestSchema } from '@/types/scannerHttp';
 import { createBindingCandidates, normalizeRequestUuid } from '@/platform/provider/request-binding';
 import { fixedProviderHttp, getPlatformRuntime } from '@/platform/runtime';
+import { resolveScanTimeZone } from '@/server/scanner/scanContext';
 
 type E1SourceHandle = Extract<SourceHandle, { kind: 'text' | 'image' }>;
 
@@ -54,6 +55,17 @@ export async function POST(request: NextRequest): Promise<Response> {
       bindingCandidates,
       signal: request.signal,
       candidateIdFactory: randomUUID,
+      // Without a reference date the model cannot legally return a time whose
+      // year the source omits, and drops the whole temporal. The reader's zone
+      // rides as a header rather than in the body, whose canonical JSON is bound
+      // into the request hash; Cloudflare's geo hint is the fallback.
+      context: {
+        nowMs: Date.now(),
+        timeZone: resolveScanTimeZone(
+          request.headers.get('x-event-every-time-zone')
+            ?? (request as unknown as { cf?: { timezone?: string } }).cf?.timezone,
+        ),
+      },
     }, { runOperation: runtime.runProviderOperation });
     if (result.status !== 'completed') return fixed(result);
     return NextResponse.json(result.value);
