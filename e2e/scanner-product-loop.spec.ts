@@ -679,7 +679,7 @@ test('a candidate with no start can be given one on the card and exports it', as
   expect(calendarText).toMatch(/DTSTART(;[^:]*)?:20260806T091500Z/);
 });
 
-test('narrow viewport keeps every card control keyboard reachable with stable accessible names', async ({ page }) => {
+test('narrow viewport keeps every card control keyboard reachable with stable accessible names', async ({ page, browserName }) => {
   await page.setViewportSize({ width: 375, height: 667 });
   await mockScanAPI(page, await narrowAccessibilityScanResponse());
   await setupLocal(page);
@@ -700,11 +700,13 @@ test('narrow viewport keeps every card control keyboard reachable with stable ac
   }
   await expect(save).toHaveAccessibleName('Save 1 event');
 
-  // DOM keyboard order, forward from the checkbox through every control.
+  // DOM keyboard order, forward from the checkbox through every control. WebKit
+  // models macOS Safari, where Option+Tab is what includes buttons in Tab order.
+  const forwardKey = browserName === 'webkit' ? 'Alt+Tab' : 'Tab';
   await selection.focus();
   await expect(selection).toBeFocused();
   for (const control of [timezone, timezoneInfo, expand, save, selectAll]) {
-    await page.keyboard.press('Tab');
+    await page.keyboard.press(forwardKey);
     await expect(control).toBeFocused();
     await expect(control).toBeInViewport();
   }
