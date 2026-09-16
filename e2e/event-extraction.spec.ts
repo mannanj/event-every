@@ -2,10 +2,13 @@ import { expect, test } from '@playwright/test';
 import type { ScanResponse } from '../src/types/scannerHttp';
 import { ScanRequestSchema } from '../src/types/scanRequest';
 import {
+  eventCards,
   mockRawScanAPI,
   mockScanAPI,
+  scanButton,
   setupLocal,
   submitText,
+  waitForCards,
 } from './helpers';
 
 type ScannerModule = typeof import('@event-every/scanner');
@@ -118,7 +121,7 @@ async function quickEventScanResponse(): Promise<ScanResponse> {
 }
 
 test.describe('Event Extraction Scenarios', () => {
-  test('Scenario 4: one strict Scanner response keeps every candidate as an ordered selectable review draft', async ({ page }) => {
+  test('Scenario 4: one strict Scanner response becomes one selectable card per candidate, in order', async ({ page }) => {
     await mockScanAPI(page, await multipleCandidatesScanResponse());
     await setupLocal(page);
     let scanRequestCount = 0;
@@ -128,32 +131,31 @@ test.describe('Event Extraction Scenarios', () => {
 
     await submitText(page, MULTIPLE_CANDIDATES_EXCERPT);
 
-    const review = page.getByRole('region', { name: 'Scanner review drafts' });
-    const drafts = review.locator('article');
-    await expect(drafts).toHaveCount(3);
+    await waitForCards(page, 3);
+    const cards = eventCards(page);
     const expectedCandidates = [
-      { id: 'candidate-m20-standup', title: 'Standup', location: 'Daily room', date: '2026-03-09', time: '09:00' },
-      { id: 'candidate-m20-design-review', title: 'Design Review', location: 'Design room', date: '2026-03-10', time: '14:00' },
-      { id: 'candidate-m20-retro', title: 'Retro', location: 'Retrospective room', date: '2026-03-11', time: '11:00' },
+      { title: 'Standup', location: 'Daily room', when: 'Mar 9 at 9:00 AM' },
+      { title: 'Design Review', location: 'Design room', when: 'Mar 10 at 2:00 PM' },
+      { title: 'Retro', location: 'Retrospective room', when: 'Mar 11 at 11:00 AM' },
     ];
     for (const [index, expectedCandidate] of expectedCandidates.entries()) {
-      const draft = drafts.nth(index);
-      await expect(draft).toContainText(expectedCandidate.id);
-      await expect(draft.getByRole('checkbox', { name: new RegExp(`Select ${expectedCandidate.title}`) })).toBeChecked();
-      await expect(draft.getByRole('textbox', { name: 'Title', exact: true })).toHaveValue(expectedCandidate.title);
-      await expect(draft.getByRole('textbox', { name: 'Location', exact: true })).toHaveValue(expectedCandidate.location);
-      await expect(draft.getByRole('textbox', { name: 'Start date', exact: true })).toHaveValue(expectedCandidate.date);
-      await expect(draft.getByRole('textbox', { name: 'Start time', exact: true })).toHaveValue(expectedCandidate.time);
+      const card = cards.nth(index);
+      await expect(card.getByTestId('event-card-title')).toHaveText(expectedCandidate.title);
+      await expect(card.getByRole('checkbox', { name: `Select ${expectedCandidate.title}` })).toBeChecked();
+      await expect(card).toContainText(expectedCandidate.when);
+      await expect(card).toContainText(expectedCandidate.location);
     }
     expect(scanRequestCount).toBe(1);
+    await expect(page.getByTestId('save-events-button')).toHaveText('Save (3)');
 
-    await drafts.nth(0).getByRole('checkbox', { name: /Select Standup/ }).uncheck();
-    await expect(drafts.nth(0).getByRole('checkbox', { name: /Select Standup/ })).not.toBeChecked();
-    await expect(drafts.nth(1).getByRole('checkbox', { name: /Select Design Review/ })).toBeChecked();
-    await expect(drafts.nth(2).getByRole('checkbox', { name: /Select Retro/ })).toBeChecked();
+    await cards.nth(0).getByRole('checkbox', { name: 'Select Standup' }).uncheck();
+    await expect(cards.nth(0).getByRole('checkbox', { name: 'Select Standup' })).not.toBeChecked();
+    await expect(cards.nth(1).getByRole('checkbox', { name: 'Select Design Review' })).toBeChecked();
+    await expect(cards.nth(2).getByRole('checkbox', { name: 'Select Retro' })).toBeChecked();
+    await expect(page.getByTestId('save-events-button')).toHaveText('Save (2)');
   });
 
-  test('Scenario 5: zero Scanner candidates leave no review drafts or processing error', async ({ page }) => {
+  test('Scenario 5: zero Scanner candidates leave no cards and say so once', async ({ page }) => {
     const requestText = 'The weather is nice today';
     const emptyResponse: ScanResponse = {
       source: {
@@ -186,8 +188,11 @@ test.describe('Event Extraction Scenarios', () => {
     await response;
 
     await expect(page.getByTestId('cancel-job-button')).toHaveCount(0);
-    await expect(page.getByRole('region', { name: 'Scanner review drafts' }).locator('article')).toHaveCount(0);
-    await expect(page.getByTestId('error-notification')).toHaveCount(0);
+    await expect(eventCards(page)).toHaveCount(0);
+    // Finding nothing is said, not swallowed (task 205): one notice, no cards.
+    const notice = page.getByTestId('error-notification');
+    await expect(notice).toHaveCount(1);
+    await expect(notice).toContainText('No event found in that.');
     expect(scanRequestCount).toBe(1);
   });
 });
@@ -195,7 +200,7 @@ test.describe('Event Extraction Scenarios', () => {
 test.describe('UI Interaction Tests', () => {
   test('Submit button is disabled with empty input', async ({ page }) => {
     await setupLocal(page);
-    await expect(page.locator('button[aria-label="Transform content to events"]')).toBeDisabled();
+    await expect(scanButton(page)).toBeDisabled();
   });
 
   test('Submit button enables with 3+ chars', async ({ page }) => {
@@ -207,7 +212,7 @@ test.describe('UI Interaction Tests', () => {
     });
     await setupLocal(page);
     await page.getByTestId('smart-input-textarea').fill('abc');
-    await expect(page.locator('button[aria-label="Transform content to events"]')).toBeEnabled();
+    await expect(scanButton(page)).toBeEnabled();
     expect(pageErrors).toEqual([]);
   });
 
@@ -241,9 +246,8 @@ test.describe('UI Interaction Tests', () => {
     await textarea.fill('Quick Event May 1 at 10am');
     await textarea.press('Meta+Enter');
 
-    const review = page.getByRole('region', { name: 'Scanner review drafts' });
-    await expect(review.locator('article')).toHaveCount(1);
-    await expect(review.getByRole('textbox', { name: 'Title', exact: true })).toHaveValue('Quick Event');
+    await waitForCards(page, 1);
+    await expect(page.getByTestId('event-card-title')).toHaveText('Quick Event');
     expect(await page.evaluate(() => localStorage.getItem('event-every:last-scan-source'))).toBeNull();
   });
 });

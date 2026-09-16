@@ -4,9 +4,11 @@ import {
   mockScanAPI,
   mockSummarize,
   mockSummarizeDelayed,
+  scanButton,
   setupLocal,
   submitText,
   TINY_PNG_BASE64,
+  waitForCards,
 } from './helpers';
 
 type ScannerModule = typeof import('@event-every/scanner');
@@ -65,8 +67,7 @@ async function scanResponse(kind: 'text' | 'image' = 'text'): Promise<ScanRespon
 }
 
 async function waitForReview(page: Page, count = 1): Promise<void> {
-  const review = page.getByRole('region', { name: 'Scanner review drafts' });
-  await expect(review.getByRole('article')).toHaveCount(count, { timeout: 20000 });
+  await waitForCards(page, count);
 }
 
 test.describe('Input draft persistence', () => {
@@ -107,7 +108,7 @@ test.describe('Input draft persistence', () => {
       buffer: Buffer.from(TINY_PNG_BASE64, 'base64'),
     });
     await expect(page.locator('img[alt="Uploaded 1"]')).toBeVisible({ timeout: 8000 });
-    await page.locator('button[aria-label="Transform content to events"]').click();
+    await scanButton(page).click();
     await waitForReview(page, 1);
 
     await page.locator('[data-testid="input-history-button"]').click();

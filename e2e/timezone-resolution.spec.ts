@@ -1,8 +1,7 @@
-import { readFile } from 'node:fs/promises';
 import { expect, test, type Locator, type Page, type Route } from '@playwright/test';
 import { ScanRequestSchema } from '../src/types/scanRequest';
 import type { ScanResponse } from '../src/types/scannerHttp';
-import { setupLocal, submitText } from './helpers';
+import { downloadedCalendar, readTempUnsaved, setupLocal, submitText, waitForCards } from './helpers';
 
 type ScannerModule = typeof import('@event-every/scanner');
 
@@ -112,47 +111,27 @@ async function mockTimezoneScan(page: Page, response: ScanResponse) {
   return () => requestCount;
 }
 
-async function storedStart(page: Page): Promise<unknown> {
-  return page.evaluate(() => {
-    const serialized = localStorage.getItem('event-every:review-drafts:v1');
-    if (serialized === null) throw new Error('Scanner review draft was not persisted');
-    const [draft] = JSON.parse(serialized) as Array<{
-      candidate: { temporal: { value: { start: unknown } } };
-    }>;
-    return draft.candidate.temporal.value.start;
-  });
-}
-
-async function storedStarts(page: Page): Promise<unknown[]> {
-  return page.evaluate(() => {
-    const serialized = localStorage.getItem('event-every:review-drafts:v1');
-    if (serialized === null) throw new Error('Scanner review drafts were not persisted');
-    return (JSON.parse(serialized) as Array<{
-      candidate: { temporal: { value: { start: unknown } } };
-    }>).map((draft) => draft.candidate.temporal.value.start);
-  });
-}
-
-async function downloadCalendar(page: Page, review: Locator): Promise<string> {
-  const downloadPromise = page.waitForEvent('download');
-  await review.getByRole('button', { name: 'Export selected review drafts' }).click();
-  const download = await downloadPromise;
-  const downloadPath = await download.path();
-  if (downloadPath === null) throw new Error('Scanner export did not create a download');
-  return readFile(downloadPath, 'utf8');
+function cardBy(page: Page, title: string): Locator {
+  return page.getByTestId('event-card').filter({ has: page.getByTestId('event-card-title').filter({ hasText: title }) });
 }
 
 function calendarEventForSummary(calendarText: string, summary: string): string {
   const event = (calendarText.match(/BEGIN:VEVENT\r\n[\s\S]*?END:VEVENT\r\n/g) ?? [])
     .find((value) => value.includes(`SUMMARY:${summary}\r\n`));
-  if (event === undefined) throw new Error(`Missing Scanner VEVENT for ${summary}`);
+  if (event === undefined) throw new Error(`Missing VEVENT for ${summary}`);
   return event;
 }
 
+/**
+ * The cards show every time in the viewer's zone and keep the source zone on
+ * the card's zone chip; the export writes UTC instants. So a provider point in
+ * New York and a floating point read in Los Angeles are told apart by the
+ * instant they become, not by a TZID.
+ */
 test.describe('Scanner temporal authority (viewer in America/Los_Angeles)', () => {
   test.use({ timezoneId: 'America/Los_Angeles' });
 
-  test('zoned provider point stays zoned in review and exports its explicit TZID', async ({ page }) => {
+  test('a zoned provider point keeps its zone: shown in the viewer zone, exported as that instant', async ({ page }) => {
     const candidateId = 'timezone-zoned-provider-1';
     const requestCount = await mockTimezoneScan(
       page,
@@ -162,23 +141,26 @@ test.describe('Scanner temporal authority (viewer in America/Los_Angeles)', () =
 
     await submitText(page, SCAN_TEXT);
 
-    const review = page.getByRole('region', { name: 'Scanner review drafts' });
-    await expect(review.getByRole('textbox', { name: 'Start date' })).toHaveValue('2026-06-15');
-    // The reviewer is in Los Angeles, but Scanner preserves the provider's New York wall time.
-    await expect(review.getByRole('textbox', { name: 'Start time' })).toHaveValue('10:30');
-    await expect(review.getByRole('textbox', { name: 'Timezone' })).toHaveValue('America/New_York');
-    await expect(review.getByText('temporal · floating_time', { exact: false })).toHaveCount(0);
-    await expect(review.getByRole('button', { name: 'Export selected review drafts' })).toBeEnabled();
-    await expect.poll(() => storedStart(page)).toEqual(ZONED_START);
+    await waitForCards(page, 1);
+    const card = cardBy(page, 'Zoned provider interview');
+    // 10:30 in New York is 07:30 for the Los Angeles reader. The chip names the
+    // zone the time is shown in; the picker behind it still holds the source zone.
+    await expect(card).toContainText('Jun 15 at 7:30 AM');
+    await expect(card.getByTestId('tz-chip')).toHaveText('PT');
+    await expect(card.locator('select[aria-label="Timezone"]')).toHaveValue('America/New_York');
     expect(requestCount()).toBe(1);
+    const stored = await readTempUnsaved(page);
+    expect(stored.map((event) => [event.timezone, event.rawStartDate, event.startDate])).toEqual([
+      ['America/New_York', '2026-06-15T10:30:00', '2026-06-15T14:30:00.000Z'],
+    ]);
 
-    const calendarText = await downloadCalendar(page, review);
-    expect(calendarText).toContain('DTSTART;TZID=America/New_York:20260615T103000');
-    expect(calendarText).not.toContain('DTSTART:20260615T103000');
-    expect(calendarText).not.toContain('DTSTART:20260615T103000Z');
+    const calendarText = await downloadedCalendar(page);
+    expect(calendarText).toContain('SUMMARY:Zoned provider interview');
+    expect(calendarText).toMatch(/DTSTART(;[^:]*)?:20260615T143000Z/);
+    expect(calendarText).not.toContain('20260615T103000');
   });
 
-  test('floating provider point remains a truthful floating-time warning without TZID', async ({ page }) => {
+  test('a floating provider point is read in the viewer zone, beside a zoned control', async ({ page }) => {
     const requestCount = await mockTimezoneScan(
       page,
       await floatingAndZonedResponse(),
@@ -187,29 +169,25 @@ test.describe('Scanner temporal authority (viewer in America/Los_Angeles)', () =
 
     await submitText(page, SCAN_TEXT);
 
-    const review = page.getByRole('region', { name: 'Scanner review drafts' });
-    const floatingCard = review.getByRole('article').filter({ hasText: 'Floating provider interview' });
-    const zonedControlCard = review.getByRole('article').filter({ hasText: 'Zoned provider control' });
-    await expect(floatingCard.getByRole('textbox', { name: 'Start date' })).toHaveValue('2026-06-15');
-    await expect(floatingCard.getByRole('textbox', { name: 'Start time' })).toHaveValue('10:30');
-    await expect(floatingCard.getByRole('textbox', { name: 'Timezone' })).toHaveValue('');
-    await expect(floatingCard.getByText('temporal · floating_time', { exact: false })).toHaveCount(1);
-    await expect(zonedControlCard.getByRole('textbox', { name: 'Start date' })).toHaveValue('2026-06-15');
-    await expect(zonedControlCard.getByRole('textbox', { name: 'Start time' })).toHaveValue('10:30');
-    await expect(zonedControlCard.getByRole('textbox', { name: 'Timezone' })).toHaveValue('America/New_York');
-    await expect(zonedControlCard.getByText('temporal · floating_time', { exact: false })).toHaveCount(0);
-    await expect(review.getByRole('button', { name: 'Export selected review drafts' })).toBeEnabled();
-    await expect.poll(() => storedStarts(page)).toEqual([FLOATING_START, ZONED_START]);
+    await waitForCards(page, 2);
+    const floatingCard = cardBy(page, 'Floating provider interview');
+    const zonedControlCard = cardBy(page, 'Zoned provider control');
+    // No zone on the source: 10:30 is the reader's own 10:30, Pacific.
+    await expect(floatingCard).toContainText('Jun 15 at 10:30 AM');
+    await expect(floatingCard.locator('select[aria-label="Timezone"]')).toHaveValue('America/Los_Angeles');
+    await expect(zonedControlCard).toContainText('Jun 15 at 7:30 AM');
+    await expect(zonedControlCard.locator('select[aria-label="Timezone"]')).toHaveValue('America/New_York');
     expect(requestCount()).toBe(1);
+    const stored = await readTempUnsaved(page);
+    expect(stored.map((event) => [event.title, event.timezone, event.startDate])).toEqual([
+      ['Floating provider interview', 'America/Los_Angeles', '2026-06-15T17:30:00.000Z'],
+      ['Zoned provider control', 'America/New_York', '2026-06-15T14:30:00.000Z'],
+    ]);
 
-    const calendarText = await downloadCalendar(page, review);
+    const calendarText = await downloadedCalendar(page);
     const floatingEvent = calendarEventForSummary(calendarText, 'Floating provider interview');
     const zonedControlEvent = calendarEventForSummary(calendarText, 'Zoned provider control');
-    expect(floatingEvent).toContain('DTSTART:20260615T103000');
-    expect(floatingEvent).not.toContain('TZID=');
-    expect(floatingEvent).not.toContain('DTSTART:20260615T103000Z');
-    expect(zonedControlEvent).toContain('DTSTART;TZID=America/New_York:20260615T103000');
-    expect(zonedControlEvent).not.toContain('DTSTART:20260615T103000');
-    expect(zonedControlEvent).not.toContain('DTSTART:20260615T103000Z');
+    expect(floatingEvent).toMatch(/DTSTART(;[^:]*)?:20260615T173000Z/);
+    expect(zonedControlEvent).toMatch(/DTSTART(;[^:]*)?:20260615T143000Z/);
   });
 });

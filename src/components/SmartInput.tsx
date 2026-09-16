@@ -608,7 +608,7 @@ const SmartInput = forwardRef<SmartInputHandle, SmartInputProps>(
                 onClick={handleSubmit}
                 disabled={!isButtonEnabled}
                 contentDensity={contentDensity}
-                aria-label="Scan it - turn your input into events"
+                aria-label="Scan - turn your input into events"
                 className="flex-shrink-0"
               />
             </div>
@@ -622,7 +622,7 @@ const SmartInput = forwardRef<SmartInputHandle, SmartInputProps>(
                 onClick={handleSubmit}
                 disabled={!isButtonEnabled}
                 contentDensity={contentDensity}
-                aria-label="Scan it - turn your input into events"
+                aria-label="Scan - turn your input into events"
               />
             </div>
           )}

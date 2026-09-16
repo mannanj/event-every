@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { scanButton } from './helpers';
 
 const BASE_USAGE = {
   status: 'available',
@@ -13,7 +14,10 @@ const BASE_USAGE = {
   resetAt: '2026-08-14T00:00:00.000Z',
 } as const;
 
-const KNOWN_RESET_MESSAGE = 'Event Every is powered by community support. New event processing is paused until August 14 12:00am, but your saved events are still available.';
+// The "saved events" clause and the "View my events" action appear only for
+// someone who has saved events; a first-time visitor gets the plain pause.
+const KNOWN_RESET_MESSAGE = 'Event Every is powered by community support. New event processing is paused until August 14 12:00am.';
+const KNOWN_RESET_MESSAGE_WITH_EVENTS = 'Event Every is powered by community support. New event processing is paused until August 14 12:00am, but your saved events are still available.';
 const UNKNOWN_RESET_MESSAGE = 'Event Every is powered by community support. New event processing is temporarily paused, but your saved events are still available.';
 
 test.use({ timezoneId: 'UTC', locale: 'en-US' });
@@ -92,23 +96,19 @@ test.describe('owner budget boundary', () => {
 
     await page.getByRole('button', { name: 'View my events' }).click();
 
-    await expect(page.getByTestId('owner-budget-view-only')).toHaveText(
-      'Event processing is paused. Your changes are saved and you can view your saved events below.',
-    );
+    // The pause is said in the input itself, and the scan button is absent
+    // rather than disabled: a button that cannot do anything is worse than none.
+    const editor = page.getByTestId('smart-input-textarea');
+    await expect(editor).toHaveAttribute('data-paused', 'true');
+    await expect(editor).toHaveAttribute('data-placeholder', /Event processing is paused/);
     await expect(page.getByText('Saved budget event', { exact: true })).toBeVisible();
-    await expect(page.getByTestId('smart-input-textarea')).toHaveAttribute('contenteditable', 'true');
-    const inputBox = page.getByTestId('input-box');
-    const transform = page.getByRole('button', { name: 'Transform content to events' });
-    await expect(transform).toBeDisabled();
-    const inputBounds = await inputBox.boundingBox();
-    const transformBounds = await transform.boundingBox();
-    expect(inputBounds).not.toBeNull();
-    expect(transformBounds).not.toBeNull();
-    expect(transformBounds!.x + transformBounds!.width).toBeLessThanOrEqual(inputBounds!.x + inputBounds!.width);
-    expect(transformBounds!.y + transformBounds!.height).toBeLessThanOrEqual(inputBounds!.y + inputBounds!.height);
+    await expect(editor).toHaveAttribute('contenteditable', 'true');
+    await expect(page.getByTestId('input-box')).toBeVisible();
+    await expect(scanButton(page)).toHaveCount(0);
   });
 
   test('preserves an edited input across an unavailable visit and restores it ready to transform', async ({ page }) => {
+    await seedSavedEvent(page);
     let usage: unknown = BASE_USAGE;
     let status = 200;
     await page.route('**/api/usage', (route) => route.fulfill({ status, json: usage }));
@@ -133,7 +133,7 @@ test.describe('owner budget boundary', () => {
     await expect(page.getByTestId('owner-budget-screen')).toBeVisible();
     await page.getByRole('button', { name: 'View my events' }).click();
     await expect(editor).toHaveText('Original saved draft');
-    await expect(page.getByRole('button', { name: 'Transform content to events' })).toBeDisabled();
+    await expect(scanButton(page)).toHaveCount(0);
 
     await editor.fill('Edited while processing was unavailable');
     await expect.poll(() => page.evaluate(async () => new Promise<string | null>((resolve) => {
@@ -150,7 +150,7 @@ test.describe('owner budget boundary', () => {
     status = 200;
     await page.reload();
     await expect(editor).toHaveText('Edited while processing was unavailable');
-    await expect(page.getByRole('button', { name: 'Transform content to events' })).toBeEnabled();
+    await expect(scanButton(page)).toBeEnabled();
   });
 
   test('stops waiting for an unavailable budget response after three seconds', async ({ page }) => {
@@ -167,6 +167,7 @@ test.describe('owner budget boundary', () => {
   });
 
   test('reads only the usage endpoint and renders only the safe events action', async ({ page }) => {
+    await seedSavedEvent(page);
     const requested: string[] = [];
     page.on('request', (request) => {
       const pathname = new URL(request.url()).pathname;
@@ -175,10 +176,13 @@ test.describe('owner budget boundary', () => {
     await mockUsage(page, { ...BASE_USAGE, exhausted: true, remainingNanodollars: 0 });
     await page.goto('/');
     await expect(page.getByTestId('owner-budget-screen')).toBeVisible();
+    await expect(page.getByTestId('owner-budget-message')).toHaveText(KNOWN_RESET_MESSAGE_WITH_EVENTS);
     expect(requested.filter((path) => path === '/api/usage')).toHaveLength(1);
     expect(requested).not.toContain('/api/waitlist');
     await expect(page.getByRole('button', { name: 'View my events' })).toHaveCount(1);
     await expect(page.getByRole('button')).toHaveCount(1);
-    await expect(page.getByRole('link')).toHaveCount(0);
+    // The standard header's home link is the only link: no waitlist, no sign-in.
+    await expect(page.getByRole('link')).toHaveCount(1);
+    await expect(page.getByRole('link')).toHaveAccessibleName(/Event Every/);
   });
 });

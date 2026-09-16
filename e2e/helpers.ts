@@ -1,4 +1,5 @@
-import { Page, Route } from '@playwright/test';
+import { expect, type Download, type Locator, type Page, type Route } from '@playwright/test';
+import { readFile } from 'node:fs/promises';
 import { ScanRequestSchema } from '../src/types/scanRequest';
 import type { ScanResponse } from '../src/types/scannerHttp';
 
@@ -163,3 +164,57 @@ export async function submitText(page: Page, text: string) {
 // A tiny valid 1x1 PNG for file-upload tests.
 export const TINY_PNG_BASE64 =
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+
+// The submit button. Its label changed with the landing rework and again to
+// "Scan it"; every spec goes through here so the next rename is one line.
+export const SCAN_BUTTON_NAME = 'Scan - turn your input into events';
+export function scanButton(page: Page): Locator {
+  return page.getByRole('button', { name: SCAN_BUTTON_NAME });
+}
+
+// Scan results render as the ordinary event cards (task 206 put them back).
+export function eventCards(page: Page): Locator {
+  return page.getByTestId('event-card');
+}
+export async function waitForCards(page: Page, count: number, timeout = 20000): Promise<void> {
+  await expect(eventCards(page)).toHaveCount(count, { timeout });
+}
+export function cardTitled(page: Page, title: string): Locator {
+  return eventCards(page).filter({ has: page.getByTestId('event-card-title').filter({ hasText: title }) });
+}
+
+// Unsaved cards persist under this key across a reload; nothing else about a
+// scan is stored until the user saves.
+export const TEMP_UNSAVED_KEY = 'event_every_temp_unsaved';
+export function readTempUnsaved(page: Page): Promise<Array<Record<string, unknown>>> {
+  return page.evaluate((key) => JSON.parse(localStorage.getItem(key) ?? '[]'), TEMP_UNSAVED_KEY);
+}
+
+// "Save (n)" exports the selected cards as one .ics download.
+export async function downloadSelectedEvents(page: Page): Promise<Download> {
+  const [download] = await Promise.all([
+    page.waitForEvent('download'),
+    page.getByTestId('save-events-button').click(),
+  ]);
+  return download;
+}
+export async function downloadedCalendar(page: Page): Promise<string> {
+  const download = await downloadSelectedEvents(page);
+  const path = await download.path();
+  if (path === null) throw new Error('export did not create a download');
+  return readFile(path, 'utf8');
+}
+
+// Card inline editors: the text is the control until clicked.
+export async function setCardTime(card: Locator, currentText: string, value: string): Promise<void> {
+  await card.getByText(currentText, { exact: true }).click();
+  const input = card.getByTestId('event-card-time-input');
+  await input.fill(value);
+  await input.press('Enter');
+}
+export async function setCardDate(card: Locator, currentText: string, value: string): Promise<void> {
+  await card.getByText(currentText, { exact: true }).click();
+  const input = card.getByTestId('event-card-date-input');
+  await input.fill(value);
+  await input.press('Enter');
+}

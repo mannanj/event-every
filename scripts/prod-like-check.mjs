@@ -91,7 +91,7 @@ const png = await render.screenshot({ type: 'png' });
 await render.close();
 await page.locator('input[type="file"]').setInputFiles({ name: 'invite.png', mimeType: 'image/png', buffer: png });
 await page.locator('img[alt="Uploaded 1"]').waitFor();
-await page.getByRole('button', { name: /Scan it/ }).click();
+await page.getByRole('button', { name: /^Scan - / }).click();
 const imageCard = await firstCard().catch(() => '');
 console.log('image card:', imageCard.slice(0, 120));
 const errors = await page.getByTestId('error-notification').allInnerTexts();

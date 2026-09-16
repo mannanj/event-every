@@ -122,7 +122,9 @@ function EventCard({
     } else if (field === 'startTime') {
       const [hours, minutes] = value.split(':').map(Number);
       if ([hours, minutes].some(Number.isNaN)) return;
-      newStart.setHours(hours, minutes);
+      // Seconds are cleared too: a start that defaulted to "now" carried its
+      // seconds into the edited time and out to the .ics (DTSTART ...T091529Z).
+      newStart.setHours(hours, minutes, 0, 0);
     } else {
       return;
     }

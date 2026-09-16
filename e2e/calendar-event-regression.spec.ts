@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { promises as fs } from 'node:fs';
 import { parseICSContent } from '../src/services/icsParser';
-import { mockAuth, mockSummarize, mockURLDetection } from './helpers';
+import { eventCards, mockAuth, mockSummarize, mockURLDetection, scanButton } from './helpers';
 
 interface StoredCalendarEvent {
   id: string;
@@ -88,13 +88,13 @@ function calendarFile(events: Array<{ uid: string; title: string; start: string;
 
 async function uploadCalendar(page: Page, contents: string, filename: string): Promise<void> {
   await expect(page.getByText(SAVED_SENTINEL.title, { exact: true })).toBeVisible();
-  await expect(page.getByRole('region', { name: 'Scanner review drafts' })).toHaveCount(0);
+  await expect(eventCards(page)).toHaveCount(0);
   await page.locator('input[type="file"]').setInputFiles({
     name: filename,
     mimeType: 'text/calendar',
     buffer: Buffer.from(contents),
   });
-  await page.getByRole('button', { name: 'Transform content to events' }).click();
+  await scanButton(page).click();
 }
 
 async function downloadSelectedEvents(page: Page): Promise<import('@playwright/test').Download> {
