@@ -398,7 +398,7 @@ function Home({ processingDisabled }: { processingDisabled: boolean }) {
           updateProgress(queueItem.id, 30);
           const scraped = await scrapeURLsBatch(detection.urls, controller.signal, detection.resolverCapability);
           if (controller.signal.aborted || activeSubmissionRef.current !== batchId) return [];
-          combinedText = buildEnrichedUrlText(inputText, detection.urls, detection.remainingText, scraped.results);
+          combinedText = buildEnrichedUrlText(inputText, detection.urls, scraped.results);
           if (!combinedText.trim()) {
             throw new Error('Unable to extract content from the provided URLs. Please check the URLs and try again.');
           }
@@ -623,9 +623,16 @@ function Home({ processingDisabled }: { processingDisabled: boolean }) {
     exportToICS(event);
   };
 
+  // Cancel and "Discard all" are one action: stop the work and drop what it
+  // produced. Pre-scanner code cleared these four together; the rewrite kept
+  // only the abort, which left every card on screen after a discard.
   const handleCancelBatch = () => {
     abortRef.current?.abort();
     recoveryAbortRef.current?.abort();
+    setUnsavedEvents([]);
+    setBatchProcessing(null);
+    setImageProcessingStatuses([]);
+    setUrlProcessingStatus(null);
     providerAbortControllersRef.current.forEach((controller) => controller.abort());
     const requestIds = new Set([
       ...activeProviderRequestIdsRef.current,

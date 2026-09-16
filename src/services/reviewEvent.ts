@@ -78,10 +78,14 @@ export function reviewDraftToCalendarEvent(
   const rawTimezone = startPoint?.timeZone ?? endPoint?.timeZone ?? undefined;
   const tz = resolveTimezone(rawTimezone, getBrowserTimezone());
 
-  // `allDay: 'unknown'` is the Scanner declining to say. A point carrying no
-  // time is the better evidence, and a timed point settles it outright.
-  const allDay = temporal?.allDay === true
-    || (temporal?.allDay !== false && startPoint !== null && startPoint.dateOnly);
+  // The points outrank the flag. Seen from the model on real input: `allDay:
+  // false` beside a date with no time (which put the event at midnight), and
+  // `allDay: true` beside a 20:00 start (which would have thrown the time away).
+  // The flag only decides when no point says anything.
+  const anchor = startPoint ?? endPoint;
+  const allDay = anchor === null
+    ? temporal?.allDay === true
+    : anchor.dateOnly && (startPoint === null || startPoint.dateOnly) && (endPoint === null || endPoint.dateOnly);
 
   let startDate: Date;
   let endDate: Date;
@@ -103,7 +107,10 @@ export function reviewDraftToCalendarEvent(
   }
 
   if (Number.isNaN(startDate.getTime())) startDate = new Date(identity.created);
-  if (Number.isNaN(endDate.getTime()) || endDate.getTime() < startDate.getTime()) {
+  // An end at or before its start exports as a zero-length or backwards event.
+  // For an all-day event the source's single date is both start and end, and
+  // the calendar wants the exclusive next day.
+  if (Number.isNaN(endDate.getTime()) || endDate.getTime() <= startDate.getTime()) {
     endDate = new Date(startDate.getTime() + (allDay ? DAY_MS : HOUR_MS));
   }
 

@@ -44,56 +44,50 @@ function sourceUrlToken(token: string): string {
   return trimmed;
 }
 
-/** Replaces source URL occurrences in source order, even when the detector normalizes/reorders them. */
-export function buildEnrichedUrlText(input: string, detectedUrls: readonly string[], remainingText: string, results: readonly ScrapedContent[]): string {
-  const wanted = new Set(detectedUrls.map((url) => normalizeUrl(url)).filter((url): url is string => url !== null));
-  const successfulByUrl = new Map<string, number[]>();
-  for (const [resultIndex, result] of results.entries()) {
-    const normalized = normalizeUrl(result.url);
-    if (normalized && result.status === 'success') successfulByUrl.set(normalized, [...(successfulByUrl.get(normalized) ?? []), resultIndex]);
-  }
-  const blocks: string[] = [];
-  const sourceParts: string[] = [];
-  const usedResultIndexes = new Set<number>();
-  let cursor = 0;
-  for (const match of input.matchAll(rawUrlPattern)) {
-    const raw = sourceUrlToken(match[0]); const normalized = normalizeUrl(raw);
-    if (!normalized || !wanted.has(normalized)) continue;
-    const index = match.index ?? 0;
-    const prose = input.slice(cursor, index).trim();
-    if (prose) sourceParts.push(prose);
-    const available = successfulByUrl.get(normalized);
-    const resultIndex = available?.shift();
-    if (resultIndex !== undefined) {
-      const result = results[resultIndex];
-      usedResultIndexes.add(resultIndex);
-      const block = `Original Event: ${normalized}\n${result.text}`;
-      blocks.push(block);
-      sourceParts.push(block);
-    }
-    // Leave sentence punctuation behind as prose after the corresponding block.
-    cursor = index + raw.length;
-  }
-  const tail = input.slice(cursor).trim();
-  if (tail) sourceParts.push(tail);
-  const sourceProse = sourceParts.filter((part) => !part.startsWith('Original Event:')).join(' ');
-  const normalizeWhitespace = (value: string) => {
-    let normalized = value.replace(/\s+/g, ' ').trim();
-    for (const [open, close] of [['(', ')'], ['[', ']'], ['{', '}']] as const) {
-      normalized = normalized.replaceAll(`${open} ${close}`, `${open}${close}`);
-    }
-    return normalized;
-  };
-  const unmatchedBlocks = results.flatMap((result, resultIndex) => {
-    if (result.status !== 'success' || usedResultIndexes.has(resultIndex)) return [];
-    const normalized = normalizeUrl(result.url);
-    return normalized ? [`Original Event: ${normalized}\n${result.text}`] : [];
+// Sites answer a server-side fetch with an interstitial more often than with the
+// page: Google Meet redirects to /unsupported and prints "confirm you're not a
+// bot", Cloudflare prints "Just a moment". Captured from production 2026-09-15.
+// Sending that to the model buries the source under noise, and the redirect URL
+// in the block then gets picked as the event link. Such a page adds nothing;
+// the link itself, left in the prose, is the evidence.
+const LOW_SIGNAL_PATTERNS = [
+  /not a (ro)?bot/i,
+  /doesn'?t work on your browser/i,
+  /enable javascript/i,
+  /verify (that )?you'?re? (a )?human/i,
+  /just a moment/i,
+  /checking your browser/i,
+  /unusual traffic/i,
+  /access denied/i,
+  /captcha/i,
+];
+// Low on purpose: a terse but real page ("Join us June 30 at 6pm at HQ") must
+// survive, and the interstitials are caught by wording, not length.
+const MIN_USEFUL_SCRAPE_LENGTH = 12;
+
+export function isLowSignalScrape(text: string): boolean {
+  const trimmed = text.replace(/\s+/g, ' ').trim();
+  if (trimmed.replace(/^loading(\.{3}|\u2026)?$/i, '').length < MIN_USEFUL_SCRAPE_LENGTH) return true;
+  return LOW_SIGNAL_PATTERNS.some((pattern) => pattern.test(trimmed));
+}
+
+/**
+ * The source text goes to the model exactly as written, links included, so a
+ * "Video call link: https://..." line keeps its link and the model can name it.
+ * Fetched pages follow in source order, each headed by the link the source
+ * wrote. `results` comes back from the scraper in the same order as the links it
+ * was given, and a fetched result reports where it landed, not what was asked,
+ * so the pairing is by position.
+ */
+export function buildEnrichedUrlText(input: string, detectedUrls: readonly string[], results: readonly ScrapedContent[]): string {
+  const alignedByPosition = results.length === detectedUrls.length;
+  const blocks = results.flatMap((result, index) => {
+    if (result.status !== 'success' || isLowSignalScrape(result.text)) return [];
+    const sourceUrl = normalizeUrl(alignedByPosition ? detectedUrls[index] : result.url) ?? result.url;
+    const body = result.title ? `${result.title}\n${result.text}` : result.text;
+    return [`Original Event: ${sourceUrl}\n${body}`];
   });
-  // The detector owns prose. Only preserve source interleaving when it agrees with that contract.
-  if (normalizeWhitespace(sourceProse) === normalizeWhitespace(remainingText)) {
-    return [...sourceParts, ...unmatchedBlocks].join('\n\n');
-  }
-  return [remainingText.trim(), ...blocks, ...unmatchedBlocks].filter(Boolean).join('\n\n');
+  return [input.trim(), ...blocks].filter(Boolean).join('\n\n');
 }
 
 export async function detectURLs(text: string, signal?: AbortSignal): Promise<URLDetectionResult> {

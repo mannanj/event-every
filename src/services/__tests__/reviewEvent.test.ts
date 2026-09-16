@@ -151,3 +151,62 @@ describe('reviewDraftToCalendarEvent', () => {
     expect(event.endDate.getTime()).toBeGreaterThan(event.startDate.getTime());
   });
 });
+
+describe('reviewDraftToCalendarEvent: the flag does not outrank the point', () => {
+  test('a date with no time is all-day even when the model says allDay: false', () => {
+    const event = reviewDraftToCalendarEvent(draft({
+      temporal: claim({
+        start: { kind: 'date', year: 2026, month: 9, day: 22 },
+        end: null,
+        duration: null,
+        allDay: false,
+      }),
+    }), identity);
+
+    expect(event.allDay).toBe(true);
+    expect(event.startDate.toISOString()).toBe('2026-09-22T00:00:00.000Z');
+    expect(event.endDate.toISOString()).toBe('2026-09-23T00:00:00.000Z');
+  });
+
+  test('a timed start is not all-day even when the model says allDay: true', () => {
+    const event = reviewDraftToCalendarEvent(draft({
+      temporal: claim({
+        start: { kind: 'zoned', date: { year: 2026, month: 10, day: 2 }, time: { hour: 20, minute: 0, second: 0 }, timeZone: 'America/Chicago', resolution: 'exact', possibleOffsets: ['-05:00'], sourceOffset: null, chosenOffset: '-05:00' },
+        end: { kind: 'zoned', date: { year: 2026, month: 10, day: 2 }, time: { hour: 23, minute: 30, second: 0 }, timeZone: 'America/Chicago', resolution: 'exact', possibleOffsets: ['-05:00'], sourceOffset: null, chosenOffset: '-05:00' },
+        duration: null,
+        allDay: true,
+      }),
+    }), identity);
+
+    expect(event.allDay).toBe(false);
+    expect(event.startDate.toISOString()).toBe('2026-10-03T01:00:00.000Z');
+    expect(event.endDate.toISOString()).toBe('2026-10-03T04:30:00.000Z');
+  });
+
+  test('an end equal to its start gets the default duration instead of zero length', () => {
+    const event = reviewDraftToCalendarEvent(draft({
+      temporal: claim({
+        start: { kind: 'floating', date: { year: 2026, month: 3, day: 13 }, time: { hour: 14, minute: 0, second: 0 } },
+        end: { kind: 'floating', date: { year: 2026, month: 3, day: 13 }, time: { hour: 14, minute: 0, second: 0 } },
+        duration: null,
+        allDay: false,
+      }),
+    }), identity);
+
+    expect(event.endDate.getTime() - event.startDate.getTime()).toBe(60 * 60 * 1000);
+  });
+
+  test('an all-day event whose end is its own start date still spans the day', () => {
+    const event = reviewDraftToCalendarEvent(draft({
+      temporal: claim({
+        start: { kind: 'date', year: 2026, month: 9, day: 22 },
+        end: { kind: 'date', year: 2026, month: 9, day: 22 },
+        duration: null,
+        allDay: true,
+      }),
+    }), identity);
+
+    expect(event.allDay).toBe(true);
+    expect(event.endDate.toISOString()).toBe('2026-09-23T00:00:00.000Z');
+  });
+});

@@ -10,7 +10,8 @@ import {
 
 const EVENT_URL = 'https://example.com/my-event';
 const SOURCE_TEXT = 'See ' + EVENT_URL + ' for details.';
-const ENRICHED_TEXT = 'See\n\nOriginal Event: https://example.com/my-event\nJoin us June 30 2026 at 6pm at HQ\n\nfor details.';
+// The source keeps its link; the fetched page follows, headed by that link.
+const ENRICHED_TEXT = SOURCE_TEXT + '\n\nOriginal Event: https://example.com/my-event\nLaunch Party\nJoin us June 30 2026 at 6pm at HQ';
 const excerpt = 'Join us June 30 2026 at 6pm at HQ';
 type ScannerModule = typeof import('@event-every/scanner');
 
@@ -79,7 +80,7 @@ test.describe('URL paste → scrape → parse', () => {
     await expect(page.getByTestId('url-pill')).toHaveCount(1);
   });
 
-  test('the scrape branch sends host-enriched text to Scanner and renders its review candidate', async ({ page }) => {
+  test('the scrape branch sends the source with its link plus the fetched page, and renders the card', async ({ page }) => {
     await setupLocal(page);
     await mockURLDetectionWithUrls(page, EVENT_URL, 'See for details.');
     await mockScrape(page, EVENT_URL, 'Launch Party', 'Join us June 30 2026 at 6pm at HQ');
@@ -98,9 +99,7 @@ test.describe('URL paste → scrape → parse', () => {
 
     await submitText(page, SOURCE_TEXT);
 
-    const review = page.getByRole('region', { name: 'Scanner review drafts' });
-    await expect(review).toBeVisible();
-    await expect(review.getByRole('textbox', { name: 'Title' })).toHaveValue('Launch Party scanner candidate');
+    await expect(page.getByTestId('event-card-title')).toHaveText('Launch Party scanner candidate');
     expect(requests).toHaveLength(1);
   });
 });
