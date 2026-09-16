@@ -7,6 +7,7 @@ import { ScanRequestSchema } from '@/types/scannerHttp';
 import { createBindingCandidates, normalizeRequestUuid } from '@/platform/provider/request-binding';
 import { fixedProviderHttp, getPlatformRuntime } from '@/platform/runtime';
 import { resolveScanTimeZone } from '@/server/scanner/scanContext';
+import { OWNER_MODELS } from '@/platform/provider/policy';
 
 type E1SourceHandle = Extract<SourceHandle, { kind: 'text' | 'image' }>;
 
@@ -41,6 +42,14 @@ export async function POST(request: NextRequest): Promise<Response> {
     }
   }
 
+  const startedAt = Date.now();
+  // One structured line per scan, no source content. Workers Logs keeps these
+  // (observability is enabled in wrangler.jsonc), so a wrong card reported from
+  // production can be traced to what the model actually returned: how many
+  // candidates, and whether each start carried a time, a date only, or nothing.
+  const log = (fields: Record<string, unknown>) => {
+    console.log(JSON.stringify({ event: 'scan', requestId, kind: scanRequest.kind, ms: Date.now() - startedAt, ...fields }));
+  };
   try {
     const runtime = getPlatformRuntime();
     const variant = scanRequest.kind === 'text' ? 'scan-text' : 'scan-image';
@@ -67,9 +76,20 @@ export async function POST(request: NextRequest): Promise<Response> {
         ),
       },
     }, { runOperation: runtime.runProviderOperation });
-    if (result.status !== 'completed') return fixed(result);
+    if (result.status !== 'completed') {
+      log({ model: OWNER_MODELS[variant], status: result.status, code: 'code' in result ? result.code : null });
+      return fixed(result);
+    }
+    log({
+      model: OWNER_MODELS[variant],
+      status: 'completed',
+      candidates: result.value.candidates.length,
+      starts: result.value.candidates.map((candidate) => candidate.temporal.value?.start?.kind ?? null),
+      issues: result.value.candidates.flatMap((candidate) => candidate.issues.map((issue) => issue.code)),
+    });
     return NextResponse.json(result.value);
-  } catch {
+  } catch (error) {
+    log({ status: 'threw', error: error instanceof Error ? error.name : 'unknown' });
     return fixed({ status: 'unavailable' });
   }
 }

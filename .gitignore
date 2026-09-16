@@ -53,3 +53,4 @@ yarn.lock
 .claude/handoff/
 .claude/worktrees/
 .claude/settings.local.json
+scripts/eval-images/

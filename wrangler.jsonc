@@ -7,6 +7,10 @@
   "workers_dev": true,
   "preview_urls": false,
   "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
+  // Workers Logs: keeps console output (the one structured line per scan in
+  // src/app/api/scan/route.ts) queryable in the dashboard for a few days, so a
+  // bad extraction reported from production can be traced without a live tail.
+  "observability": { "enabled": true, "head_sampling_rate": 1 },
   "services": [
     { "binding": "WORKER_SELF_REFERENCE", "service": "event-every" }
   ],

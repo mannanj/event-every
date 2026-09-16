@@ -62,6 +62,13 @@ export type ProviderTransportInput = Readonly<{
   apiKey: string;
   providerBody: Readonly<Record<string, unknown>>;
   signal: AbortSignal;
+  /**
+   * Evaluation only. Production never sets this: the model is pinned per
+   * consumer in OWNER_MODELS and the caller's body cannot change it. Without
+   * this seam a measurement that "compares models" compares one model with
+   * itself, which is exactly what the task-205 comparison did.
+   */
+  modelOverride?: string;
 }>;
 
 type TransportDependencies = Readonly<{
@@ -97,9 +104,10 @@ function fixedHttpFailure(consumerKind: ConsumerKind, status: number): StoredPro
 function fixedProviderBody(
   consumerKind: ConsumerKind,
   providerBody: Readonly<Record<string, unknown>>,
+  modelOverride?: string,
 ): Readonly<Record<string, unknown>> | null {
   if (!Array.isArray(providerBody.messages)) return null;
-  const model = OWNER_MODELS[VARIANT_BY_CONSUMER[consumerKind]];
+  const model = modelOverride ?? OWNER_MODELS[VARIANT_BY_CONSUMER[consumerKind]];
   if (consumerKind === 'scan_text' || consumerKind === 'scan_image') {
     const responseFormat = providerBody.response_format;
     if (!responseFormat || typeof responseFormat !== 'object' || Array.isArray(responseFormat)) return null;
@@ -214,7 +222,7 @@ export async function callOpenRouter(
   dependencies: TransportDependencies = {},
 ): Promise<ProviderTransportResult> {
   const fetcher = dependencies.fetcher ?? globalThis.fetch.bind(globalThis);
-  const providerBody = fixedProviderBody(input.consumerKind, input.providerBody);
+  const providerBody = fixedProviderBody(input.consumerKind, input.providerBody, input.modelOverride);
   if (providerBody === null) return invalidFailure();
 
   let response: Response;

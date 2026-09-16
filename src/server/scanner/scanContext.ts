@@ -71,6 +71,13 @@ export function buildScanContextMessage(context: ScanContext): string {
     'Resolve relative dates - today, tomorrow, next Friday, this weekend - against the current date.',
     'A year that still cannot be derived leaves the point as kind "partial" with a null year.',
     'Never null a start that the source states. A partial point preserves the date; a null start loses it.',
+    'A clock time written with the date is part of the start: return a point that carries that time,',
+    'never a date-only point. A date-only point is only for a source that states no time at all.',
+    'A stated end or closing time is the end point. A range like "7:00 - 8:30pm" is a start and an end.',
+    'A time zone the source names - an IANA name such as America/New_York, an abbreviation such as ET,',
+    'or "Time zone: ..." - makes the point zoned with that zone. Do not resolve times into the reader zone.',
+    'The title is the name of the event itself, not the heading, app or section it appears under:',
+    'in "Google Meet joining info" above an event called "Civic Signal", the title is "Civic Signal".',
     'This context names no event. Never emit a candidate for the current date alone.',
   ].join('\n');
 }

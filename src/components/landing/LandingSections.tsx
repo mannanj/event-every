@@ -4,7 +4,7 @@ import StandardFooter from '@/components/SiteFooter';
 
 const STEPS: { n: string; verb: string; desc: string }[] = [
   { n: "1", verb: "Drop it", desc: "Add your images, text or more." },
-  { n: "2", verb: "Pop it", desc: "Click the button and download the file." },
+  { n: "2", verb: "Scan it", desc: "Click the button and download the file." },
   { n: "3", verb: "Stop it", desc: "Stop what you're doing and enjoy the event." },
 ];
 

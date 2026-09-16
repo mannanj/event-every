@@ -7,11 +7,11 @@ describe('owner provider policy', () => {
     expect(OWNER_DAILY_LIMIT_NANODOLLARS).toBe(1_000_000_000);
     expect(OWNER_PROVIDER_URL).toBe('https://openrouter.ai/api/v1/chat/completions');
     expect(OWNER_MODELS).toEqual({
-      'scan-text': 'deepseek/deepseek-v4-flash', 'scan-image': 'mistralai/mistral-small-2603',
+      'scan-text': 'mistralai/mistral-small-2603', 'scan-image': 'mistralai/mistral-small-2603',
       'resolve-timezone': 'deepseek/deepseek-v4-flash', summarize: 'deepseek/deepseek-v4-flash',
     });
     expect(Object.fromEntries(['scan-text', 'scan-image', 'resolve-timezone', 'summarize'].map((variant) => [variant, ownerPolicyForVariant(variant as never)]))).toEqual({
-      'scan-text': { route: 'scan', model: 'deepseek/deepseek-v4-flash', reservationNanodollars: 20_000_000 },
+      'scan-text': { route: 'scan', model: 'mistralai/mistral-small-2603', reservationNanodollars: 20_000_000 },
       'scan-image': { route: 'scan', model: 'mistralai/mistral-small-2603', reservationNanodollars: 50_000_000 },
       'resolve-timezone': { route: 'resolve-timezone', model: 'deepseek/deepseek-v4-flash', reservationNanodollars: 1_000_000 },
       summarize: { route: 'summarize', model: 'deepseek/deepseek-v4-flash', reservationNanodollars: 500_000 },

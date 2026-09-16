@@ -16,7 +16,10 @@
 export interface EvalCase {
   id: string;
   category: string;
+  /** Text input, or for an image case the text the image was rendered from (documentation only). */
   text: string;
+  /** PNG under scripts/eval-images/ (see render-eval-images.mjs). Present on image cases only. */
+  image?: string;
   /** How many events a correct reading finds. 0 means "there is no event here". */
   expectCandidates: number;
   /** Lowercased substring the title should contain. Omitted where any title is fine. */
@@ -25,6 +28,8 @@ export interface EvalCase {
   expectDate?: { year: number; month: number; day: number };
   /** Expected start hour/minute, 24h. Omitted where the input gives no time. */
   expectTime?: { hour: number; minute: number };
+  /** The input states no time, so a timed point is an invention. */
+  expectNoTime?: boolean;
 }
 
 export const EVAL_CASES: readonly EvalCase[] = [
@@ -81,7 +86,24 @@ export const EVAL_CASES: readonly EvalCase[] = [
   { id: 'noise-2', category: 'noisy', text: 'unsubscribe | privacy policy | JOIN US! Spring Gala — April 24 2026 — 6:30pm — Grand Hall — tickets $40 — view in browser',
     expectCandidates: 1, expectTitle: 'gala', expectDate: { year: 2026, month: 4, day: 24 }, expectTime: { hour: 18, minute: 30 } },
 
+  // A real invite pasted from Google Calendar, the input reported broken on 2026-09-15.
+  // September 22 is a Tuesday in 2026 and the scan context supplies the year.
+  { id: 'meet-1', category: 'invite', text: 'Google Meeting info:\nCivic Signal\nTuesday, September 22 · 7:00 – 8:30pm\nTime zone: America/New_York\nGoogle Meet joining info\nVideo call link: https://meet.google.com/odi-xddv-kez\nOr dial: (US) +1 254-218-5862 PIN: 199 901 399#\nMore phone numbers: https://tel.meet/odi-xddv-kez?pin=2308079664797',
+    expectCandidates: 1, expectTitle: 'civic signal', expectDate: { year: 2026, month: 9, day: 22 }, expectTime: { hour: 19, minute: 0 } },
+
   // Long input, to see whether it truncates or hallucinates.
   { id: 'long-1', category: 'long', text: `${'Background context that is not an event. '.repeat(40)}The only real item: kickoff on March 20 2026 at 10am.`,
     expectCandidates: 1, expectDate: { year: 2026, month: 3, day: 20 }, expectTime: { hour: 10, minute: 0 } },
+
+  // IMAGES. Rendered by scripts/render-eval-images.mjs; the same shapes a phone
+  // camera roll produces: a screenshot of an invite, a gig poster, a text thread,
+  // and a notice with no time at all.
+  { id: 'img-meet', category: 'image', image: 'meet-invite.png', text: '(screenshot of meet-1)',
+    expectCandidates: 1, expectTitle: 'civic signal', expectDate: { year: 2026, month: 9, day: 22 }, expectTime: { hour: 19, minute: 0 } },
+  { id: 'img-poster', category: 'image', image: 'gig-poster.png', text: '(gig poster: Midnight Signal, Friday October 2, doors 8pm)',
+    expectCandidates: 1, expectTitle: 'midnight signal', expectDate: { year: 2026, month: 10, day: 2 }, expectTime: { hour: 20, minute: 0 } },
+  { id: 'img-sms', category: 'image', image: 'text-message.png', text: '(text thread: Dinner Saturday Sept 19 at 7:30pm at Lupa)',
+    expectCandidates: 1, expectDate: { year: 2026, month: 9, day: 19 }, expectTime: { hour: 19, minute: 30 } },
+  { id: 'img-allday', category: 'image', image: 'all-day-notice.png', text: '(notice: Company offsite Friday March 20 2026, all day)',
+    expectCandidates: 1, expectTitle: 'offsite', expectDate: { year: 2026, month: 3, day: 20 }, expectNoTime: true },
 ];

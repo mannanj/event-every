@@ -30,8 +30,13 @@ export const TRANSPORT_LEASE_MS = 14 * 60_000;
 export const COMMITTED_LEASE_MS = 15 * 60_000;
 export const REPLAY_RETENTION_MS = 48 * 60 * 60_000;
 export const ACCOUNTING_RETENTION_MS = 72 * 60 * 60_000;
+// Measured 2026-09-15 on scripts/scan-eval-cases.ts (28 text cases, one run
+// each, same transport as production): mistral-small-2603 27/28 correct in
+// ~4s per call; deepseek-v4-flash 15/27, mostly date-only points with the
+// stated time dropped, at 13-80s per call. The same Mistral model already
+// serves images, so one model now handles both scan variants.
 export const OWNER_MODELS = Object.freeze({
-  'scan-text': 'deepseek/deepseek-v4-flash',
+  'scan-text': 'mistralai/mistral-small-2603',
   'scan-image': 'mistralai/mistral-small-2603',
   'resolve-timezone': 'deepseek/deepseek-v4-flash',
   summarize: 'deepseek/deepseek-v4-flash',

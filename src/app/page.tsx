@@ -361,6 +361,13 @@ function Home({ processingDisabled }: { processingDisabled: boolean }) {
         if (!controller.signal.aborted && !(error instanceof DOMException && error.name === 'AbortError')) {
           pushProcessingError('image', error);
         }
+        // A failed or cancelled image must not keep the "scanning" shimmer on
+        // screen: the statuses stayed 'processing' until the 10s cleanup below,
+        // so the user saw an error and then a scan that appeared to continue.
+        const message = error instanceof Error ? error.message : 'Unable to scan this image.';
+        setImageProcessingStatuses((previous) => previous.map((item) =>
+          item.status === 'pending' || item.status === 'processing' ? { ...item, status: 'error' as const, error: message } : item,
+        ));
       } finally {
         const current = abortRef.current === controller;
         if (current) abortRef.current = null;

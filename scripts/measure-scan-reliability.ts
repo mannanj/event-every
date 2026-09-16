@@ -31,20 +31,36 @@
  * fraction of a cent instead of $0.02 against the app's $1/day pot.
  *
  *   bun scripts/measure-scan-reliability.ts [repeats-per-case]
+ *
+ *   EVAL_MODELS         comma list of text models (default: the production text model)
+ *   EVAL_IMAGE_MODELS   comma list of image models (default: the production image model)
+ *   EVAL_ONLY           comma list of case ids to run
+ *
+ * The request is built exactly as the Worker builds it: same transport wrapper
+ * (context message, schema guidance, evidence repair), same pinned body. The
+ * model is the only variable, and it is varied through the transport's own
+ * evaluation seam rather than a body field the transport would overwrite.
  */
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 
 import { scanSource } from '@/server/scanner/scan';
 import { createEventEveryOpenRouterTransport } from '@/server/scanner/transport';
+import { OWNER_MODELS } from '@/platform/provider/policy';
+import { existsSync } from 'node:fs';
 import { toDurableScanReplay } from '@/platform/provider/replay';
 import { callOpenRouter } from '@/platform/provider/transport';
-import { createOpenRouterTextLinkProvider } from '@event-every/scanner/openrouter';
+import { createOpenRouterTextLinkProvider, createOpenRouterVisionProvider } from '@event-every/scanner/openrouter';
 
 import { EVAL_CASES, type EvalCase } from './scan-eval-cases';
 
 const REPEATS = Number(process.argv[2] ?? 1);
-const MODELS = (process.env.EVAL_MODELS ?? 'deepseek/deepseek-v4-flash,deepseek/deepseek-v4.1-flash').split(',');
+const TEXT_MODELS = (process.env.EVAL_MODELS ?? OWNER_MODELS['scan-text']).split(',').filter(Boolean);
+const IMAGE_MODELS = (process.env.EVAL_IMAGE_MODELS ?? OWNER_MODELS['scan-image']).split(',').filter(Boolean);
+const ONLY = (process.env.EVAL_ONLY ?? '').split(',').filter(Boolean);
+const IMAGE_DIR = `${import.meta.dir}/eval-images`;
+// The Worker sends the reader's zone and the admission instant; the eval pins both.
+const CONTEXT = { nowMs: Date.parse('2026-09-15T16:00:00-04:00'), timeZone: 'America/New_York' } as const;
 const CONCURRENCY = 6;
 
 function apiKey(): string {
@@ -116,28 +132,39 @@ function score(testCase: EvalCase, replay: unknown): Outcome {
       return { schema: true, correct: false, why: `time ${when.hh}:${when.mm} != ${hour}:${minute}` };
     }
   }
+  if (testCase.expectNoTime && when.hh !== undefined) {
+    return { schema: true, correct: false, why: `invented time ${when.hh}:${when.mm} for an all-day input` };
+  }
   return { schema: true, correct: true, why: 'ok' };
 }
 
 async function runCase(model: string, testCase: EvalCase, key: string): Promise<Outcome> {
-  const source = { sourceId: randomUUID(), kind: 'text' as const, contentHandle: randomUUID() };
+  const kind = testCase.image ? 'image' as const : 'text' as const;
+  const source = { sourceId: randomUUID(), kind, contentHandle: randomUUID() };
   const transport = createEventEveryOpenRouterTransport({
+    context: CONTEXT,
     invoke: async (providerBody) =>
       callOpenRouter({
-        consumerKind: 'scan_text',
+        consumerKind: kind === 'image' ? 'scan_image' : 'scan_text',
         apiKey: key,
-        providerBody: { ...providerBody, model },
+        providerBody,
+        modelOverride: model,
         signal: AbortSignal.timeout(120_000),
       }),
   });
-  const provider = createOpenRouterTextLinkProvider({
-    transport,
-    resolve: async () => ({ sourceId: source.sourceId, kind: 'text' as const, text: testCase.text }),
-  });
+  const provider = kind === 'image'
+    ? createOpenRouterVisionProvider({
+      transport,
+      resolve: async () => ({ sourceId: source.sourceId, kind: 'image' as const, dataUrl: `data:image/png;base64,${readFileSync(`${IMAGE_DIR}/${testCase.image}`).toString('base64')}` }),
+    })
+    : createOpenRouterTextLinkProvider({
+      transport,
+      resolve: async () => ({ sourceId: source.sourceId, kind: 'text' as const, text: testCase.text }),
+    });
 
   let result;
   try {
-    result = await scanSource({ kind: 'text', handle: source, provider }, { candidateIdFactory: randomUUID });
+    result = await scanSource({ kind, handle: source, provider } as Parameters<typeof scanSource>[0], { candidateIdFactory: randomUUID });
   } catch (error) {
     return { schema: false, correct: false, why: error instanceof Error ? error.message.slice(0, 60) : 'threw' };
   }
@@ -149,10 +176,19 @@ async function runCase(model: string, testCase: EvalCase, key: string): Promise<
 }
 
 const key = apiKey();
-const jobs = EVAL_CASES.flatMap((c) => Array.from({ length: REPEATS }, () => c));
-console.log(`${EVAL_CASES.length} cases x ${REPEATS} = ${jobs.length} runs per model\n`);
+const selected = EVAL_CASES.filter((c) => ONLY.length === 0 || ONLY.includes(c.id));
+const textCases = selected.filter((c) => !c.image);
+const imageCases = selected.filter((c) => c.image && existsSync(`${IMAGE_DIR}/${c.image}`));
+if (selected.some((c) => c.image) && imageCases.length === 0) console.log('image cases skipped: run `node scripts/render-eval-images.mjs` first\n');
 
-for (const model of MODELS) {
+const plan: Array<{ model: string; cases: EvalCase[] }> = [
+  ...TEXT_MODELS.map((model) => ({ model, cases: textCases })),
+  ...IMAGE_MODELS.map((model) => ({ model, cases: imageCases })),
+].filter((p) => p.cases.length > 0);
+
+for (const { model, cases } of plan) {
+  const jobs = cases.flatMap((c) => Array.from({ length: REPEATS }, () => c));
+  console.log(`\n${cases[0]!.image ? 'IMAGE' : 'TEXT'} ${cases.length} cases x ${REPEATS} = ${jobs.length} runs`);
   const outcomes: { testCase: EvalCase; outcome: Outcome }[] = [];
   for (let i = 0; i < jobs.length; i += CONCURRENCY) {
     const slice = jobs.slice(i, i + CONCURRENCY);

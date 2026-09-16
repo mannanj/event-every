@@ -93,7 +93,7 @@ const ParticleButton: React.FC<ParticleButtonProps> = ({
       <button
         onClick={onClick}
         disabled={disabled}
-        aria-label={ariaLabel || 'Pop it - turn your input into events'}
+        aria-label={ariaLabel || 'Scan it - turn your input into events'}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
         style={{
@@ -116,7 +116,7 @@ const ParticleButton: React.FC<ParticleButtonProps> = ({
             transition: 'color 0.4s ease',
           }}
         >
-          Pop it
+          Scan it
         </span>
 
         {/* Fluid paint-in-water effect with sun-like colors - appears after text */}
