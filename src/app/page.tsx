@@ -38,6 +38,7 @@ import { ProcessingEvent, ImageProcessingStatus, BatchProcessing, URLProcessingS
 import { scan } from '@/services/scanClient';
 import { createReviewDrafts } from '@/services/scannerDraft';
 import { mapWithConcurrency } from '@/utils/concurrency';
+import { requestTriage } from '@/services/scanTriage';
 import type { ReviewDraft } from '@/types/review';
 import { reviewDraftsToCalendarEvents } from '@/services/reviewEvent';
 import { ScanResponseSchema, type ScanRequest } from '@/types/scannerHttp';
@@ -46,6 +47,7 @@ import AuthWrapper from '@/components/AuthWrapper';
 // Matches the processing queue's own ceiling; more in flight than that only
 // queues at the provider.
 const IMAGE_SCAN_CONCURRENCY = 3;
+const TEXT_SCAN_CONCURRENCY = 3;
 
 function providerScanDrafts(response: ReturnType<typeof ScanResponseSchema.parse>, operation: ProviderOperationRecord): ReviewDraft[] {
   const createdAt = new Date(operation.createdAtMs).toISOString();
@@ -263,6 +265,7 @@ function Home({ processingDisabled }: { processingDisabled: boolean }) {
   const runScan = useCallback(async (
     request: ScanRequest,
     signal: AbortSignal,
+    options: { quietWhenEmpty?: boolean } = {},
   ): Promise<CalendarEvent[]> => {
     let operation: ProviderOperationRecord | undefined;
     let providerCompleted = false;
@@ -283,7 +286,7 @@ function Home({ processingDisabled }: { processingDisabled: boolean }) {
       const scanned = acceptProviderScan(response, operation);
       // A scan that finds nothing used to be indistinguishable from being
       // ignored: input cleared, no cards, no message (task-205).
-      if (scanned.length === 0 && !signal.aborted) {
+      if (scanned.length === 0 && !signal.aborted && !options.quietWhenEmpty) {
         pushProcessingNotice(
           request.kind === 'image' ? 'image' : 'text',
           'No event found in that. A date and a time are what it looks for.',
@@ -425,7 +428,25 @@ function Home({ processingDisabled }: { processingDisabled: boolean }) {
 
         setUrlProcessingStatus({ phase: 'extracting', message: 'Extracting events...' });
         updateProgress(queueItem.id, 50);
-        const scanned = await runScan({ kind: 'text', text: combinedText }, controller.signal);
+        // Triage decides when and how many scans run, never what they return.
+        // A null outcome (no key, slow, or failed) is the single scan as before.
+        const triage = await requestTriage(combinedText, detection.hasUrls ? 'url-page' : 'paste', controller.signal);
+        if (controller.signal.aborted || activeSubmissionRef.current !== batchId) return [];
+        const decision = triage?.decision ?? { kind: 'single' as const };
+        let scanned: CalendarEvent[] = [];
+        if (decision.kind === 'skip') {
+          pushProcessingNotice('text', 'No date or time found in that. Add when it happens and try again.');
+        } else if (decision.kind === 'split') {
+          setUrlProcessingStatus({ phase: 'extracting', message: `Extracting ${decision.chunks.length} events...` });
+          const perChunk = await mapWithConcurrency(decision.chunks, TEXT_SCAN_CONCURRENCY, (chunk) =>
+            runScan({ kind: 'text', text: chunk }, controller.signal, { quietWhenEmpty: true }));
+          scanned = perChunk.flat();
+          if (scanned.length === 0 && !controller.signal.aborted) {
+            pushProcessingNotice('text', 'No event found in that. A date and a time are what it looks for.');
+          }
+        } else {
+          scanned = await runScan({ kind: 'text', text: combinedText }, controller.signal);
+        }
         if (controller.signal.aborted || activeSubmissionRef.current !== batchId) return [];
         const titles = scanned.map((event) => event.title);
         summarizeAndStore(summaryEntryId, inputText, titles.map((title) => ({ title })));
