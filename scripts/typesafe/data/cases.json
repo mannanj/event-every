@@ -1,0 +1,2021 @@
+[
+  {
+    "id": "r-1",
+    "source": "text",
+    "text": "Meet for Civic Signal\nThursday, September 3 · 7:30 – 8:30pm\nTime zone: America/New_York\nGoogle Meet joining info\nVideo call link: https://meet.google.com/yjo-wpmx-hso",
+    "referenceDate": "2026-09-01",
+    "truth": {
+      "title": "Meet for Civic Signal",
+      "date": "2026-09-03",
+      "time": "19:30",
+      "location": "Virtual (Google Meet)",
+      "allDay": false,
+      "titleAccept": [
+        "Meet for Civic Signal"
+      ]
+    },
+    "hard": "real scan from user history; truth is the exported card"
+  },
+  {
+    "id": "r-2",
+    "source": "text",
+    "text": "June 13, 2026\n\nHi Mannan,\n\nI’m pleased to confirm your upcoming virtual phone screen interview via Microsoft Teams for the Sr. Software Engineer Frontend position at Togetherwork. Below are the details:\n\nDate/Time: Jun 15, 2026 10:30am-11:00am (GMT-04:00) Eastern Time (US & Canada)\nInterviewers: Bri Sanders (Sr. Talent Acquisition Partner)\n\nMicrosoft Teams: https://teams.microsoft.com/l/meetup-join/19%3ameeting_ZDNlNTE0ODItNmJmZS00MWE2LWI4MjItNjYyNGEyZWIxODQ1%40thread.v2/0?context=%7b%22Tid%22%3a%2278c11cb7-c74d-45f6-a28c-0e92979a1094%22%2c%22Oid%22%3a%22dbd6aca5-cbd2-48ff-bcd5-ec1c41666175%22%7d. \n\nThis will be a virtual meeting conducted through Microsoft Teams. You are welcome to have your camera on or off—whichever you’re more comfortable with. Please note: this interview will be recorded for internal review and evaluation purposes.\n\nWhat to Review Before the Interview:\n\n-   Job Description:\n    Please take a moment to review the responsibilities and requirements.\n    \n-   Employment Application:  Formal Employment Application\n    Please complete this prior to the interview, as we’ll reference it during the discussion.\n    \n-   Benefits Overview:\n    Attached is our benefits guide and 401K  overview for your review ahead of time.\n    \n\nWhat to Expect During the Interview:\n\nThe recruiter will cover:\n\n-   Relevant Experience: How your background aligns with the role\n    \n-   Technical Skills: Any required tools, platforms, or methods\n    \n-   Cultural Fit: How your working style and values align with Togetherwork’s culture\n    \n-   Career Motivation: What draws you to this opportunity and your goals\n    \n-   Availability: Start date and logistics\n    \n-   Application Review: We’ll go over your responses\n    \n\nPlease reply to this email to confirm receipt and let us know if you have any questions before the interview. We look forward to connecting with you!\n\nEnjoy the rest of your day.",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Sr. Software Engineer Frontend - Virtual Phone Screen Interview",
+      "date": "2026-06-15",
+      "time": "10:30",
+      "location": "Microsoft Teams",
+      "allDay": false,
+      "titleAccept": [
+        "Sr. Software Engineer Frontend - Virtual Phone Screen Interview"
+      ]
+    },
+    "hard": "real scan; the app exported this email twice with a 06:30 start (10:30 ET stored as UTC), once correctly"
+  },
+  {
+    "id": "f-01",
+    "source": "text",
+    "text": "Dentist appointment Thursday Sept 24 at 2:30pm, Bright Smile Dental, 410 Oak St. Arrive 10 min early for paperwork.",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Dentist appointment",
+      "date": "2026-09-24",
+      "time": "14:30",
+      "location": "Bright Smile Dental, 410 Oak St",
+      "allDay": false,
+      "titleAccept": [
+        "Dentist appointment"
+      ]
+    },
+    "hard": "clean"
+  },
+  {
+    "id": "f-02",
+    "source": "ocr",
+    "text": "AUTUMN HARVEST FESTIVAL\nSAT OCT 1O 2O26\n1lam - 5pm\nRIVERSIDE PARK PAVILI0N\nFREE ADMISSI0N\nSPONSORED BY GREENLEAF GROCERY AND KXRT 91.3",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Autumn Harvest Festival",
+      "date": "2026-10-10",
+      "time": "11:00",
+      "location": "Riverside Park Pavilion",
+      "allDay": false,
+      "titleAccept": [
+        "Autumn Harvest Festival"
+      ]
+    },
+    "hard": "OCR swaps 0/O and 1/l in both the date and the time, sponsor line is noise"
+  },
+  {
+    "id": "f-03",
+    "source": "email",
+    "text": "Re: Re: Q4 planning\n\nSounds good, let's lock it in for Tuesday the 22nd at 10am in the Larkspur room. I'll send the deck beforehand.\n\nBest,\nPriya\n\nOn Mon, Sep 14, 2026 at 4:12 PM Dan Ortiz <dan.ortiz@example.com> wrote:\n> Could we do Tuesday or Wednesday next week? Morning works best for me.\n>\n> Sent from my iPhone",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Q4 planning",
+      "date": "2026-09-22",
+      "time": "10:00",
+      "location": "Larkspur room",
+      "allDay": false,
+      "titleAccept": [
+        "Q4 planning"
+      ]
+    },
+    "hard": "quoted history offers two days, only the reply fixes the date; title is behind Re: Re:"
+  },
+  {
+    "id": "f-04",
+    "source": "invite",
+    "text": "Design review: onboarding flow\nFriday, September 18 - 3:00 - 3:45pm (Pacific Time - Los Angeles)\nJoin with Google Meet\nmeet.google.com/abc-defg-hij\nJoin by phone\n(US) +1 402-555-0198 PIN: 448 213 771#\nGuests: 6 yes, 1 awaiting\nAdd to calendar | View all guest info",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Design review: onboarding flow",
+      "date": "2026-09-18",
+      "time": "15:00",
+      "location": "Google Meet",
+      "allDay": false,
+      "titleAccept": [
+        "Design review: onboarding flow"
+      ]
+    },
+    "hard": "dial-in PIN and guest counts look like numbers that could be mistaken for times; timezone stated"
+  },
+  {
+    "id": "f-05",
+    "source": "poster",
+    "text": "GOODNIGHT RADIO\nwith special guests THE PALE MOONS\nFRI NOV 6\nDOORS 8PM / SHOW 9PM\n$25 ADV / $30 DOOR\nTHE BLUEBIRD, 3317 E COLFAX AVE\n21+ / ALL AGES W/ GUARDIAN",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Goodnight Radio with The Pale Moons",
+      "date": "2026-11-06",
+      "time": "21:00",
+      "location": "The Bluebird, 3317 E Colfax Ave",
+      "allDay": false,
+      "titleAccept": [
+        "Goodnight Radio with The Pale Moons"
+      ]
+    },
+    "hard": "doors vs show time; show is the start, and $25/$30 must not be read as times"
+  },
+  {
+    "id": "f-06",
+    "source": "sms",
+    "text": "hey still on for sat?\nyep! trivia at murphy's, 7:30\nok cool see you there\nbring cash they don't take cards",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Trivia night",
+      "date": "2026-09-19",
+      "time": "19:30",
+      "location": "Murphy's",
+      "allDay": false,
+      "titleAccept": [
+        "Trivia night"
+      ]
+    },
+    "hard": "weekday only, evening implied by trivia context, chatter around the event"
+  },
+  {
+    "id": "f-07",
+    "source": "web",
+    "text": "Home > Events > Workshops\nIntro to Sourdough Baking\nAdd to calendar | Share\nSelect a date:\nSat Oct 3, 10:00 AM (SOLD OUT)\nSat Oct 17, 10:00 AM (4 spots left)\nSat Nov 7, 10:00 AM\nPrice: $65 per person, includes starter to take home\nLocation: Flour & Stone Bakery, 88 Mill Lane\nYou selected: Sat Oct 17, 10:00 AM",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Intro to Sourdough Baking",
+      "date": "2026-10-17",
+      "time": "10:00",
+      "location": "Flour & Stone Bakery, 88 Mill Lane",
+      "allDay": false,
+      "titleAccept": [
+        "Intro to Sourdough Baking"
+      ]
+    },
+    "hard": "three dates listed, only the selected one is intended"
+  },
+  {
+    "id": "f-08",
+    "source": "email",
+    "text": "Reminder: Parents' evening at St Bede's Primary on 05/11 from 16:00. Please book a slot with your child's teacher via the app.\n\nKind regards,\nSchool Office\nSt Bede's Primary, Leeds LS6",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Parents' evening",
+      "date": "2026-11-05",
+      "time": "16:00",
+      "location": "St Bede's Primary",
+      "allDay": false,
+      "titleAccept": [
+        "Parents' evening"
+      ]
+    },
+    "hard": "05/11 is DD/MM, hinted by UK spelling and a Leeds postcode; MM/DD reading would give May 11"
+  },
+  {
+    "id": "f-09",
+    "source": "text",
+    "text": "Team offsite 10/8 - all day at the Lakehouse. Lunch provided. RSVP to Sam by Friday.",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Team offsite",
+      "date": "2026-10-08",
+      "time": null,
+      "location": "the Lakehouse",
+      "allDay": true,
+      "titleAccept": [
+        "Team offsite"
+      ]
+    },
+    "hard": "MM/DD with no locale hint, RSVP Friday is a distractor date, all-day stated"
+  },
+  {
+    "id": "f-10",
+    "source": "text",
+    "text": "Grandma's ninetieth birthday party on the twenty-first of November at half past three, at our place (14 Willow Crescent). Cake at four.",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Grandma's 90th birthday party",
+      "date": "2026-11-21",
+      "time": "15:30",
+      "location": "14 Willow Crescent",
+      "allDay": false,
+      "titleAccept": [
+        "Grandma's 90th birthday party",
+        "Grandma's ninetieth birthday party"
+      ]
+    },
+    "hard": "ordinal words for the date, 'half past three' for the time, 'cake at four' is a second time"
+  },
+  {
+    "id": "f-11",
+    "source": "email",
+    "text": "Heads up: deployment freeze begins 2026-12-18. No prod changes until Jan 4. Hotfixes need VP sign-off.",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Deployment freeze begins",
+      "date": "2026-12-18",
+      "time": null,
+      "location": null,
+      "allDay": true,
+      "titleAccept": [
+        "Deployment freeze begins"
+      ]
+    },
+    "hard": "ISO date, multi-week range, no clock time; Jan 4 end date is not the start"
+  },
+  {
+    "id": "f-12",
+    "source": "sms",
+    "text": "can you do next thursday for the haircut? 11am at fade society\nsure, book it",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Haircut",
+      "date": "2026-09-24",
+      "time": "11:00",
+      "location": "Fade Society",
+      "allDay": false,
+      "titleAccept": [
+        "Haircut"
+      ]
+    },
+    "hard": "'next Thursday' from a Wednesday resolves to the 24th, not tomorrow the 17th"
+  },
+  {
+    "id": "f-13",
+    "source": "text",
+    "text": "Kickoff meeting Mon 21 Sep 14:00-15:30, Room 4B, Building C. Bring the signed SOW.",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Kickoff meeting",
+      "date": "2026-09-21",
+      "time": "14:00",
+      "location": "Room 4B, Building C",
+      "allDay": false,
+      "titleAccept": [
+        "Kickoff meeting"
+      ]
+    },
+    "hard": "24h time range, DD Mon order"
+  },
+  {
+    "id": "f-14",
+    "source": "text",
+    "text": "Lunch with Aunt Carol at noon on Sunday, Olive Garden on Route 9. She's bringing the photo albums.",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Lunch with Aunt Carol",
+      "date": "2026-09-20",
+      "time": "12:00",
+      "location": "Olive Garden on Route 9",
+      "allDay": false,
+      "titleAccept": [
+        "Lunch with Aunt Carol"
+      ]
+    },
+    "hard": "noon as a word, weekday only"
+  },
+  {
+    "id": "f-15",
+    "source": "poster",
+    "text": "MIDNIGHT PREMIERE\nSTARFALL II: THE LONG DARK\nTHURSDAY OCT 15\nREGAL CINEMA 12\nTICKETS AT BOX OFFICE OR ONLINE\nCOSTUMES ENCOURAGED",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Starfall II midnight premiere",
+      "date": "2026-10-16",
+      "time": "00:00",
+      "location": "Regal Cinema 12",
+      "allDay": false,
+      "titleAccept": [
+        "Starfall II midnight premiere"
+      ]
+    },
+    "hard": "midnight on 'Thursday Oct 15' is 00:00 on Oct 16 by the calendar; the Thursday label is colloquial"
+  },
+  {
+    "id": "f-16",
+    "source": "sms",
+    "text": "Let's do 3pm Tuesday for the walkthrough.\nActually make it 4pm, the inspector is running late.\nAddress is 2201 Birch Ave unit 3, gate code 4471.",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Walkthrough",
+      "date": "2026-09-22",
+      "time": "16:00",
+      "location": "2201 Birch Ave unit 3",
+      "allDay": false,
+      "titleAccept": [
+        "Walkthrough"
+      ]
+    },
+    "hard": "corrected time; first stated 3pm is superseded, gate code is numeric noise"
+  },
+  {
+    "id": "f-17",
+    "source": "email",
+    "text": "All staff: the office is closed Monday, October 12 for Indigenous Peoples' Day. Normal hours resume Tuesday. Enjoy the long weekend.",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Office closed - Indigenous Peoples' Day",
+      "date": "2026-10-12",
+      "time": null,
+      "location": null,
+      "allDay": true,
+      "titleAccept": [
+        "Office closed - Indigenous Peoples' Day"
+      ]
+    },
+    "hard": "closure is all-day; 'normal hours resume Tuesday' is not an event"
+  },
+  {
+    "id": "f-18",
+    "source": "email",
+    "text": "FINAL REMINDER: grant applications are due 11:59pm Oct 30. Late submissions will not be reviewed. Submit via the portal, not by email.",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Grant applications due",
+      "date": "2026-10-30",
+      "time": "23:59",
+      "location": null,
+      "allDay": false,
+      "titleAccept": [
+        "Grant applications due"
+      ]
+    },
+    "hard": "deadline with a clock time, so not all-day even though it reads like a due date"
+  },
+  {
+    "id": "f-19",
+    "source": "sms",
+    "text": "don't forget Marcus's birthday is on the 3rd of March!! he wants that lego set",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Marcus's birthday",
+      "date": "2027-03-03",
+      "time": null,
+      "location": null,
+      "allDay": true,
+      "titleAccept": [
+        "Marcus's birthday"
+      ]
+    },
+    "hard": "no year, March has passed so it rolls to 2027; all-day"
+  },
+  {
+    "id": "f-20",
+    "source": "text",
+    "text": "Family camping trip, Fri Oct 9 - Sun Oct 11, Big Basin campground site 14. Check-in is any time after 2 on Friday.",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Family camping trip",
+      "date": "2026-10-09",
+      "time": null,
+      "location": "Big Basin campground site 14",
+      "allDay": true,
+      "titleAccept": [
+        "Family camping trip"
+      ]
+    },
+    "hard": "multi-day range treated as all-day; 'after 2' is a loose check-in window, not a start time"
+  },
+  {
+    "id": "f-21",
+    "source": "web",
+    "text": "Webinar: Scaling Postgres Beyond 10TB\nWed Sept 30, 1:00 PM EST\nRegister free | Add to calendar | Share on LinkedIn\nA Zoom link will be emailed after registration.\nSpeakers: R. Okafor (Crunchy), M. Lind (Neon)",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Webinar: Scaling Postgres Beyond 10TB",
+      "date": "2026-09-30",
+      "time": "13:00",
+      "location": "Zoom",
+      "allDay": false,
+      "titleAccept": [
+        "Webinar: Scaling Postgres Beyond 10TB"
+      ]
+    },
+    "hard": "EST stated in September (really EDT); Zoom is implied as the location"
+  },
+  {
+    "id": "f-22",
+    "source": "poster",
+    "text": "VERNISSAGE\nGalerie Rot, Berlin-Mitte\nDonnerstag, 8. Oktober, 19:00 Uhr\nEintritt frei\nDie Ausstellung laeuft bis 22. November",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Vernissage",
+      "date": "2026-10-08",
+      "time": "19:00",
+      "location": "Galerie Rot, Berlin-Mitte",
+      "allDay": false,
+      "titleAccept": [
+        "Vernissage"
+      ]
+    },
+    "hard": "German day-month format, timezone implied by Berlin, exhibition end date is a distractor"
+  },
+  {
+    "id": "f-23",
+    "source": "text",
+    "text": "All hands: Thursday 9/24, 9am PT / 12pm ET. Link will be in Slack #general. Recording posted after.",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "All hands",
+      "date": "2026-09-24",
+      "time": "09:00",
+      "location": null,
+      "allDay": false,
+      "titleAccept": [
+        "All hands"
+      ]
+    },
+    "hard": "PT/ET pair; the first-listed PT is the canonical time, no venue or link given"
+  },
+  {
+    "id": "f-24",
+    "source": "email",
+    "text": "Talk accepted! You are presenting at PyCon Lisbon on 14 Nov, 11:15 slot, 30 minutes plus Q&A. Room assignment to follow.\n\nCheers,\nProgramme Committee",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "PyCon Lisbon talk",
+      "date": "2026-11-14",
+      "time": "11:15",
+      "location": "Lisbon",
+      "allDay": false,
+      "titleAccept": [
+        "PyCon Lisbon talk"
+      ]
+    },
+    "hard": "city-only location, DD Mon date, duration should not become an end date"
+  },
+  {
+    "id": "f-25",
+    "source": "ocr",
+    "text": "Subject:Interviewconfirmation\nHiJordan,\nYourinterviewisconfirmedforMonday,September28at9:45am.\nPleasearriveattheFrontDesk,Level3,100PineStreet.\nRegards,\nTalentTeam",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Interview",
+      "date": "2026-09-28",
+      "time": "09:45",
+      "location": "Front Desk, Level 3, 100 Pine Street",
+      "allDay": false,
+      "titleAccept": [
+        "Interview"
+      ]
+    },
+    "hard": "OCR dropped every space; date, time and address must be split out of run-together words"
+  },
+  {
+    "id": "f-26",
+    "source": "ocr",
+    "text": "Page 1 of 1                    Printed 09/14/26\nCOMMUNITY\nBLOOD\nDRIVE\nWednes-\nday, October 7th\n9am to 2pm\nSt. Mark's Fellowship\nHall\nWalk-ins welcome\nwww.redcross.org",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Community Blood Drive",
+      "date": "2026-10-07",
+      "time": "09:00",
+      "location": "St. Mark's Fellowship Hall",
+      "allDay": false,
+      "titleAccept": [
+        "Community Blood Drive"
+      ]
+    },
+    "hard": "title split across three lines, weekday hyphenated mid-word, print header date is not the event date"
+  },
+  {
+    "id": "f-27",
+    "source": "email",
+    "text": "RE: RE: FW: catering tasting\n\nConfirmed for Oct 2 at 1pm at Bella Cucina (the Elm St location, not downtown). Bring your allergy list.\n\n--\nMonica Reyes\nEvents Coordinator | 555-0142\nmonica@example.com",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Catering tasting",
+      "date": "2026-10-02",
+      "time": "13:00",
+      "location": "Bella Cucina, Elm St",
+      "allDay": false,
+      "titleAccept": [
+        "Catering tasting"
+      ]
+    },
+    "hard": "RE: RE: FW: prefix on the title, two locations mentioned with one negated"
+  },
+  {
+    "id": "f-28",
+    "source": "invite",
+    "text": "Sprint retro\nRequired: Eng team\nWhen: Monday, September 21, 2026 4:00 PM-4:30 PM (UTC-05:00) Eastern Time (US & Canada)\nWhere: Microsoft Teams Meeting\n________________________________\nMicrosoft Teams Need help?\nJoin the meeting now\nMeeting ID: 271 448 903 22\nPasscode: xY7pQ\nDial in by phone\n+1 469-555-0133,,88213#",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Sprint retro",
+      "date": "2026-09-21",
+      "time": "16:00",
+      "location": "Microsoft Teams",
+      "allDay": false,
+      "titleAccept": [
+        "Sprint retro"
+      ]
+    },
+    "hard": "Outlook boilerplate, meeting ID and dial-in digits, timezone in parentheses"
+  },
+  {
+    "id": "f-29",
+    "source": "poster",
+    "text": "JOIN US!\nFOR AN EVENING OF\nJAZZ UNDER THE STARS\nSUNDAY SEPTEMBER 27TH\n6:30 PM\nROOFTOP TERRACE - HOTEL MERIDIAN\nCOCKTAILS - LIVE MUSIC - RAFFLE\nPROCEEDS BENEFIT THE CITY YOUTH ORCHESTRA\nPRESENTED BY NORTHSIDE CREDIT UNION",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Jazz Under the Stars",
+      "date": "2026-09-27",
+      "time": "18:30",
+      "location": "Rooftop Terrace, Hotel Meridian",
+      "allDay": false,
+      "titleAccept": [
+        "Jazz Under the Stars"
+      ]
+    },
+    "hard": "title comes after 'JOIN US! FOR AN EVENING OF', beneficiary and sponsor lines compete for the title"
+  },
+  {
+    "id": "f-30",
+    "source": "sms",
+    "text": "mom says dinner sunday is moved to saturday\nsame time? 6?\nyeah 6 at her place\nok",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Dinner at Mom's",
+      "date": "2026-09-19",
+      "time": "18:00",
+      "location": "Mom's place",
+      "allDay": false,
+      "titleAccept": [
+        "Dinner at Mom's"
+      ]
+    },
+    "hard": "day rescheduled mid-thread, time confirmed by a question and answer"
+  },
+  {
+    "id": "f-31",
+    "source": "web",
+    "text": "Skip to content | Tickets | Venue Info | FAQ\nTHE NUTCRACKER - Ballet Northwest\nNov 27 - Dec 6 | McCaw Hall\nBuy Tickets from $39\nPerformances:\nFri Nov 27 7:30pm\nSat Nov 28 2:00pm\nSat Nov 28 7:30pm\nSun Nov 29 1:00pm\n...\nYour order: 2 x Adult, Sat Nov 28 2:00pm, Orchestra Row K\nOrder #55019203",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "The Nutcracker - Ballet Northwest",
+      "date": "2026-11-28",
+      "time": "14:00",
+      "location": "McCaw Hall",
+      "allDay": false,
+      "titleAccept": [
+        "The Nutcracker - Ballet Northwest"
+      ]
+    },
+    "hard": "run dates and several performances listed, only the ordered one is intended; two shows on the same day"
+  },
+  {
+    "id": "f-32",
+    "source": "sms",
+    "text": "Reminder: your car is booked in tomorrow between 8 and 8:30am for the MOT at Kwik Fit Harrogate Rd. Reply C to cancel.",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Car MOT",
+      "date": "2026-09-17",
+      "time": "08:00",
+      "location": "Kwik Fit Harrogate Rd",
+      "allDay": false,
+      "titleAccept": [
+        "Car MOT",
+        "MOT"
+      ]
+    },
+    "hard": "'tomorrow' relative to the reference date, an arrival window rather than a single time"
+  },
+  {
+    "id": "f-33",
+    "source": "text",
+    "text": "Save the date: Elena & Tom, January 16, Casa Loma, Toronto. Ceremony 4pm, reception to follow. Formal invitation to come.",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Elena & Tom's wedding",
+      "date": "2027-01-16",
+      "time": "16:00",
+      "location": "Casa Loma, Toronto",
+      "allDay": false,
+      "titleAccept": [
+        "Elena & Tom's wedding"
+      ]
+    },
+    "hard": "no year, rolls to 2027; the word 'wedding' never appears and must be inferred from the save-the-date"
+  },
+  {
+    "id": "f-34",
+    "source": "email",
+    "text": "Fwd: Invitation: Vendor demo - Acme SecureVault @ Tue Oct 6, 2026 11am - 12pm (CDT) (jordan@example.com)\n\nFYI, join if you can.\n\n---------- Forwarded message ---------\nVendor demo - Acme SecureVault\nTuesday Oct 6, 2026 - 11am - 12pm Central Time - Chicago\nLocation: Conference Room Juniper (2nd floor)\nJoining info: meet.google.com/xyz-abcd-efg\nYes / No / Maybe",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Vendor demo - Acme SecureVault",
+      "date": "2026-10-06",
+      "time": "11:00",
+      "location": "Conference Room Juniper (2nd floor)",
+      "allDay": false,
+      "titleAccept": [
+        "Vendor demo - Acme SecureVault"
+      ]
+    },
+    "hard": "forwarded invite with both a physical room and a Meet link; the room is the stated location"
+  },
+  {
+    "id": "f-35",
+    "source": "ocr",
+    "text": "ADMIT ONE\nCITY  MARATHON  EXPO\nBIB PICKUP\nFRl 1O/16  12:OO-2O:OO\nHALL B, CONVENTION CTR\nNO PICKUP ON RACE DAY",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Marathon Expo bib pickup",
+      "date": "2026-10-16",
+      "time": "12:00",
+      "location": "Hall B, Convention Center",
+      "allDay": false,
+      "titleAccept": [
+        "Marathon Expo bib pickup",
+        "City Marathon Expo"
+      ]
+    },
+    "hard": "OCR turns 0 into O and I into l inside a 24h range and a MM/DD date"
+  },
+  {
+    "id": "f-36",
+    "source": "text",
+    "text": "Book club is at Nadia's this month, the last Wednesday, usual 7:30. We're doing Piranesi, so finish it this time.",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Book club - Piranesi",
+      "date": "2026-09-30",
+      "time": "19:30",
+      "location": "Nadia's",
+      "allDay": false,
+      "titleAccept": [
+        "Book club - Piranesi",
+        "Book club"
+      ]
+    },
+    "hard": "'last Wednesday of this month' must be computed; pm implied by 'usual 7:30'"
+  },
+  {
+    "id": "f-37",
+    "source": "email",
+    "text": "Hi all, the site visit at the Fairview lot is set for Thu 10/1, meet at the gate at 7:45am sharp. Hard hats required, the GC will have extras.\n\nThanks,\nRob\n\nRob Kessler | Project Manager\nHalvorsen Construction\nO: 555-0177 | M: 555-0188\nThis email may contain confidential information intended only for the recipient.",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Site visit - Fairview lot",
+      "date": "2026-10-01",
+      "time": "07:45",
+      "location": "Fairview lot gate",
+      "allDay": false,
+      "titleAccept": [
+        "Site visit - Fairview lot",
+        "Site visit"
+      ]
+    },
+    "hard": "long signature with phone numbers, MM/DD, location is a spot within a site"
+  },
+  {
+    "id": "f-38",
+    "source": "sms",
+    "text": "yo pickup game tonight 8 at lincoln park courts, bring a dark shirt\nim in",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Pickup basketball game",
+      "date": "2026-09-16",
+      "time": "20:00",
+      "location": "Lincoln Park courts",
+      "allDay": false,
+      "titleAccept": [
+        "Pickup basketball game"
+      ]
+    },
+    "hard": "'tonight' is the reference date, bare '8' needs pm from context, lowercase venue"
+  },
+  {
+    "id": "f-39",
+    "source": "email",
+    "text": "Dear families, school picture day is Friday Oct 2. Order forms are due back the same day. Uniforms are not required, but please no logos.",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "School picture day",
+      "date": "2026-10-02",
+      "time": null,
+      "location": null,
+      "allDay": true,
+      "titleAccept": [
+        "School picture day"
+      ]
+    },
+    "hard": "no clock time so all-day; 'due back' reads like a deadline but is the same day"
+  },
+  {
+    "id": "f-40",
+    "source": "email",
+    "text": "Hi, following up on our call. The kickoff will be Wednesday, Sept 23 at 10:00 CET via Zoom (link below). The workshop itself runs Oct 5-7 in Amsterdam; more on logistics later.\n\nZoom: https://zoom.us/j/9912345678?pwd=k3Lm\n\nBest,\nLotte",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Kickoff",
+      "date": "2026-09-23",
+      "time": "10:00",
+      "location": "Zoom",
+      "allDay": false,
+      "titleAccept": [
+        "Kickoff"
+      ]
+    },
+    "hard": "two events in one email, the nearer kickoff is intended; CET stated, Amsterdam workshop is a distractor"
+  },
+  {
+    "id": "s-1",
+    "source": "ocr",
+    "text": "PR0DUCT LAUNCH EVENT\nJoin us as we unveil the newest lineup!\nDate: 0ctober 5, 2O26\nTime: 1O:0O AM\nLocation: Ha1l B, Riverside Convention Center\nRefreshments provided",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Product Launch Event",
+      "date": "2026-10-05",
+      "time": "10:00",
+      "location": "Hall B, Riverside Convention Center",
+      "allDay": false,
+      "titleAccept": [
+        "Product Launch Event"
+      ]
+    },
+    "hard": "OCR confuses 0/O and 1/l across the date, time, and venue name"
+  },
+  {
+    "id": "s-2",
+    "source": "ocr",
+    "text": "CONFIDENTIAL - INTERNAL USE ONLY\nANNUAL\nSHAREHOLDER\nMEETING\nWhen:November12,2026 2:00PM\nWhere:ConferenceRoomA,3rdFloor\nPage1of1",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Annual Shareholder Meeting",
+      "date": "2026-11-12",
+      "time": "14:00",
+      "location": "Conference Room A, 3rd Floor",
+      "allDay": false,
+      "titleAccept": [
+        "Annual Shareholder Meeting"
+      ]
+    },
+    "hard": "title split across three lines in caps, spaces dropped around date/time/location, stray header and footer text"
+  },
+  {
+    "id": "s-3",
+    "source": "ocr",
+    "text": "Monday Morning Standup\nEvery Manager please attend\nTime: l1:3O AM\nJu1y 2O, 2O26\nRoom: Innovation Lab",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Monday Morning Standup",
+      "date": "2026-07-20",
+      "time": "11:30",
+      "location": "Innovation Lab",
+      "allDay": false,
+      "titleAccept": [
+        "Monday Morning Standup"
+      ]
+    },
+    "hard": "1/l/I character swaps in the time, date, and month abbreviation"
+  },
+  {
+    "id": "s-5",
+    "source": "ocr",
+    "text": "NOTlCE - PLEASE POST\nPrinted: 12/01/2026\n---\nOFFlCE ClOSED\nDEC 24-26, 2O26\nfor the ho1iday\n---\nBuilding Services",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Office Closed for Holiday",
+      "date": "2026-12-24",
+      "time": null,
+      "location": null,
+      "allDay": true,
+      "titleAccept": [
+        "Office Closed for Holiday"
+      ]
+    },
+    "hard": "stray printed-on date must be ignored, multi-day range collapses to start date, OCR digit noise"
+  },
+  {
+    "id": "s-6",
+    "source": "email",
+    "text": "On Wed, Sep 16, 2026 at 9:02 AM Dana Reyes wrote:\n> Can we do the client call at 2pm today?\n> Also loop in Marcus.\n\nActually let's push it to 3pm today, 2 works better for their side too but they asked for 3. Same dial-in as always.\n\nThanks,\nDana Reyes\nSenior Account Manager\nSent from my iPhone",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Client Call",
+      "date": "2026-09-16",
+      "time": "15:00",
+      "location": null,
+      "allDay": false,
+      "titleAccept": [
+        "Client Call"
+      ]
+    },
+    "hard": "quoted history proposes 2pm but the reply text corrects it to 3pm; signature and iPhone footer are noise"
+  },
+  {
+    "id": "s-7",
+    "source": "email",
+    "text": "Subject: Dinner Friday\n\nHi all,\n\nReservation is confirmed for Friday, September 18 at 7:30pm at Lucia's Trattoria on 5th Ave. Table for six under my name.\n\nSee you there,\nPriya\n\n---\nPriya Nair\nOperations Lead\n555-0148",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Dinner Reservation",
+      "date": "2026-09-18",
+      "time": "19:30",
+      "location": "Lucia's Trattoria, 5th Ave",
+      "allDay": false,
+      "titleAccept": [
+        "Dinner Reservation"
+      ]
+    },
+    "hard": "clean but has a full signature block with a phone number to ignore"
+  },
+  {
+    "id": "s-8",
+    "source": "email",
+    "text": "Sounds good, locking in Thursday Sept 24 at 11am for the walkthrough then. See everyone at the property.\n\nOn Tue, Sep 15, 2026, Carlos M. wrote:\n> How about Wednesday the 23rd at 1pm?\n>\n> On Mon, Sep 14, 2026, Ines wrote:\n>> Can we look at the warehouse sometime next week? Maybe Tuesday morning?\n\nBest,\nCarlos",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Warehouse Walkthrough",
+      "date": "2026-09-24",
+      "time": "11:00",
+      "location": null,
+      "allDay": false,
+      "titleAccept": [
+        "Warehouse Walkthrough"
+      ]
+    },
+    "hard": "three different candidate dates appear across the quoted thread; only the top reply reflects the final agreed time"
+  },
+  {
+    "id": "s-9",
+    "source": "email",
+    "text": "Subject: RE: Fwd: dinner friday??\n\nyes still happening! 8pm at The Anchor House, ask for the Nguyen reservation. bring the kids if you want\n\n- M",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Dinner",
+      "date": "2026-09-18",
+      "time": "20:00",
+      "location": "The Anchor House",
+      "allDay": false,
+      "titleAccept": [
+        "Dinner"
+      ]
+    },
+    "hard": "subject line is layered RE: Fwd: noise, real title must come from the body, terse signature"
+  },
+  {
+    "id": "s-10",
+    "source": "email",
+    "text": "Subject: Quarterly Sync - Zoom\n\nHi team,\n\nJoining details below.\n\nWhen: Monday, September 21, 2026, 10:00 AM (EST)\nWhere: Zoom - https://zoom.us/j/8813492201\nDial-in: +1-646-555-0199, Meeting ID: 881 349 2201\n\nAgenda attached.\n\nRegards,\nOps Team",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Quarterly Sync",
+      "date": "2026-09-21",
+      "time": "10:00",
+      "location": "Zoom",
+      "allDay": false,
+      "titleAccept": [
+        "Quarterly Sync"
+      ]
+    },
+    "hard": "EST timezone stated explicitly, dial-in number and meeting ID are noise, link should not become the location"
+  },
+  {
+    "id": "s-11",
+    "source": "invite",
+    "text": "Sam Patel invited you\nDesign Review - Q4 Roadmap\nWed Sep 23, 2026 - 3:00 - 4:00pm\nJoin with Google Meet\nmeet.google.com/xyz-defg-hjk\n\nGuests\nSam Patel - organizer\nYou - awaiting response\n2 more",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Design Review - Q4 Roadmap",
+      "date": "2026-09-23",
+      "time": "15:00",
+      "location": "Google Meet",
+      "allDay": false,
+      "titleAccept": [
+        "Design Review - Q4 Roadmap"
+      ]
+    },
+    "hard": "screenshot has organizer and guest RSVP clutter, join link must resolve to Google Meet as the location"
+  },
+  {
+    "id": "s-12",
+    "source": "invite",
+    "text": "Budget Planning Session\nWhen: Thursday, October 1, 2026 1:00 PM-2:30 PM\nWhere: Conf Rm 402\nOrganizer: Wendy Cho\nShow As: Busy\nResponse: None\nRecurrence: Does not repeat",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Budget Planning Session",
+      "date": "2026-10-01",
+      "time": "13:00",
+      "location": "Conf Rm 402",
+      "allDay": false,
+      "titleAccept": [
+        "Budget Planning Session"
+      ]
+    },
+    "hard": "Outlook metadata fields (Organizer, Show As, Response, Recurrence) surround the real fields"
+  },
+  {
+    "id": "s-13",
+    "source": "invite",
+    "text": "Interview - Backend Engineer Role\nDate: Friday, Sept 25, 2026\nTime: 2:00 PM - 2:45 PM\nJoin Zoom Meeting\nhttps://zoom.us/j/99213345678?pwd=abc123\nMeeting ID: 992 1334 5678\nPasscode: 774411\nOne tap mobile: +13126266799,,99213345678#",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Interview - Backend Engineer Role",
+      "date": "2026-09-25",
+      "time": "14:00",
+      "location": "Zoom",
+      "allDay": false,
+      "titleAccept": [
+        "Interview - Backend Engineer Role"
+      ]
+    },
+    "hard": "long meeting ID, passcode, and one-tap mobile dial string are pure noise around the real details"
+  },
+  {
+    "id": "s-14",
+    "source": "invite",
+    "text": "Weekly Sync (recurs every Tuesday 9am)\n\nNote for this week only: moved to Wednesday Sept 30 at 9:30am due to the holiday, same room - Huddle Room 2. Back to normal Tuesday slot next week.",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Weekly Sync",
+      "date": "2026-09-30",
+      "time": "09:30",
+      "location": "Huddle Room 2",
+      "allDay": false,
+      "titleAccept": [
+        "Weekly Sync"
+      ]
+    },
+    "hard": "recurring meeting's default schedule is overridden for one specific instance; must extract the exception, not the recurrence rule"
+  },
+  {
+    "id": "s-15",
+    "source": "poster",
+    "text": "THE HOLLOW CROWNS\nLIVE AT THE BRASS ROOM\nFRIDAY SEPT 25\nDOORS 8PM / SHOW 9PM\nALL AGES",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "The Hollow Crowns",
+      "date": "2026-09-25",
+      "time": "21:00",
+      "location": "The Brass Room",
+      "allDay": false,
+      "titleAccept": [
+        "The Hollow Crowns"
+      ]
+    },
+    "hard": "doors and show times both given; the calendar-worthy start is the show time, not doors"
+  },
+  {
+    "id": "s-16",
+    "source": "poster",
+    "text": "SATURDAY NIGHT COMEDY SHOWCASE\nOCT 10 - 8:00 PM\nTHE LAUGH DEN\n$25 ADV / $30 DOOR\nPRESENTED BY KZRX RADIO",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Saturday Night Comedy Showcase",
+      "date": "2026-10-10",
+      "time": "20:00",
+      "location": "The Laugh Den",
+      "allDay": false,
+      "titleAccept": [
+        "Saturday Night Comedy Showcase"
+      ]
+    },
+    "hard": "ticket price tiers and a sponsor line surround the real details, all in caps"
+  },
+  {
+    "id": "s-17",
+    "source": "poster",
+    "text": "SUMMER\nNIGHT\nMARKET\nSAT SEPT 19 * 5PM-10PM\nDOWNTOWN PLAZA\nFOOD * MUSIC * LOCAL VENDORS",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Summer Night Market",
+      "date": "2026-09-19",
+      "time": "17:00",
+      "location": "Downtown Plaza",
+      "allDay": false,
+      "titleAccept": [
+        "Summer Night Market"
+      ]
+    },
+    "hard": "title is stacked across three separate lines, event has a time range and asterisk-separated clutter"
+  },
+  {
+    "id": "s-18",
+    "source": "poster",
+    "text": "JOIN US!\nFALL HARVEST FESTIVAL\nA celebration for the whole family\nSunday, October 4, 2026 - Noon to 4pm\nMaple Grove Park",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Fall Harvest Festival",
+      "date": "2026-10-04",
+      "time": "12:00",
+      "location": "Maple Grove Park",
+      "allDay": false,
+      "titleAccept": [
+        "Fall Harvest Festival"
+      ]
+    },
+    "hard": "'JOIN US!' precedes the real title and could be mistaken for it; a descriptive tagline is a second distractor phrase"
+  },
+  {
+    "id": "s-19",
+    "source": "poster",
+    "text": "RUN FOR THE CURE 5K\nSUNDAY SEPT 20\nRegistration & Check-in: 7:00 AM\nRace Starts: 8:00 AM\nRiverside Park Start Line",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Run for the Cure 5K",
+      "date": "2026-09-20",
+      "time": "08:00",
+      "location": "Riverside Park",
+      "allDay": false,
+      "titleAccept": [
+        "Run for the Cure 5K"
+      ]
+    },
+    "hard": "registration time and race start time both listed; the event start is the race, not check-in"
+  },
+  {
+    "id": "s-20",
+    "source": "sms",
+    "text": "hey are we still on for tomorrow?\nyes! 7pm at the rooftop bar like we said\ngreat see you then",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Catch-up",
+      "date": "2026-09-17",
+      "time": "19:00",
+      "location": "the rooftop bar",
+      "allDay": false,
+      "titleAccept": [
+        "Catch-up"
+      ]
+    },
+    "hard": "'tomorrow' must be resolved against the reference date, no explicit date ever stated"
+  },
+  {
+    "id": "s-21",
+    "source": "sms",
+    "text": "wanna grab lunch friday?\nyeah! actually let's skip the usual spot, how about noon at 214 Birch St, that new ramen place\nworks for me, see you friday",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Lunch",
+      "date": "2026-09-18",
+      "time": "12:00",
+      "location": "214 Birch St",
+      "allDay": false,
+      "titleAccept": [
+        "Lunch"
+      ]
+    },
+    "hard": "explicit location changes mid-thread from vague 'usual spot' to a real address; date is a bare weekday"
+  },
+  {
+    "id": "s-22",
+    "source": "sms",
+    "text": "still good for 6 tonight?\nactually can we push to 6:30 instead of 6? running late\nsure, 6:30 works, same place - Java Junction",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Meetup",
+      "date": "2026-09-16",
+      "time": "18:30",
+      "location": "Java Junction",
+      "allDay": false,
+      "titleAccept": [
+        "Meetup"
+      ]
+    },
+    "hard": "time is corrected mid-thread from 6 to 6:30, 'tonight' resolves to the reference date"
+  },
+  {
+    "id": "s-23",
+    "source": "sms",
+    "text": "ok I booked it! Maya's birthday dinner is Sat Sept 26 @ 7, table for 10 at Casa Verde\nyesss cant wait\nomw to buy the cake lol",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Maya's Birthday Dinner",
+      "date": "2026-09-26",
+      "time": "19:00",
+      "location": "Casa Verde",
+      "allDay": false,
+      "titleAccept": [
+        "Maya's Birthday Dinner"
+      ]
+    },
+    "hard": "casual chatter and slang surround the confirmed plan; '@' stands in for 'at'"
+  },
+  {
+    "id": "s-24",
+    "source": "web",
+    "text": "Home | Tour Dates | Merch | Contact\n\nMIDNIGHT ECHO - FALL TOUR\n\nSept 20 - Denver - SOLD OUT\nSept 22 - Salt Lake City\nSept 25 - Portland, OR - Doors 7, Show 8pm\nSept 27 - Seattle\n\n[ Buy Tickets - Portland ]  [ Add to Calendar ]\n\nVenue: Crystal Ballroom",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Midnight Echo - Fall Tour",
+      "date": "2026-09-25",
+      "time": "20:00",
+      "location": "Crystal Ballroom, Portland, OR",
+      "allDay": false,
+      "titleAccept": [
+        "Midnight Echo - Fall Tour"
+      ]
+    },
+    "hard": "four tour dates listed but the ticket button and page context single out Portland; doors vs show time distinction again"
+  },
+  {
+    "id": "s-25",
+    "source": "web",
+    "text": "Startup Pitch Night\n\nDate options:\nOct 8 - SOLD OUT\nOct 15 - SOLD OUT\nOct 22 - 3 tickets left!\n\nGeneral Admission $15 | VIP $40\n\nDoors open 6:30pm, pitches begin 7:00pm\nLocation: The Hatchery, 88 Commerce St",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Startup Pitch Night",
+      "date": "2026-10-22",
+      "time": "19:00",
+      "location": "The Hatchery, 88 Commerce St",
+      "allDay": false,
+      "titleAccept": [
+        "Startup Pitch Night"
+      ]
+    },
+    "hard": "only one of three listed dates still has availability; ticket price tiers and a doors/start split are noise"
+  },
+  {
+    "id": "s-26",
+    "source": "web",
+    "text": "Exhibit: Light and Shadow\nOngoing through January 2027\n\nOpening Night Reception\nThursday, September 24, 2026, 6:00-8:00pm\nMembers get early access at 5:30pm\n\nMain Gallery, 2nd Floor",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Light and Shadow Opening Night Reception",
+      "date": "2026-09-24",
+      "time": "18:00",
+      "location": "Main Gallery, 2nd Floor",
+      "allDay": false,
+      "titleAccept": [
+        "Light and Shadow Opening Night Reception"
+      ]
+    },
+    "hard": "'Ongoing through January' describes the exhibit run, not the event; members-only early access time is a distractor"
+  },
+  {
+    "id": "s-27",
+    "source": "web",
+    "text": "Sponsors: Northwind / Delta Cloud / Vantage\n\nOPENING KEYNOTE\nWednesday, Oct 14, 2026 - 9:00 AM\nAustin, TX\n\n[Register Now] [View Full Schedule] [Sponsor Info]",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Opening Keynote",
+      "date": "2026-10-14",
+      "time": "09:00",
+      "location": "Austin, TX",
+      "allDay": false,
+      "titleAccept": [
+        "Opening Keynote"
+      ]
+    },
+    "hard": "sponsor logo text and nav buttons surround the details; only a city is given, no venue name"
+  },
+  {
+    "id": "s-28",
+    "source": "text",
+    "text": "Reminder: the board meeting is set for March 3rd this cycle, same as always. Full agenda to follow closer to the date.",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Board Meeting",
+      "date": "2027-03-03",
+      "time": null,
+      "location": null,
+      "allDay": true,
+      "titleAccept": [
+        "Board Meeting"
+      ]
+    },
+    "hard": "no year stated and March 3 has already passed this year, so it must roll forward to the following year; no time given"
+  },
+  {
+    "id": "s-29",
+    "source": "email",
+    "text": "Flight confirmation: BA 0284 departing Heathrow Terminal 5 on 03/04/2026 at 14:20 for Edinburgh. Please arrive 2 hours early.",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Flight to Edinburgh",
+      "date": "2026-04-03",
+      "time": "14:20",
+      "location": "Heathrow Terminal 5",
+      "allDay": false,
+      "titleAccept": [
+        "Flight to Edinburgh",
+        "Flight confirmation"
+      ]
+    },
+    "hard": "date is DD/MM format, disambiguated only by the British Airways/Heathrow context clues"
+  },
+  {
+    "id": "s-30",
+    "source": "text",
+    "text": "Save the date - the foundation's annual gala falls on the twenty-second of November this year, at the Grand Meridian Hotel.",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Annual Gala",
+      "date": "2026-11-22",
+      "time": null,
+      "location": "Grand Meridian Hotel",
+      "allDay": true,
+      "titleAccept": [
+        "Annual Gala"
+      ]
+    },
+    "hard": "date is spelled out as an ordinal phrase rather than digits, no time given"
+  },
+  {
+    "id": "s-31",
+    "source": "web",
+    "text": "Calendar export note: START:2026-12-01T14:00:00+01:00 CET, SUMMARY: Berlin Office Holiday Party, LOCATION: Kesselhaus",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Berlin Office Holiday Party",
+      "date": "2026-12-01",
+      "time": "14:00",
+      "location": "Kesselhaus",
+      "allDay": false,
+      "titleAccept": [
+        "Berlin Office Holiday Party"
+      ]
+    },
+    "hard": "raw ISO timestamp with a CET offset must be read as the local wall-clock time, not converted"
+  },
+  {
+    "id": "s-32",
+    "source": "sms",
+    "text": "Let's meet Friday at the office to go over the contract, say around 4pm.",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Contract Review",
+      "date": "2026-09-18",
+      "time": "16:00",
+      "location": "the office",
+      "allDay": false,
+      "titleAccept": [
+        "Contract Review",
+        "Go over the contract"
+      ]
+    },
+    "hard": "only a bare weekday is given, must resolve to the nearest upcoming Friday from the reference date"
+  },
+  {
+    "id": "s-33",
+    "source": "email",
+    "text": "Can we do the vendor call next Thursday? Anytime after 10 works for me.",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Vendor Call",
+      "date": "2026-09-24",
+      "time": "10:00",
+      "location": null,
+      "allDay": false,
+      "titleAccept": [
+        "Vendor Call"
+      ]
+    },
+    "hard": "'next Thursday' is ambiguous between the immediate Thursday and the one after; treated here as the following week, and 'after 10' is read as starting at 10"
+  },
+  {
+    "id": "s-34",
+    "source": "web",
+    "text": "The Midnight Hour plays The Fillmore on October 3, 2026. Show starts at 19:30 sharp, no separate doors time listed.",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "The Midnight Hour",
+      "date": "2026-10-03",
+      "time": "19:30",
+      "location": "The Fillmore",
+      "allDay": false,
+      "titleAccept": [
+        "The Midnight Hour"
+      ]
+    },
+    "hard": "clean 24-hour time, no ambiguity"
+  },
+  {
+    "id": "s-35",
+    "source": "sms",
+    "text": "The book club meets Tuesday at half past three in the afternoon at the downtown library.",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Book Club",
+      "date": "2026-09-22",
+      "time": "15:30",
+      "location": "Downtown Library",
+      "allDay": false,
+      "titleAccept": [
+        "Book Club"
+      ]
+    },
+    "hard": "time is spelled out as 'half past three in the afternoon' rather than digits"
+  },
+  {
+    "id": "s-36",
+    "source": "text",
+    "text": "Ribbon-cutting for the new community garden starts at noon on Saturday, September 19.",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Community Garden Ribbon-Cutting",
+      "date": "2026-09-19",
+      "time": "12:00",
+      "location": null,
+      "allDay": false,
+      "titleAccept": [
+        "Community Garden Ribbon-Cutting"
+      ]
+    },
+    "hard": "'noon' must resolve to 12:00 and not be mistaken for an all-day event"
+  },
+  {
+    "id": "s-37",
+    "source": "text",
+    "text": "Reminder: grant applications are due by midnight this Friday, September 18.",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Grant Application Deadline",
+      "date": "2026-09-18",
+      "time": "23:59",
+      "location": null,
+      "allDay": false,
+      "titleAccept": [
+        "Grant Application Deadline"
+      ]
+    },
+    "hard": "'midnight' is ambiguous between end of Friday and start of Saturday; treated as 23:59 on the stated date, plus a deadline-vs-event distinction"
+  },
+  {
+    "id": "s-38",
+    "source": "sms",
+    "text": "Quick note - the client demo originally set for 2pm has been moved to 4pm today, September 16. Same conference line.",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Client Demo",
+      "date": "2026-09-16",
+      "time": "16:00",
+      "location": null,
+      "allDay": false,
+      "titleAccept": [
+        "Client Demo"
+      ]
+    },
+    "hard": "original time is corrected later in the same message; 'same conference line' gives no resolvable location"
+  },
+  {
+    "id": "s-39",
+    "source": "email",
+    "text": "Product Webinar - Thursday, Sept 24 at 9:00-10:00am PT / 12:00-1:00pm ET. Join via the Zoom link in your confirmation email.",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Product Webinar",
+      "date": "2026-09-24",
+      "time": "09:00",
+      "location": "Zoom",
+      "allDay": false,
+      "titleAccept": [
+        "Product Webinar"
+      ]
+    },
+    "hard": "two timezones given for the same event; PT is treated as the canonical wall-clock start time since it's listed first"
+  },
+  {
+    "id": "s-40",
+    "source": "sms",
+    "text": "Don't forget - it's Grandpa Lou's birthday on October 8. No plans yet, just don't want anyone to forget.",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Grandpa Lou's Birthday",
+      "date": "2026-10-08",
+      "time": null,
+      "location": null,
+      "allDay": true,
+      "titleAccept": [
+        "Grandpa Lou's Birthday"
+      ]
+    },
+    "hard": "clean all-day birthday reminder, no time or location ever given"
+  },
+  {
+    "id": "h-1",
+    "source": "ocr",
+    "text": "ANNUA1 STAFF RETREAT\nSeptember 19 - 2pm\nThursday\nAtt: Al1 departments",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Annual Staff Retreat",
+      "date": "2026-09-19",
+      "time": "14:00",
+      "location": null,
+      "allDay": false,
+      "titleAccept": [
+        "Annual Staff Retreat"
+      ]
+    },
+    "hard": "OCR swapped 1 for l, and line breaks split title and date"
+  },
+  {
+    "id": "h-2",
+    "source": "ocr",
+    "text": "BOARD0FTRUSTEESUMEETING\nOCT15\n10AM\nROOM403ADMINBLDG",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Board of Trustees Meeting",
+      "date": "2026-10-15",
+      "time": "10:00",
+      "location": "Room 403, Admin Building",
+      "allDay": false,
+      "titleAccept": [
+        "Board of Trustees Meeting"
+      ]
+    },
+    "hard": "0 for O, no spaces between words, date only month-day"
+  },
+  {
+    "id": "h-3",
+    "source": "email",
+    "text": "Subject: Q4 Planning Session\n\nHi team,\n\nLet's meet on Friday, September 26th at 3:30 PM in Conference Room B to review Q4 goals.\n\nThanks,\nSarah\n\n> On Sep 16, Sarah wrote:\n> Previous discussion about Q3 metrics...\n> [quoted text continues]",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Q4 Planning Session",
+      "date": "2026-09-26",
+      "time": "15:30",
+      "location": "Conference Room B",
+      "allDay": false,
+      "titleAccept": [
+        "Q4 Planning Session"
+      ]
+    },
+    "hard": "Email chain with quoted history; ordinal date format"
+  },
+  {
+    "id": "h-4",
+    "source": "email",
+    "text": "Lunch with Alex on Monday next week - 12:15 at the Italian place downtown\n\n---\nSent from my iPhone",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Lunch with Alex",
+      "date": "2026-09-21",
+      "time": "12:15",
+      "location": "Downtown Italian restaurant",
+      "allDay": false,
+      "titleAccept": [
+        "Lunch with Alex"
+      ]
+    },
+    "hard": "Relative date (next Monday); implied location; iPhone footer noise"
+  },
+  {
+    "id": "h-5",
+    "source": "sms",
+    "text": "still on for coffee tmrw at 10 am? at the usual spot",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Coffee",
+      "date": "2026-09-17",
+      "time": "10:00",
+      "location": "Usual spot",
+      "allDay": false,
+      "titleAccept": [
+        "Coffee"
+      ]
+    },
+    "hard": "Text speak and chatter; implied location; relative date"
+  },
+  {
+    "id": "h-6",
+    "source": "text",
+    "text": "Dentist appt Tuesday 2pm - Dr. Mitchell's office, Suite 210",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Dentist appointment",
+      "date": "2026-09-22",
+      "time": "14:00",
+      "location": "Dr. Mitchell's office, Suite 210",
+      "allDay": false,
+      "titleAccept": [
+        "Dentist appointment",
+        "Dentist appt"
+      ]
+    },
+    "hard": "Weekday without date; office building reference"
+  },
+  {
+    "id": "h-7",
+    "source": "invite",
+    "text": "Google Calendar: Team Sync\nWhen: Thursday, September 25, 2026 10:00 AM - 10:30 AM\nWhere: Bldg 3 Room 218 or call +1-800-555-0123\n\nJoin Zoom: https://zoom.us/j/12345?pwd=abc123",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Team Sync",
+      "date": "2026-09-25",
+      "time": "10:00",
+      "location": "Bldg 3 Room 218 / Zoom",
+      "allDay": false,
+      "titleAccept": [
+        "Team Sync"
+      ]
+    },
+    "hard": "Google invite format with dial-in and Zoom link; hybrid meeting"
+  },
+  {
+    "id": "h-8",
+    "source": "invite",
+    "text": "From: boss@company.com\nSubject: RE: All-hands on September 30\n\nPlease plan to join us Wed 9/30 2pm in the main auditorium.\nGoogleMeet: meet.google.com/abc-defg-hij",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "All-hands",
+      "date": "2026-09-30",
+      "time": "14:00",
+      "location": "Main auditorium / Google Meet",
+      "allDay": false,
+      "titleAccept": [
+        "All-hands"
+      ]
+    },
+    "hard": "RE: prefix; date shorthand (9/30); Google Meet link"
+  },
+  {
+    "id": "h-9",
+    "source": "poster",
+    "text": "LIVE MUSIC NIGHT\nSATURDAY SEPT 20\nDOORS 7PM / SHOW 8:30PM\nCHARITY FUNDRAISER - ALL PROCEEDS TO LOCAL FOOD BANK\n$25 ADVANCE / $30 DOOR\nThe Riverside Venue | 42 Maple St",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Live Music Night - Charity Fundraiser",
+      "date": "2026-09-20",
+      "time": "20:30",
+      "location": "The Riverside Venue, 42 Maple St",
+      "allDay": false,
+      "titleAccept": [
+        "Live Music Night - Charity Fundraiser"
+      ]
+    },
+    "hard": "ALL CAPS; doors vs show time distinction; sponsor text and pricing noise"
+  },
+  {
+    "id": "h-10",
+    "source": "poster",
+    "text": "ART EXHIBITION OPENING\n\"Modern Visions\"\nFRIDAY 9/19 6PM ONWARDS\nGallery Moderne | Downtown Arts District\nSponsored by ArtsFlow Foundation\nLight refreshments provided",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Art Exhibition Opening - Modern Visions",
+      "date": "2026-09-19",
+      "time": "18:00",
+      "location": "Gallery Moderne, Downtown Arts District",
+      "allDay": false,
+      "titleAccept": [
+        "Art Exhibition Opening - Modern Visions"
+      ]
+    },
+    "hard": "Title in quotes; sponsor line; refreshments line; shorthand date"
+  },
+  {
+    "id": "h-11",
+    "source": "web",
+    "text": "FALL FESTIVAL | Riverside Park\nEventBrite | Add to Calendar | Share\nDate: Sunday, September 27\nTime: 10 AM - 5 PM\nAdmission: $5 per person | Children under 12 free\nFeatures: 50+ vendors, live music, food trucks, kids zone\nParking available at North Lot",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Fall Festival",
+      "date": "2026-09-27",
+      "time": "10:00",
+      "location": "Riverside Park",
+      "allDay": false,
+      "titleAccept": [
+        "Fall Festival"
+      ]
+    },
+    "hard": "Web listing with nav and CTA noise; time range; admission pricing"
+  },
+  {
+    "id": "h-12",
+    "source": "web",
+    "text": "Home | Events | Tickets | Contact\n\nCOMING SOON: Jazz Night at The Blue Note\nOctober 10, 2026\nShowtime: 9 PM\n$40-$80 / Table reservations available\nWhere: The Blue Note, 123 Music Lane, Downtown\n\nAbout | Terms | Privacy",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Jazz Night at The Blue Note",
+      "date": "2026-10-10",
+      "time": "21:00",
+      "location": "The Blue Note, 123 Music Lane, Downtown",
+      "allDay": false,
+      "titleAccept": [
+        "Jazz Night at The Blue Note"
+      ]
+    },
+    "hard": "Web nav links at top; ticket price range; year in future date"
+  },
+  {
+    "id": "h-13",
+    "source": "text",
+    "text": "FALL CONFERENCE - Nov 2-3\nKey Dates:\n- Registration opens 9/20\n- Early bird: 9/20 - 10/5\n- Regular: 10/6 - 11/1\nAttend the 2-day summit on AI trends and innovation",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Fall Conference - AI Trends and Innovation",
+      "date": "2026-11-02",
+      "time": null,
+      "location": null,
+      "allDay": true,
+      "titleAccept": [
+        "Fall Conference - AI Trends and Innovation"
+      ]
+    },
+    "hard": "Multi-day event; multiple dates listed but main event is Nov 2-3; all-day"
+  },
+  {
+    "id": "h-14",
+    "source": "text",
+    "text": "Soccer match: Wildcats vs Eagles\nNext Saturday 3:00 PM\nField 2 at Central Park\nSee you there!",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Wildcats vs Eagles",
+      "date": "2026-09-26",
+      "time": "15:00",
+      "location": "Field 2, Central Park",
+      "allDay": false,
+      "titleAccept": [
+        "Wildcats vs Eagles",
+        "Soccer match"
+      ]
+    },
+    "hard": "Sport event; relative date; field reference"
+  },
+  {
+    "id": "h-15",
+    "source": "sms",
+    "text": "Mom's birthday party - Sunday the 21st, 4 PM at her place. Can you bring potato salad?",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Mom's birthday party",
+      "date": "2026-09-21",
+      "time": "16:00",
+      "location": "Mom's place",
+      "allDay": false,
+      "titleAccept": [
+        "Mom's birthday party"
+      ]
+    },
+    "hard": "Ordinal date; informal location; personal event with chatter"
+  },
+  {
+    "id": "h-16",
+    "source": "email",
+    "text": "Project Deadline Extended!\n\nThe Q3 final deliverables submission deadline is now October 15th (all day).\nPlease ensure all documents are uploaded by 11:59 PM EST.\n\nThank you,\nProject Manager",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Q3 Final Deliverables Deadline",
+      "date": "2026-10-15",
+      "time": null,
+      "location": null,
+      "allDay": true,
+      "titleAccept": [
+        "Q3 Final Deliverables Deadline",
+        "Project Deadline Extended!"
+      ]
+    },
+    "hard": "Deadline event; all-day flag; EST timezone mentioned; end-of-day time in text"
+  },
+  {
+    "id": "h-17",
+    "source": "text",
+    "text": "Company closed on Friday 9/17 for Labor Day observation",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Company closed - Labor Day observation",
+      "date": "2026-09-17",
+      "time": null,
+      "location": null,
+      "allDay": true,
+      "titleAccept": [
+        "Company closed - Labor Day observation"
+      ]
+    },
+    "hard": "Holiday closure; all-day; shorthand date; no explicit 'all day' word"
+  },
+  {
+    "id": "h-18",
+    "source": "web",
+    "text": "Tax Workshop Series\n\nSession 1: Tax Basics - Friday 9/25 at 2 PM EST\nSession 2: Deductions - Thursday 10/2 at 2 PM EST\nSession 3: Business Taxes - Thursday 10/9 at 2 PM EST\n\nRegister online. Zoom link sent upon registration.",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Tax Basics Workshop",
+      "date": "2026-09-25",
+      "time": "14:00",
+      "location": "Zoom",
+      "allDay": false,
+      "titleAccept": [
+        "Tax Basics Workshop",
+        "Tax Workshop Series"
+      ]
+    },
+    "hard": "Series with multiple dates; first session is the 'main' event; EST timezone; Zoom online"
+  },
+  {
+    "id": "h-19",
+    "source": "invite",
+    "text": "SAVE THE DATE!\nCorporate Holiday Party\nDecember 18, 2026\n5:30 PM - 8:30 PM\nGrand Ballroom, Marriott Downtown\nInvitation to follow",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Corporate Holiday Party",
+      "date": "2026-12-18",
+      "time": "17:30",
+      "location": "Grand Ballroom, Marriott Downtown",
+      "allDay": false,
+      "titleAccept": [
+        "Corporate Holiday Party"
+      ]
+    },
+    "hard": "Save-the-date format; time range; formal venue with hotel name"
+  },
+  {
+    "id": "h-21",
+    "source": "text",
+    "text": "Breakfast meeting with the new team - 8:30 tomorrow at Station Coffee downtown",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Breakfast meeting",
+      "date": "2026-09-17",
+      "time": "08:30",
+      "location": "Station Coffee, downtown",
+      "allDay": false,
+      "titleAccept": [
+        "Breakfast meeting"
+      ]
+    },
+    "hard": "Relative date (tomorrow); informal location; meal-named event"
+  },
+  {
+    "id": "h-22",
+    "source": "email",
+    "text": "Flight reminder: Your departure is on September 19 at 14:35 from LAX\n\nAirline: SkyAir\nFlight: SK-287\nTerminal: 4\nGate: TBA\n\nArrive at airport 3 hours before departure.",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Flight SK-287 Departure",
+      "date": "2026-09-19",
+      "time": "14:35",
+      "location": "LAX Terminal 4",
+      "allDay": false,
+      "titleAccept": [
+        "Flight SK-287 Departure"
+      ]
+    },
+    "hard": "Flight event with confirmation details; specific time; gate/terminal info; city airport code"
+  },
+  {
+    "id": "h-23",
+    "source": "text",
+    "text": "Birthday: Grandma turns 80 on October 12",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Grandma's 80th Birthday",
+      "date": "2026-10-12",
+      "time": null,
+      "location": null,
+      "allDay": true,
+      "titleAccept": [
+        "Grandma's 80th Birthday"
+      ]
+    },
+    "hard": "Birthday event; all-day; age mentioned; minimal text"
+  },
+  {
+    "id": "h-24",
+    "source": "poster",
+    "text": "VINTAGE MARKET | SEPT 20\n10AM-4PM\nSOUTH PARKING LOT, CITY CENTER MALL\nHandmade crafts | Local vendors | Free admission\nFood court open all day",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Vintage Market",
+      "date": "2026-09-20",
+      "time": "10:00",
+      "location": "South Parking Lot, City Center Mall",
+      "allDay": false,
+      "titleAccept": [
+        "Vintage Market"
+      ]
+    },
+    "hard": "ALL CAPS; time range; detailed location; vendor/food descriptors"
+  },
+  {
+    "id": "h-25",
+    "source": "invite",
+    "text": "Outlook Calendar Item\n\nSubject: Executive Strategy Session\nDate: Wednesday, 24 September 2026\nTime: 15:00-16:00 (CET)\nLocation: Zoom + Main Conference Room, Building A Floor 3\nRequired attendance",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Executive Strategy Session",
+      "date": "2026-09-24",
+      "time": "15:00",
+      "location": "Main Conference Room, Building A Floor 3 / Zoom",
+      "allDay": false,
+      "titleAccept": [
+        "Executive Strategy Session"
+      ]
+    },
+    "hard": "Outlook format; ISO-style date; CET timezone; hybrid location; required flag"
+  },
+  {
+    "id": "h-26",
+    "source": "sms",
+    "text": "Haircut appointment Fri 2:30pm Sarah's Salon downtown - can't miss it!",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Haircut",
+      "date": "2026-09-18",
+      "time": "14:30",
+      "location": "Sarah's Salon, downtown",
+      "allDay": false,
+      "titleAccept": [
+        "Haircut"
+      ]
+    },
+    "hard": "Weekday shorthand; time without leading zero; salon name; informal language"
+  },
+  {
+    "id": "h-27",
+    "source": "web",
+    "text": "Music Festival Lineup\n\nSunday September 22, 2026\nMain Stages Open 12 PM\nHeadliner Performance 9 PM\nLocation: Riverside Meadows\n\nArtists, Tickets, Map, Parking, FAQ",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Music Festival",
+      "date": "2026-09-22",
+      "time": "12:00",
+      "location": "Riverside Meadows",
+      "allDay": false,
+      "titleAccept": [
+        "Music Festival"
+      ]
+    },
+    "hard": "Festival with multiple stage times; web nav links; using opening time as start"
+  },
+  {
+    "id": "h-28",
+    "source": "email",
+    "text": "Client meeting rescheduled\n\nInstead of tomorrow, let's meet on October 2nd at 10:30 AM at your office building lobby.\n\nBest regards,\nAlex\n\nP.S. I'll call you 10 mins before.",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Client meeting",
+      "date": "2026-10-02",
+      "time": "10:30",
+      "location": "Office building lobby",
+      "allDay": false,
+      "titleAccept": [
+        "Client meeting"
+      ]
+    },
+    "hard": "Rescheduled from original date; canceled date mentioned; informal location"
+  },
+  {
+    "id": "h-29",
+    "source": "text",
+    "text": "Thanksgiving dinner at home - Thursday Nov 26 - everyone arriving around 3pm for 4pm dinner",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Thanksgiving dinner",
+      "date": "2026-11-26",
+      "time": "16:00",
+      "location": "Home",
+      "allDay": false,
+      "titleAccept": [
+        "Thanksgiving dinner"
+      ]
+    },
+    "hard": "Holiday date; approximate arrival time vs. actual event time; family event"
+  },
+  {
+    "id": "h-31",
+    "source": "invite",
+    "text": "Professional Development Workshop\n\nWhen: Friday, September 20 from 9 AM to 12 PM\nWhere: Virtual - Zoom Meeting\nZoom Link: https://zoom.us/j/meeting123?pwd=xyz\n\nCourse: Advanced Data Analytics\nContinuing Education Credits: 3",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Advanced Data Analytics Workshop",
+      "date": "2026-09-20",
+      "time": "09:00",
+      "location": "Zoom",
+      "allDay": false,
+      "titleAccept": [
+        "Advanced Data Analytics Workshop",
+        "Professional Development Workshop"
+      ]
+    },
+    "hard": "Workshop format; virtual/Zoom meeting; 3-hour duration; CE credits metadata"
+  },
+  {
+    "id": "h-32",
+    "source": "text",
+    "text": "Annual company picnic - Saturday next week, 11 AM at Hilltop Park. Rain date is the following Sunday.",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Annual company picnic",
+      "date": "2026-09-26",
+      "time": "11:00",
+      "location": "Hilltop Park",
+      "allDay": false,
+      "titleAccept": [
+        "Annual company picnic"
+      ]
+    },
+    "hard": "Relative date (Saturday next week); rain date mentioned; outdoor event"
+  },
+  {
+    "id": "h-33",
+    "source": "web",
+    "text": "Yoga Classes - Fall Session\n\nBeginners Yoga\nMondays & Wednesdays, Sept 23 - Nov 12\n6:30 PM - 7:30 PM\nStudio A, Wellness Center\n8 sessions / $60 total or drop-in $10/class",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Beginners Yoga",
+      "date": "2026-09-23",
+      "time": "18:30",
+      "location": "Studio A, Wellness Center",
+      "allDay": false,
+      "titleAccept": [
+        "Beginners Yoga"
+      ]
+    },
+    "hard": "Series class with multiple dates; recurring (Mon/Wed); first session picked; pricing"
+  },
+  {
+    "id": "h-34",
+    "source": "email",
+    "text": "Subject: RE: Lunch Plans\n\nYes! I'm looking forward to it. Thursday Sept 25 at noon works perfectly. Let's meet at that new place on Main Street.\n\nSee you then!",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Lunch",
+      "date": "2026-09-25",
+      "time": "12:00",
+      "location": "New place on Main Street",
+      "allDay": false,
+      "titleAccept": [
+        "Lunch"
+      ]
+    },
+    "hard": "RE: reply; noon (not 12:00); implicit location; confirmation tone"
+  },
+  {
+    "id": "h-35",
+    "source": "poster",
+    "text": "HALLOWEEN PARTY\nFRIDAY OCT 31 | 8PM UNTIL MIDNIGHT\nLOCATION: The Warehouse, 500 Industrial Ave\nCOSTUMES ENCOURAGED | DJ | DANCE FLOOR\nTickets: $20 pre-sale / $25 at door\nSponsored by Local Youth Council",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Halloween Party",
+      "date": "2026-10-31",
+      "time": "20:00",
+      "location": "The Warehouse, 500 Industrial Ave",
+      "allDay": false,
+      "titleAccept": [
+        "Halloween Party"
+      ]
+    },
+    "hard": "Holiday event; ALL CAPS; 'until midnight' duration phrase; sponsor line; pricing"
+  },
+  {
+    "id": "h-37",
+    "source": "invite",
+    "text": "Google Calendar: Back to School Night\nDate: Wednesday, August 26, 2026\nTime: 6:00 PM - 7:30 PM PT\nLocation: Jefferson Elementary School Multi-Purpose Room\nNote: Spanish translation available\n\nParent attendance required",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Back to School Night",
+      "date": "2026-08-26",
+      "time": "18:00",
+      "location": "Jefferson Elementary School Multi-Purpose Room",
+      "allDay": false,
+      "titleAccept": [
+        "Back to School Night"
+      ]
+    },
+    "hard": "Past date (historical case); PT timezone; school multi-purpose room; translation note"
+  },
+  {
+    "id": "h-38",
+    "source": "text",
+    "text": "Appointment with Dr. Patel\nWednesday afternoon, around 3 PM\nDowntown Medical Plaza Suite 320\nCan reschedule if needed",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Appointment with Dr. Patel",
+      "date": "2026-09-23",
+      "time": "15:00",
+      "location": "Downtown Medical Plaza Suite 320",
+      "allDay": false,
+      "titleAccept": [
+        "Appointment with Dr. Patel"
+      ]
+    },
+    "hard": "Vague 'afternoon'; medical appointment; suite/floor info; conditional reschedule"
+  },
+  {
+    "id": "h-39",
+    "source": "web",
+    "text": "Art Class Registration Open!\n\nFall Watercolor Series\nStarting: Monday, September 23, 2026\nEvery Monday for 6 weeks\n7:00 PM - 8:30 PM\nStudio B, Arts Center Downtown\n$150 course fee",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Fall Watercolor Series",
+      "date": "2026-09-23",
+      "time": "19:00",
+      "location": "Studio B, Arts Center Downtown",
+      "allDay": false,
+      "titleAccept": [
+        "Fall Watercolor Series"
+      ]
+    },
+    "hard": "Series starting date; recurring (6 weeks); course fee; studio location"
+  },
+  {
+    "id": "h-40",
+    "source": "email",
+    "text": "Team lunch to celebrate the project completion!\n\nJoin us on Friday, September 20 at half past twelve at Giovanni's Italian Restaurant (reservation under Management).\n\nCasual attire. Let me know by Wed if you can make it.",
+    "referenceDate": "2026-09-16",
+    "truth": {
+      "title": "Team lunch - Project celebration",
+      "date": "2026-09-20",
+      "time": "12:30",
+      "location": "Giovanni's Italian Restaurant",
+      "allDay": false,
+      "titleAccept": [
+        "Team lunch - Project celebration",
+        "Team lunch to celebrate the project completion!"
+      ]
+    },
+    "hard": "Half past twelve (non-standard format); celebration event; RSVP deadline; reservation note"
+  }
+]

@@ -1,0 +1,16 @@
+[
+  {
+    "id": "wrong-1",
+    "text": "June 13, 2026\n\nHi Mannan,\n\nI’m pleased to confirm your upcoming virtual phone screen interview via Microsoft Teams for the Sr. Software Engineer Frontend position at Togetherwork. Below are the details:\n\nDate/Time: Jun 15, 2026 10:30am-11:00am (GMT-04:00) Eastern Time (US & Canada)\nInterviewers: Bri Sanders (Sr. Talent Acquisition Partner)\n\nMicrosoft Teams: https://teams.microsoft.com/l/meetup-join/19%3ameeting_ZDNlNTE0ODItNmJmZS00MWE2LWI4MjItNjYyNGEyZWIxODQ1%40thread.v2/0?context=%7b%22Tid%22%3a%2278c11cb7-c74d-45f6-a28c-0e92979a1094%22%2c%22Oid%22%3a%22dbd6aca5-cbd2-48ff-bcd5-ec1c41666175%22%7d. \n\nThis will be a virtual meeting conducted through Microsoft Teams. You are welcome to have your camera on or off—whichever you’re more comfortable with. Please note: this interview will be recorded for internal review and evaluation purposes.\n\nWhat to Review Before the Interview:\n\n-   Job Description:\n    Please take a moment to review the responsibilities and requirements.\n    \n-   Employment Application:  Formal Employment Application\n    Please complete this prior to the interview, as we’ll reference it during the discussion.\n    \n-   Benefits Overview:\n    Attached is our benefits guide and 401K  overview for your review ahead of time.\n    \n\nWhat to Expect During the Interview:\n\nThe recruiter will cover:\n\n-   Relevant Experience: How your background aligns with the role\n    \n-   Technical Skills: Any required tools, platforms, or methods\n    \n-   Cultural Fit: How your working style and values align with Togetherwork’s culture\n    \n-   Career Motivation: What draws you to this opportunity and your goals\n    \n-   Availability: Start date and logistics\n    \n-   Application Review: We’ll go over your responses\n    \n\nPlease reply to this email to confirm receipt and let us know if you have any questions before the interview. We look forward to connecting with you!\n\nEnjoy the rest of your day.",
+    "referenceDate": "2026-09-16",
+    "extracted": {
+      "title": "Sr. Software Engineer Frontend - Virtual Phone Screen Interview",
+      "startDate": "2026-06-15",
+      "startTime": "06:30",
+      "location": "Microsoft Teams"
+    },
+    "expectLow": [
+      "time"
+    ]
+  }
+]
