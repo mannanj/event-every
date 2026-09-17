@@ -60,6 +60,7 @@ describe('route manifest', () => {
       '/api/scan': { method: 'POST', maxBodyBytes: 12 * 1024 * 1024, allow: 'POST' },
       '/api/scrape-url': { method: 'POST', maxBodyBytes: 4 * 1024, allow: 'POST' },
       '/api/summarize': { method: 'POST', maxBodyBytes: 16 * 1024, allow: 'POST' },
+      '/api/triage': { method: 'POST', maxBodyBytes: 20 * 1024, allow: 'POST' },
       '/api/usage': { method: 'GET', maxBodyBytes: 0, allow: 'GET' },
       '/api/waitlist': { method: 'POST', maxBodyBytes: 4 * 1024, allow: 'POST', retired: true },
       '/api/auth/challenge': { method: 'POST', maxBodyBytes: 8 * 1024, allow: 'POST' },

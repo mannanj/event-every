@@ -6,7 +6,7 @@ export const ROUTE_MANIFEST: Readonly<Record<string, RoutePolicy>> = {
   '/api/auth/check': policy('GET', 0), '/api/auth/logout': policy('POST', 0), '/api/auth/verify': policy('POST', 2 * 1024, true),
   '/api/detect-urls': policy('POST', 128 * 1024), '/api/keep-alive': policy('GET', 0, true), '/api/provider-status': policy('POST', 1024),
   '/api/resolve-timezone': policy('POST', 16 * 1024), '/api/scan': policy('POST', 12 * MiB), '/api/scrape-url': SCRAPE_URL_POLICY,
-  '/api/summarize': policy('POST', 16 * 1024), '/api/usage': policy('GET', 0), '/api/waitlist': policy('POST', 4 * 1024, true),
+  '/api/summarize': policy('POST', 16 * 1024), '/api/triage': policy('POST', 20 * 1024), '/api/usage': policy('GET', 0), '/api/waitlist': policy('POST', 4 * 1024, true),
   // Accounts. `challenge` asks for a sign-in link; `redeem` spends one. Both
   // names were reserved ahead of the implementation — redeem is a GET because
   // what spends the link is a person clicking it in their mail client, which is
