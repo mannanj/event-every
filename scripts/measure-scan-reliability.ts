@@ -53,6 +53,8 @@ import { callOpenRouter } from '@/platform/provider/transport';
 import { createOpenRouterTextLinkProvider, createOpenRouterVisionProvider } from '@event-every/scanner/openrouter';
 
 import { EVAL_CASES, type EvalCase } from './scan-eval-cases';
+import { normalizeTemporal } from '@/services/temporalNormalize';
+import type { EventCandidate } from '@event-every/scanner';
 
 const REPEATS = Number(process.argv[2] ?? 1);
 const TEXT_MODELS = (process.env.EVAL_MODELS ?? OWNER_MODELS['scan-text']).split(',').filter(Boolean);
@@ -92,15 +94,25 @@ function readTemporal(candidate: unknown): { y?: number; m?: number; d?: number;
     | { start?: { date?: { year?: number; month?: number; day?: number }; time?: { hour?: number; minute?: number } } }
     | null
     | undefined;
-  const start = temporal?.start;
+  const start = temporal?.start as
+    | { kind?: string; year?: number | null; month?: number | null; day?: number | null; hour?: number | null; minute?: number | null;
+        date?: { year?: number; month?: number; day?: number }; time?: { hour?: number; minute?: number } }
+    | null | undefined;
+  // Partial and date-only points carry their fields at the top level; the app
+  // assumes the current year when the source omits it (scannerDraft.ts), so
+  // the eval scores what the card will show, not what the model left blank.
+  const y = start?.date?.year ?? start?.year ?? (start?.month != null && start?.day != null ? new Date().getFullYear() : undefined);
   return {
-    y: start?.date?.year, m: start?.date?.month, d: start?.date?.day,
-    hh: start?.time?.hour, mm: start?.time?.minute,
+    y: y ?? undefined, m: start?.date?.month ?? start?.month ?? undefined, d: start?.date?.day ?? start?.day ?? undefined,
+    hh: start?.time?.hour ?? start?.hour ?? undefined, mm: start?.time?.minute ?? start?.minute ?? undefined,
   };
 }
 
 function score(testCase: EvalCase, replay: unknown): Outcome {
-  const candidates = (replay as { candidates: readonly unknown[] }).candidates;
+  // Score what the review card will show: the app completes the year and
+  // collapses an all-day midnight range before the card is built.
+  const candidates = (replay as { candidates: readonly unknown[] }).candidates.map((c) => normalizeTemporal(c as EventCandidate, new Date()));
+  if (process.env.EVAL_DUMP) console.log(`\n[${testCase.id}] ${JSON.stringify(candidates.map((c) => ({ title: (c as { title?: { value?: unknown } }).title?.value, temporal: (c as { temporal?: { value?: unknown } }).temporal?.value, issues: (c as { issues?: unknown }).issues })))}`);
 
   if (candidates.length !== testCase.expectCandidates) {
     // The negative cases live or die here: inventing an event out of "I cannot

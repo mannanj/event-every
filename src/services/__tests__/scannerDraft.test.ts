@@ -312,3 +312,33 @@ describe('scanner review drafts', () => {
     expect(changed.readiness.warnings.map(({ code }) => code)).toContain('field_not_found');
   });
 });
+
+describe('missing year', () => {
+  const partialNoYear = { kind: 'partial' as const, year: null, month: 7, day: 29, hour: 11, minute: 0, second: null };
+  const missingYear: ScannerIssue = { code: 'missing_year', kind: 'incomplete', severity: 'blocker', field: 'temporal', message: 'The date year is unresolved.', evidence: [] } as unknown as ScannerIssue;
+
+  test('a month and a day without a year get the current year and stop blocking export', () => {
+    const input = EventCandidateSchema.parse({
+      ...candidate(),
+      temporal: claim({ start: partialNoYear, end: null, duration: null, allDay: false }),
+      issues: [missingYear],
+    });
+    const draft = createReviewDraft(input, [], source, identity);
+    const start = draft.candidate.temporal.value?.start;
+    expect(start).toEqual({ kind: 'floating', date: { year: 2026, month: 7, day: 29 }, time: { hour: 11, minute: 0, second: 0 } });
+    expect(draft.candidate.issues.some((issue) => issue.code === 'missing_year')).toBe(false);
+    expect(draft.readiness.canGenerate).toBe(true);
+  });
+
+  test('a point with no month or day is left alone', () => {
+    const input = EventCandidateSchema.parse({
+      ...candidate(),
+      temporal: claim({ start: { ...partialNoYear, day: null }, end: null, duration: null, allDay: false }),
+      issues: [missingYear],
+    });
+    const draft = createReviewDraft(input, [], source, identity);
+    const start = draft.candidate.temporal.value?.start;
+    expect(start?.kind === 'partial' && start.year).toBeNull();
+    expect(draft.readiness.canGenerate).toBe(false);
+  });
+});

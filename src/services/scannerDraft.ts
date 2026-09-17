@@ -10,6 +10,7 @@ import type {
   ReviewSource,
 } from '../types/review';
 import type { ScanResponse } from '../types/scannerHttp';
+import { normalizeTemporal } from './temporalNormalize';
 
 const prodId = '-//Event Every//Scanner//EN';
 
@@ -38,7 +39,7 @@ export function createReviewDraft(
   source: ReviewSource,
   identity: DraftIdentity,
 ): ReviewDraft {
-  const parsedCandidate = EventCandidateSchema.parse(candidate);
+  const parsedCandidate = EventCandidateSchema.parse(normalizeTemporal(candidate, new Date(identity.createdAt)));
   return {
     ...identity,
     candidate: parsedCandidate,
