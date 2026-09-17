@@ -37,10 +37,15 @@ import { convertRawToDate } from '@/utils/timeConversion';
 import { ProcessingEvent, ImageProcessingStatus, BatchProcessing, URLProcessingStatus } from '@/types/processing';
 import { scan } from '@/services/scanClient';
 import { createReviewDrafts } from '@/services/scannerDraft';
+import { mapWithConcurrency } from '@/utils/concurrency';
 import type { ReviewDraft } from '@/types/review';
 import { reviewDraftsToCalendarEvents } from '@/services/reviewEvent';
 import { ScanResponseSchema, type ScanRequest } from '@/types/scannerHttp';
 import AuthWrapper from '@/components/AuthWrapper';
+
+// Matches the processing queue's own ceiling; more in flight than that only
+// queues at the provider.
+const IMAGE_SCAN_CONCURRENCY = 3;
 
 function providerScanDrafts(response: ReturnType<typeof ScanResponseSchema.parse>, operation: ProviderOperationRecord): ReviewDraft[] {
   const createdAt = new Date(operation.createdAtMs).toISOString();
@@ -340,22 +345,28 @@ function Home({ processingDisabled }: { processingDisabled: boolean }) {
       const titles: string[] = [];
 
       try {
-        for (let index = 0; index < imageFiles.length; index += 1) {
-          if (controller.signal.aborted) break;
+        // Each image is its own provider operation, so a batch no longer waits
+        // on one slow scan at a time: up to IMAGE_SCAN_CONCURRENCY run together
+        // and the titles are gathered in upload order.
+        let completed = 0;
+        const perImage = await mapWithConcurrency(imageFiles, IMAGE_SCAN_CONCURRENCY, async (file, index) => {
+          if (controller.signal.aborted || activeSubmissionRef.current !== batchId) return [];
           const status = statuses[index];
           setImageProcessingStatuses((previous) => previous.map((item) =>
             item.id === status.id ? { ...item, status: 'processing' as const } : item,
           ));
-          updateProgress(queueItem.id, Math.round((index / imageFiles.length) * 100));
-          const dataUrl = await fileToDataUrl(imageFiles[index]);
-          if (controller.signal.aborted || activeSubmissionRef.current !== batchId) break;
+          const dataUrl = await fileToDataUrl(file);
+          if (controller.signal.aborted || activeSubmissionRef.current !== batchId) return [];
           const scanned = await runScan({ kind: 'image', dataUrl }, controller.signal);
-          if (controller.signal.aborted || activeSubmissionRef.current !== batchId) break;
-          titles.push(...scanned.map((event) => event.title));
+          if (controller.signal.aborted || activeSubmissionRef.current !== batchId) return [];
+          completed += 1;
+          updateProgress(queueItem.id, Math.round((completed / imageFiles.length) * 100));
           setImageProcessingStatuses((previous) => previous.map((item) =>
             item.id === status.id ? { ...item, status: 'complete' as const, eventCount: scanned.length } : item,
           ));
-        }
+          return scanned.map((event) => event.title);
+        });
+        titles.push(...perImage.flat());
         if (!controller.signal.aborted) summarizeAndStore(summaryEntryId, '', titles.map((title) => ({ title })));
       } catch (error) {
         if (!controller.signal.aborted && !(error instanceof DOMException && error.name === 'AbortError')) {

@@ -92,7 +92,7 @@ export function titleCandidates(text: string, extractorTitle?: string): string[]
   if (extractorTitle) { offer(extractorTitle); offer(clean(extractorTitle)); }
   const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
   // Poster titles are often stacked one word per line; offer the joined run.
-  let run: string[] = [];
+  const run: string[] = [];
   for (const l of lines) { if (l.length <= 24 && /^[A-Z0-9 '&!-]+$/.test(l) && !/\d/.test(l)) run.push(l); else break; }
   if (run.length >= 2) offer(titleCase(run.join(' ')));
   const chunks = text.split(/\n|,|\s[-–—·|\/]\s|\.\.\.|:\s|\.\s|!\s|\?\s/).map((s) => s.trim()).filter(Boolean);
