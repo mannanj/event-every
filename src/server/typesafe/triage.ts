@@ -23,8 +23,15 @@ export const SHAPES = [
 ] as const;
 export type TriageShape = (typeof SHAPES)[number];
 
+/** Ordered Score levels; the index maps to minutes. "All day" is index 6 and never applied. */
+export const DURATION_LEVELS = ['30 minutes', '1 hour', '90 minutes', '2 hours', '3 hours', 'half a day', 'all day'] as const;
+export const DURATION_MINUTES = [30, 60, 90, 120, 180, 240, null] as const;
+const DURATION_MIN_CONFIDENCE = 0.6;
+
 export interface TriageVerdict {
   hasEvent: number;
+  /** Typical length for a one-event input, or null when unsure, all-day, or not asked. */
+  durationMinutes: number | null;
   complete: number | null;
   shape: { choice: TriageShape; probabilities: Record<TriageShape, number>; confidence: number };
   /** Probability that paragraph k (k >= 1) starts a different event from k-1. */
@@ -75,6 +82,11 @@ export function triageQuestions(source: TriageSource, paragraphCount: number): R
       },
     },
   };
+  questions.duration = {
+    type: 'score',
+    instructions: 'How long does the main event in `paragraphs` last? If an end time or duration is stated, pick the matching level. Otherwise judge from the kind of occasion: a dentist visit or coffee is short, a dinner or a show is a couple of hours, a workshop or conference day is half a day or more.',
+    criteria: [...DURATION_LEVELS],
+  };
   if (source !== 'url-page') {
     questions.complete = {
       type: 'noul',
@@ -90,6 +102,14 @@ export function triageQuestions(source: TriageSource, paragraphCount: number): R
     }
   }
   return questions;
+}
+
+function durationOf(answer: TypeSafeAnswer | undefined): number | null {
+  if (answer?.type !== 'score' || answer.confidence < DURATION_MIN_CONFIDENCE) return null;
+  let best: string | null = null;
+  for (const [level, p] of Object.entries(answer.probabilities)) if (best === null || p > (answer.probabilities[best] ?? 0)) best = level;
+  const index = best === null ? -1 : Number(best);
+  return DURATION_MINUTES[index] ?? null;
 }
 
 function shapeOf(answer: TypeSafeAnswer | undefined): TriageVerdict['shape'] | null {
@@ -122,7 +142,12 @@ export async function triageText(
   if (hasEvent === null || !shape) return null;
   const boundaries: number[] = [];
   for (let k = 1; k < paragraphs.length; k += 1) boundaries.push(noulOf(result.answers[`boundary_${k}`]) ?? 0);
-  return { hasEvent, complete: noulOf(result.answers.complete), shape, boundaries, paragraphs, ms: result.ms };
+  return {
+    hasEvent,
+    durationMinutes: shape.choice === 'one_event' ? durationOf(result.answers.duration) : null,
+    complete: noulOf(result.answers.complete),
+    shape, boundaries, paragraphs, ms: result.ms,
+  };
 }
 
 /** Thresholds from scripts/typesafe/data/NEXT-USE-CASE.md; tune on real traffic. */

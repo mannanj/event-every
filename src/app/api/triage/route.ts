@@ -41,5 +41,6 @@ export async function POST(request: NextRequest): Promise<Response> {
     shape: verdict.shape.choice,
     hasEvent: verdict.hasEvent,
     complete: verdict.complete,
+    durationMinutes: verdict.durationMinutes,
   });
 }

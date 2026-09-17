@@ -4,6 +4,7 @@ import { decideTriage, splitParagraphs, triageQuestions, triageText, type Triage
 
 const verdict = (over: Partial<TriageVerdict>): TriageVerdict => ({
   hasEvent: 0.95,
+  durationMinutes: null,
   complete: 0.9,
   shape: {
     choice: 'one_event',
@@ -31,8 +32,8 @@ describe('splitParagraphs', () => {
 
 describe('triageQuestions', () => {
   test('asks boundaries only with three or more paragraphs and completeness only for typed input', () => {
-    expect(Object.keys(triageQuestions('paste', 2))).toEqual(['has_event', 'shape', 'complete']);
-    expect(Object.keys(triageQuestions('url-page', 3))).toEqual(['has_event', 'shape', 'boundary_1', 'boundary_2']);
+    expect(Object.keys(triageQuestions('paste', 2))).toEqual(['has_event', 'shape', 'duration', 'complete']);
+    expect(Object.keys(triageQuestions('url-page', 3))).toEqual(['has_event', 'shape', 'duration', 'boundary_1', 'boundary_2']);
   });
 });
 
@@ -107,5 +108,35 @@ describe('triageText fallback', () => {
     expect(result?.shape.probabilities.several_independent_events).toBe(0);
     expect((sent as { state: { referenceWeekday: string } }).state.referenceWeekday).toBe('Wednesday');
     expect((sent as { model: string }).model).toBe('jev-latest');
+  });
+});
+
+describe('duration', () => {
+  const originalFetch = globalThis.fetch;
+  afterEach(() => { globalThis.fetch = originalFetch; setTypeSafeKeyForTests(undefined); });
+
+  const answer = (shape: string, score: unknown) => async () => Response.json({
+    answers: {
+      has_event: { type: 'noul', noul: 0.97 },
+      shape: { type: 'choice', choice: shape, probabilities: { [shape]: 0.9 }, confidence: 0.9 },
+      duration: score,
+    },
+    usage: { input_tokens: 1, output_tokens: 1 },
+  });
+
+  test('takes the most likely level for a confident one-event answer', async () => {
+    setTypeSafeKeyForTests('k');
+    globalThis.fetch = answer('one_event', { type: 'score', score: 2.8, legend: {}, probabilities: { '2': 0.2, '3': 0.7, '4': 0.1 }, confidence: 0.7 }) as unknown as typeof fetch;
+    expect((await triageText('Dinner Friday 7pm', 'paste'))?.durationMinutes).toBe(120);
+  });
+
+  test('gives nothing when unsure, all-day, or not a single event', async () => {
+    setTypeSafeKeyForTests('k');
+    globalThis.fetch = answer('one_event', { type: 'score', score: 2, legend: {}, probabilities: { '1': 0.4, '3': 0.4 }, confidence: 0.3 }) as unknown as typeof fetch;
+    expect((await triageText('Thing Friday', 'paste'))?.durationMinutes).toBeNull();
+    globalThis.fetch = answer('one_event', { type: 'score', score: 6, legend: {}, probabilities: { '6': 0.95 }, confidence: 0.95 }) as unknown as typeof fetch;
+    expect((await triageText('Offsite Friday', 'paste'))?.durationMinutes).toBeNull();
+    globalThis.fetch = answer('several_independent_events', { type: 'score', score: 1, legend: {}, probabilities: { '1': 0.9 }, confidence: 0.9 }) as unknown as typeof fetch;
+    expect((await triageText('A\n\nB\n\nC', 'paste'))?.durationMinutes).toBeNull();
   });
 });

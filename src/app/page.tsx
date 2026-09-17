@@ -38,7 +38,7 @@ import { ProcessingEvent, ImageProcessingStatus, BatchProcessing, URLProcessingS
 import { scan } from '@/services/scanClient';
 import { createReviewDrafts } from '@/services/scannerDraft';
 import { mapWithConcurrency } from '@/utils/concurrency';
-import { requestTriage } from '@/services/scanTriage';
+import { requestTriage, withTriageDuration } from '@/services/scanTriage';
 import type { ReviewDraft } from '@/types/review';
 import { reviewDraftsToCalendarEvents } from '@/services/reviewEvent';
 import { ScanResponseSchema, type ScanRequest } from '@/types/scannerHttp';
@@ -106,7 +106,9 @@ function Home({ processingDisabled }: { processingDisabled: boolean }) {
     // The Scanner answers only what the source said. Everything a calendar
     // additionally requires - an end, a zone, a title - is applied here, which is
     // where it lived before the Scanner migration.
-    const incoming = reviewDraftsToCalendarEvents(providerScanDrafts(response, operation));
+    const drafts = providerScanDrafts(response, operation);
+    const incoming = reviewDraftsToCalendarEvents(drafts).map((event, index) =>
+      withTriageDuration(event, drafts[index].candidate.temporal.value?.end != null, batchDurationRef.current));
     const next = mergeScannedEvents(unsavedEventsRef.current, incoming);
     unsavedEventsRef.current = next;
     setUnsavedEvents(next);
@@ -164,6 +166,8 @@ function Home({ processingDisabled }: { processingDisabled: boolean }) {
     })();
   };
   const abortRef = useRef<AbortController | null>(null);
+  // Triage's typical-duration verdict for the batch being scanned, if any.
+  const batchDurationRef = useRef<number | null>(null);
   const activeSubmissionRef = useRef<string | null>(null);
   const activeImageBatchRef = useRef<string | null>(null);
   const loadedSigRef = useRef<string | null>(null);
@@ -433,6 +437,7 @@ function Home({ processingDisabled }: { processingDisabled: boolean }) {
         const triage = await requestTriage(combinedText, detection.hasUrls ? 'url-page' : 'paste', controller.signal);
         if (controller.signal.aborted || activeSubmissionRef.current !== batchId) return [];
         const decision = triage?.decision ?? { kind: 'single' as const };
+        batchDurationRef.current = decision.kind === 'single' ? triage?.durationMinutes ?? null : null;
         let scanned: CalendarEvent[] = [];
         if (decision.kind === 'skip') {
           pushProcessingNotice('text', 'No date or time found in that. Add when it happens and try again.');
@@ -458,6 +463,7 @@ function Home({ processingDisabled }: { processingDisabled: boolean }) {
         }
         if (abortRef.current === controller) setUrlProcessingStatus(null);
       } finally {
+        batchDurationRef.current = null;
         if (abortRef.current === controller) abortRef.current = null;
         setBatchProcessing((previous) => previous?.id === batchId ? { ...previous, isProcessing: false } : previous);
       }

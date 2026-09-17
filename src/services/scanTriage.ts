@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { CalendarEvent } from '@/types/event';
 
 /**
  * Client half of pre-scan triage. Resolves to null on any failure or after
@@ -21,6 +22,7 @@ const TriageResponseSchema = z.union([
     shape: z.string(),
     hasEvent: z.number(),
     complete: z.number().nullable(),
+    durationMinutes: z.number().int().positive().nullable().optional(),
   }),
 ]);
 
@@ -54,4 +56,14 @@ export async function requestTriage(
     clearTimeout(timer);
     signal?.removeEventListener('abort', onOuterAbort);
   }
+}
+
+/**
+ * Replaces the one-hour default end with triage's typical duration. Only for a
+ * timed event whose source stated no end; a stated end or an all-day event is
+ * left exactly as the scanner produced it.
+ */
+export function withTriageDuration(event: CalendarEvent, sourceHasEnd: boolean, durationMinutes: number | null | undefined): CalendarEvent {
+  if (!durationMinutes || sourceHasEnd || event.allDay) return event;
+  return { ...event, endDate: new Date(event.startDate.getTime() + durationMinutes * 60_000) };
 }
