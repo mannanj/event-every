@@ -164,10 +164,11 @@ describe('sanitizeResolvedTimezone (LLM-output trust boundary)', () => {
       .toEqual({ timezone: 'Etc/GMT+4', confidence: 0.9 });
   });
 
-  test('zeroes confidence for an unmappable label (the interview-email input)', () => {
-    // "Eastern Time (US & Canada)" cannot be mapped to a real zone here; confidence 0 tells the
-    // client to keep its already-correct browser-zone value rather than apply a garbage zone.
-    expect(sanitizeResolvedTimezone('Eastern Time (US & Canada)', 0.95).confidence).toBe(0);
+  test('maps the interview-email label and zeroes confidence for a truly unmappable one', () => {
+    // "Eastern Time (US & Canada)" is the Windows display name and now maps; a label that
+    // names no zone still gets confidence 0 so the client keeps its browser-zone value.
+    expect(sanitizeResolvedTimezone('Eastern Time (US & Canada)', 0.95)).toEqual({ timezone: 'America/New_York', confidence: 0.95 });
+    expect(sanitizeResolvedTimezone('Local Time', 0.95).confidence).toBe(0);
   });
 
   test('defaults a missing confidence to 0.5 for a valid zone', () => {
@@ -177,5 +178,24 @@ describe('sanitizeResolvedTimezone (LLM-output trust boundary)', () => {
 
   test('zeroes confidence for a non-string timezone', () => {
     expect(sanitizeResolvedTimezone(null, 0.9).confidence).toBe(0);
+  });
+});
+
+describe('long timezone names from calendar invites', () => {
+  // The interview email that produced the 06:30 card carried this exact
+  // label; the app has to understand it rather than fall back to the reader.
+  test('Windows display names resolve to the IANA zone', () => {
+    expect(resolveTimezoneZone('Eastern Time (US & Canada)')).toEqual({ timezone: 'America/New_York', resolved: true });
+    expect(resolveTimezoneZone('(GMT-04:00) Eastern Time (US & Canada)')).toEqual({ timezone: 'America/New_York', resolved: true });
+    expect(resolveTimezoneZone('Pacific Time (US & Canada)')).toEqual({ timezone: 'America/Los_Angeles', resolved: true });
+  });
+  test('plain and daylight names resolve, and European names are not read as US Central', () => {
+    expect(resolveTimezoneZone('Pacific Time').timezone).toBe('America/Los_Angeles');
+    expect(resolveTimezoneZone('Eastern Daylight Time').timezone).toBe('America/New_York');
+    expect(resolveTimezoneZone('Central European Summer Time').timezone).toBe('Europe/Paris');
+    expect(resolveTimezoneZone('Central Time').timezone).toBe('America/Chicago');
+  });
+  test('a bare offset with no name still resolves to a fixed offset', () => {
+    expect(resolveTimezoneZone('GMT-04:00').timezone).toBe('Etc/GMT+4');
   });
 });

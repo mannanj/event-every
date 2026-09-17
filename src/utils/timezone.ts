@@ -35,6 +35,37 @@ const TIMEZONE_ABBREVIATIONS: Record<string, string> = {
 
 const KNOWN_ABBREVIATIONS = new Set(Object.keys(TIMEZONE_ABBREVIATIONS));
 
+// Long names as calendar tools print them: Outlook and Google put the Windows
+// display name ("Eastern Time (US & Canada)") or the plain name ("Pacific
+// Time", "Central European Summer Time") in invites. Matched before numeric
+// offsets so "(GMT-04:00) Eastern Time (US & Canada)" keeps its DST rules
+// instead of freezing at a fixed offset. Order matters: longer, more specific
+// names come first so "Central European" is not read as "Central".
+const TIMEZONE_LONG_NAMES: ReadonlyArray<readonly [RegExp, string]> = [
+  [/\bcentral european\b/i, 'Europe/Paris'],
+  [/\beastern european\b/i, 'Europe/Athens'],
+  [/\bwestern european\b/i, 'Europe/Lisbon'],
+  [/\b(?:british|greenwich mean)\b/i, 'Europe/London'],
+  [/\bindia(?:n)? standard\b/i, 'Asia/Kolkata'],
+  [/\bjapan\b/i, 'Asia/Tokyo'],
+  [/\bkorea\b/i, 'Asia/Seoul'],
+  [/\baus(?:tralian)? eastern\b/i, 'Australia/Sydney'],
+  [/\bnew zealand\b/i, 'Pacific/Auckland'],
+  [/\batlantic\b/i, 'America/Halifax'],
+  [/\bhawaii/i, 'Pacific/Honolulu'],
+  [/\balaska/i, 'America/Anchorage'],
+  [/\bpacific\b/i, 'America/Los_Angeles'],
+  [/\bmountain\b/i, 'America/Denver'],
+  [/\bcentral\b/i, 'America/Chicago'],
+  [/\beastern\b/i, 'America/New_York'],
+];
+
+function parseLongTimezoneName(text: string): string | null {
+  if (!/\b(?:time|standard|daylight|summer)\b/i.test(text) && !/\(us & canada\)/i.test(text)) return null;
+  for (const [pattern, zone] of TIMEZONE_LONG_NAMES) if (pattern.test(text)) return zone;
+  return null;
+}
+
 export function getBrowserTimezone(): string {
   try {
     return Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -44,6 +75,9 @@ export function getBrowserTimezone(): string {
 }
 
 function parseTimezoneFromText(text: string): string | null {
+  const longName = parseLongTimezoneName(text);
+  if (longName) return longName;
+
   // Numeric UTC/GMT offsets are matched FIRST: "GMT-04:00" must resolve to Etc/GMT+4 (UTC-4),
   // not short-circuit on the bare \bGMT\b / \bUTC\b entries in the abbreviation map below (which
   // would return Europe/London / UTC and discard the offset). The offset branch was previously

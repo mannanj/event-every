@@ -210,3 +210,30 @@ describe('reviewDraftToCalendarEvent: the flag does not outrank the point', () =
     expect(event.endDate.toISOString()).toBe('2026-09-23T00:00:00.000Z');
   });
 });
+
+describe('long zone names from invites', () => {
+  // The Togetherwork interview email: "10:30am (GMT-04:00) Eastern Time (US & Canada)".
+  // Two cards in real history stored this as 06:30, the wall clock stamped as UTC.
+  test('a Windows zone label places 10:30 Eastern at 14:30 UTC whatever the reader zone', () => {
+    const event = reviewDraftToCalendarEvent(draft({
+      temporal: claim({
+        start: {
+          kind: 'zoned',
+          date: { year: 2026, month: 6, day: 15 },
+          time: { hour: 10, minute: 30, second: 0 },
+          timeZone: 'Eastern Time (US & Canada)',
+          resolution: 'exact',
+          possibleOffsets: ['-04:00'],
+          sourceOffset: null,
+          chosenOffset: '-04:00',
+        },
+        end: null,
+        duration: null,
+        allDay: false,
+      }),
+    }), identity);
+    expect(event.startDate.toISOString()).toBe('2026-06-15T14:30:00.000Z');
+    expect(event.timezone).toBe('America/New_York');
+    expect(event.timezoneStatus).toBe('resolved');
+  });
+});
