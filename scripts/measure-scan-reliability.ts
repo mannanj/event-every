@@ -176,7 +176,13 @@ async function runCase(model: string, testCase: EvalCase, key: string): Promise<
 }
 
 const key = apiKey();
-const selected = EVAL_CASES.filter((c) => ONLY.length === 0 || ONLY.includes(c.id));
+// Real scans from the owner's own history live in eval-images/real/, which is
+// gitignored because the repo is public and the screenshots carry names and
+// emails. Their answer key sits beside them and is merged in when present.
+const REAL_CASES_PATH = `${IMAGE_DIR}/real/cases.json`;
+const REAL_CASES: EvalCase[] = existsSync(REAL_CASES_PATH) ? JSON.parse(readFileSync(REAL_CASES_PATH, 'utf8')) as EvalCase[] : [];
+const ALL_CASES = [...EVAL_CASES, ...REAL_CASES];
+const selected = ALL_CASES.filter((c) => ONLY.length === 0 || ONLY.includes(c.id));
 const textCases = selected.filter((c) => !c.image);
 const imageCases = selected.filter((c) => c.image && existsSync(`${IMAGE_DIR}/${c.image}`));
 if (selected.some((c) => c.image) && imageCases.length === 0) console.log('image cases skipped: run `node scripts/render-eval-images.mjs` first\n');
