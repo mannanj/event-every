@@ -38,6 +38,7 @@ import { ProcessingEvent, ImageProcessingStatus, BatchProcessing, URLProcessingS
 import { scan } from '@/services/scanClient';
 import { createReviewDrafts } from '@/services/scannerDraft';
 import { mapWithConcurrency } from '@/utils/concurrency';
+import { imageToScanDataUrl } from '@/utils/imageDownscale';
 import { requestTriage, withTriageDuration } from '@/services/scanTriage';
 import type { ReviewDraft } from '@/types/review';
 import { reviewDraftsToCalendarEvents } from '@/services/reviewEvent';
@@ -317,13 +318,6 @@ function Home({ processingDisabled }: { processingDisabled: boolean }) {
     }
   }, [acceptProviderScan]);
 
-  const fileToDataUrl = (file: File): Promise<string> => new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
-    reader.onerror = () => reject(reader.error ?? new Error('Unable to read image.'));
-    reader.readAsDataURL(file);
-  });
-
   const pushProcessingNotice = (type: 'image' | 'text', message: string) => {
     const id = `error-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     setProcessingEvents((previous) => [...previous, { id, type, status: 'error', error: message }]);
@@ -364,7 +358,7 @@ function Home({ processingDisabled }: { processingDisabled: boolean }) {
           setImageProcessingStatuses((previous) => previous.map((item) =>
             item.id === status.id ? { ...item, status: 'processing' as const } : item,
           ));
-          const dataUrl = await fileToDataUrl(file);
+          const dataUrl = await imageToScanDataUrl(file);
           if (controller.signal.aborted || activeSubmissionRef.current !== batchId) return [];
           const scanned = await runScan({ kind: 'image', dataUrl }, controller.signal);
           if (controller.signal.aborted || activeSubmissionRef.current !== batchId) return [];
