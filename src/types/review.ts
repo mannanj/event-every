@@ -21,6 +21,8 @@ export type ReviewDraft = Readonly<{
   scanIssues: readonly ScannerIssue[];
   readiness: IcsReadiness;
   source: ReviewSource;
+  /** The source gave a month and day with no year and the current year was assumed. */
+  assumedYear?: boolean;
 }>;
 
 export type ReviewFieldEdit =

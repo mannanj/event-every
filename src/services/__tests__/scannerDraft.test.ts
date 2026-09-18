@@ -342,3 +342,15 @@ describe('missing year', () => {
     expect(draft.readiness.canGenerate).toBe(false);
   });
 });
+
+describe('assumed year hint', () => {
+  test('the draft says when the year was filled in', () => {
+    const input = EventCandidateSchema.parse({
+      ...candidate(),
+      temporal: claim({ start: { kind: 'date', year: null, month: 1, day: 15 }, end: null, duration: null, allDay: true }),
+      issues: [],
+    });
+    expect(createReviewDraft(input, [], source, identity).assumedYear).toBe(true);
+    expect(createReviewDraft(candidate(), [], source, identity).assumedYear).toBeUndefined();
+  });
+});

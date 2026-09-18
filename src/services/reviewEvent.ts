@@ -45,11 +45,11 @@ function rawFromPoint(point: TemporalPoint | null): RawPoint | null {
     // half would be inventing the event rather than defaulting around it.
     if (point.year === null || point.month === null || point.day === null) return null;
     const date = `${pad(point.year, 4)}-${pad(point.month)}-${pad(point.day)}`;
-    if (point.hour === null || point.minute === null) {
+    if (point.hour === null) {
       return { raw: date, timeZone: null, dateOnly: true };
     }
     return {
-      raw: `${date}T${pad(point.hour)}:${pad(point.minute)}:${pad(point.second ?? 0)}`,
+      raw: `${date}T${pad(point.hour)}:${pad(point.minute ?? 0)}:${pad(point.second ?? 0)}`,
       timeZone: null,
       dateOnly: false,
     };
@@ -94,8 +94,10 @@ export function reviewDraftToCalendarEvent(
     // All-day dates are stored at UTC midnight and read back with UTC getters so
     // the calendar day never drifts with the viewer's zone (task-194).
     startDate = startPoint ? parseAllDayDate(startPoint.raw.slice(0, 10)) : new Date(identity.created);
+    // A stated all-day end names the last day; the calendar wants the day
+    // after it (exclusive DTEND), or "Sep 20-22" imports as Sep 20-21.
     endDate = endPoint
-      ? parseAllDayDate(endPoint.raw.slice(0, 10))
+      ? new Date(parseAllDayDate(endPoint.raw.slice(0, 10)).getTime() + DAY_MS)
       : new Date(startDate.getTime() + DAY_MS);
   } else {
     startDate = startPoint
@@ -124,6 +126,7 @@ export function reviewDraftToCalendarEvent(
     startDate,
     endDate,
     ...(startMissing ? { startMissing: true } : {}),
+    ...(draft.assumedYear ? { assumedYear: true } : {}),
     location: candidate.location.value ?? undefined,
     description: candidate.description.value ?? undefined,
     url: normalizeUrl(candidate.url.value),

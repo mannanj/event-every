@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import type { EventCandidate } from '@event-every/scanner';
-import { normalizeTemporal } from '../temporalNormalize';
+import { normalizeCandidate, normalizeTemporal } from '../temporalNormalize';
 
 const now = new Date('2026-09-16T12:00:00Z');
 const zoned = (hour: number, minute: number, second = 0) => ({
@@ -49,5 +49,34 @@ describe('normalizeTemporal', () => {
   test('leaves a candidate without a temporal alone', () => {
     const input = withTemporal(null);
     expect(normalizeTemporal(input, now)).toBe(input);
+  });
+});
+
+describe('review fixes: last day, stated hour, assumed year', () => {
+  const zonedOn = (day: number, hour: number, minute: number, second = 0) => ({ ...zoned(hour, minute, second), date: { year: 2026, month: 9, day } });
+
+  test('a multi-day all-day range written to 23:59 keeps its last day', () => {
+    const out = normalizeTemporal(withTemporal({ start: zonedOn(20, 0, 0), end: zonedOn(22, 23, 59, 59), duration: null, allDay: true }), now);
+    expect(out.temporal.value?.end).toEqual({ kind: 'date', year: 2026, month: 9, day: 22 });
+  });
+
+  test('a midnight end names the day before it', () => {
+    const out = normalizeTemporal(withTemporal({ start: zonedOn(20, 0, 0), end: zonedOn(23, 0, 0), duration: null, allDay: true }), now);
+    expect(out.temporal.value?.end).toEqual({ kind: 'date', year: 2026, month: 9, day: 22 });
+    const single = normalizeTemporal(withTemporal({ start: zonedOn(20, 0, 0), end: zonedOn(21, 0, 0), duration: null, allDay: true }), now);
+    expect(single.temporal.value?.end).toBeNull();
+  });
+
+  test('a stated hour with no minute is a time, not an all-day date', () => {
+    const out = normalizeTemporal(withTemporal({ start: { kind: 'partial', year: 2026, month: 7, day: 29, hour: 11, minute: null, second: null }, end: null, duration: null, allDay: false }), now);
+    expect(startOf(out)).toEqual({ kind: 'floating', date: { year: 2026, month: 7, day: 29 }, time: { hour: 11, minute: 0, second: 0 } });
+  });
+
+  test('reports when the year was assumed and only then', () => {
+    const guessed = normalizeCandidate(withTemporal({ start: { kind: 'date', year: null, month: 1, day: 15 }, end: null, duration: null, allDay: true }), now);
+    expect(guessed.assumedYear).toBe(true);
+    expect(startOf(guessed.candidate)).toEqual({ kind: 'date', year: 2026, month: 1, day: 15 });
+    const stated = normalizeCandidate(withTemporal({ start: { kind: 'date', year: 2026, month: 1, day: 15 }, end: null, duration: null, allDay: true }), now);
+    expect(stated.assumedYear).toBe(false);
   });
 });

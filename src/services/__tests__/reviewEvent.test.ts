@@ -257,3 +257,35 @@ describe('missing start', () => {
     expect(event.startMissing).toBeUndefined();
   });
 });
+
+describe('review fixes in the calendar event', () => {
+  test('a stated all-day end exports as the day after the last day', () => {
+    const event = reviewDraftToCalendarEvent(draft({
+      temporal: claim({
+        start: { kind: 'date', year: 2026, month: 9, day: 20 },
+        end: { kind: 'date', year: 2026, month: 9, day: 22 },
+        duration: null, allDay: true,
+      }),
+    }), identity);
+    expect(event.allDay).toBe(true);
+    expect(event.startDate.toISOString()).toBe('2026-09-20T00:00:00.000Z');
+    expect(event.endDate.toISOString()).toBe('2026-09-23T00:00:00.000Z');
+  });
+
+  test('a partial with an hour and no minute is a timed event', () => {
+    const event = reviewDraftToCalendarEvent(draft({
+      temporal: claim({
+        start: { kind: 'partial', year: 2026, month: 7, day: 29, hour: 11, minute: null, second: null },
+        end: null, duration: null, allDay: false,
+      }),
+    }), identity);
+    expect(event.allDay).toBe(false);
+    expect(event.rawStartDate).toBe('2026-07-29T11:00:00');
+  });
+
+  test('carries the assumed-year hint from the draft', () => {
+    const event = reviewDraftToCalendarEvent({ ...draft({}), assumedYear: true }, identity);
+    expect(event.assumedYear).toBe(true);
+    expect(reviewDraftToCalendarEvent(draft({}), identity).assumedYear).toBeUndefined();
+  });
+});
