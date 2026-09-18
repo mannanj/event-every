@@ -129,9 +129,11 @@ describe('reviewDraftToCalendarEvent', () => {
       }),
     }), identity);
 
-    // Falls back to the creation instant rather than inventing 0022 or 1970.
+    // The placeholder is the creation instant, never 0022 or 1970, and the
+    // card is told the date is missing rather than shown a fabricated one.
     expect(event.startDate.toISOString()).toBe(identity.created.toISOString());
     expect(event.rawStartDate).toBeUndefined();
+    expect(event.startMissing).toBe(true);
   });
 
   test('an untitled candidate still exports under a name', () => {
@@ -235,5 +237,23 @@ describe('long zone names from invites', () => {
     expect(event.startDate.toISOString()).toBe('2026-06-15T14:30:00.000Z');
     expect(event.timezone).toBe('America/New_York');
     expect(event.timezoneStatus).toBe('resolved');
+  });
+});
+
+describe('missing start', () => {
+  test('a candidate with no start is flagged instead of quietly dated to now', () => {
+    const event = reviewDraftToCalendarEvent(draft({
+      temporal: claim({ start: null, end: null, duration: null, allDay: false }),
+    }), identity);
+    expect(event.startMissing).toBe(true);
+  });
+  test('a stated start carries no flag', () => {
+    const event = reviewDraftToCalendarEvent(draft({
+      temporal: claim({
+        start: { kind: 'floating', date: { year: 2026, month: 9, day: 22 }, time: { hour: 19, minute: 0, second: 0 } },
+        end: null, duration: null, allDay: false,
+      }),
+    }), identity);
+    expect(event.startMissing).toBeUndefined();
   });
 });

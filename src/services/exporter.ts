@@ -70,6 +70,9 @@ function addAttachmentsToICSAtIndex(icsContent: string, attachments: EventAttach
 
 export function exportToICS(event: CalendarEvent): ExportResult {
   try {
+    if (event.startMissing) {
+      return { success: false, error: 'This event needs a date before it can be exported' };
+    }
     const eventAttributes: EventAttributes = {
       start: dateToArray(event.startDate, event.allDay),
       end: dateToArray(event.endDate, event.allDay),
@@ -161,6 +164,10 @@ export function validateEvent(event: CalendarEvent): ValidationResult {
 
   if (!event.title || event.title.trim() === '') {
     errors.push('Event title is required');
+  }
+
+  if (event.startMissing) {
+    errors.push('This event needs a date before it can be exported');
   }
 
   if (!event.startDate || !(event.startDate instanceof Date) || isNaN(event.startDate.getTime())) {

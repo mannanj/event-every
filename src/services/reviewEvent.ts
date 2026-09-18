@@ -114,11 +114,16 @@ export function reviewDraftToCalendarEvent(
     endDate = new Date(startDate.getTime() + (allDay ? DAY_MS : HOUR_MS));
   }
 
+  // The clock never fills a missing date. The placeholder keeps sorting and
+  // storage working; the flag keeps the card honest and export closed.
+  const startMissing = startPoint === null;
+
   return {
     id: identity.id,
     title: candidate.title.value?.trim() || 'Untitled Event',
     startDate,
     endDate,
+    ...(startMissing ? { startMissing: true } : {}),
     location: candidate.location.value ?? undefined,
     description: candidate.description.value ?? undefined,
     url: normalizeUrl(candidate.url.value),

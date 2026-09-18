@@ -91,3 +91,11 @@ describe('exportToICS — DOM-free failure path', () => {
     expect(r.success).toBe(false);
   });
 });
+
+describe('a card that still needs a date', () => {
+  test('is rejected by validation in plain words and refused by export', () => {
+    const event = makeEvent({ startMissing: true });
+    expect(validateEvent(event).errors).toContain('This event needs a date before it can be exported');
+    expect(exportToICS(event)).toEqual({ success: false, error: 'This event needs a date before it can be exported' });
+  });
+});

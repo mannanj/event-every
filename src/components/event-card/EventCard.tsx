@@ -106,7 +106,7 @@ function EventCard({
       const newStart = parseAllDayDate(value);
       if (isNaN(newStart.getTime())) return;
       const newEnd = shiftEndPreservingDuration(event.startDate, event.endDate, newStart);
-      onEdit({ ...event, startDate: newStart, endDate: newEnd });
+      onEdit({ ...event, startDate: newStart, endDate: newEnd, startMissing: undefined });
       return;
     }
 
@@ -130,7 +130,7 @@ function EventCard({
     }
 
     const newEnd = shiftEndPreservingDuration(event.startDate, event.endDate, newStart);
-    onEdit(resyncRawFields({ ...event, startDate: newStart, endDate: newEnd }));
+    onEdit(resyncRawFields({ ...event, startDate: newStart, endDate: newEnd, startMissing: undefined }));
   };
 
   return (
@@ -220,16 +220,24 @@ function EventCard({
                   />
                 ) : (
                   <span
-                    className="cursor-pointer hover:bg-gray-200 rounded"
+                    className={event.startMissing
+                      ? 'cursor-pointer rounded border border-black px-1 font-medium text-black hover:bg-gray-200'
+                      : 'cursor-pointer hover:bg-gray-200 rounded'}
+                    data-testid={event.startMissing ? 'event-card-date-missing' : undefined}
                     onClick={(e) => {
                       e.stopPropagation();
                       setEditingField('startDate');
                     }}
                   >
-                    {(event.allDay ? DATE_FMT_ALLDAY : DATE_FMT).format(event.startDate)}
+                    {event.startMissing
+                      ? 'Add a date'
+                      : (event.allDay ? DATE_FMT_ALLDAY : DATE_FMT).format(event.startDate)}
                   </span>
                 )}
-                {!event.allDay && (
+                {event.assumedYear && !event.startMissing && (
+                  <span className="ml-1 text-xs text-gray-500" data-testid="event-card-year-assumed">(year assumed)</span>
+                )}
+                {!event.allDay && !event.startMissing && (
                   <>
                     {' '}at{' '}
                     {editingField === 'startTime' ? (

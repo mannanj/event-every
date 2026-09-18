@@ -25,6 +25,10 @@ export interface CalendarEvent {
   rawTimezone?: string;
   timezoneStatus?: TimezoneStatus;
   timezoneSource?: TimezoneSource;
+  /** The source stated no start. startDate is a placeholder; the card asks for a date and export refuses. */
+  startMissing?: boolean;
+  /** The source stated a month and day but no year, and the current year was assumed. */
+  assumedYear?: boolean;
   created: Date;
   source: 'image' | 'text' | 'url';
   originalInput?: string;
