@@ -24,7 +24,11 @@ type QueueListener = (queue: QueueItem[]) => void;
 
 class ProcessingQueue {
   private queue: QueueItem[] = [];
-  private maxConcurrent = 3;
+  // One at a time. Scans share a single durable pending provider operation
+  // (providerOperation.ts), so a second item started alongside the first was
+  // refused with a technical error and dropped (review finding, Task 222).
+  // Queued items now wait their turn instead.
+  private maxConcurrent = 1;
   private listeners: QueueListener[] = [];
   private processingCallbacks: Map<string, (item: QueueItem) => Promise<CalendarEvent[]>> = new Map();
 

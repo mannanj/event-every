@@ -339,7 +339,7 @@ function Home({ processingDisabled }: { processingDisabled: boolean }) {
     addToQueue('image', files, undefined, async (queueItem: QueueItem) => {
       const imageFiles = queueItem.payload as File[];
       const controller = new AbortController();
-      if (abortRef.current) throw new Error('A provider operation is already pending.');
+      if (abortRef.current) throw new Error('Another scan is still running. Wait for it to finish, then try again.');
       abortRef.current = controller;
       const batchId = crypto.randomUUID();
       activeSubmissionRef.current = batchId;
@@ -404,7 +404,7 @@ function Home({ processingDisabled }: { processingDisabled: boolean }) {
     addToQueue('text', text, undefined, async (queueItem: QueueItem) => {
       const inputText = queueItem.payload as string;
       const controller = new AbortController();
-      if (abortRef.current) throw new Error('A provider operation is already pending.');
+      if (abortRef.current) throw new Error('Another scan is still running. Wait for it to finish, then try again.');
       if (activeImageBatchRef.current !== null) setImageProcessingStatuses([]);
       abortRef.current = controller;
       const batchId = crypto.randomUUID();

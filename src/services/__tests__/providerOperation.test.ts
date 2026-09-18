@@ -70,7 +70,7 @@ test('blocks a new submission while any nonterminal record exists', async () => 
   });
   await expect(beginProviderOperation({
     route: '/api/scan', consumerKind: 'scan_text', consumerRef: CONSUMER_REF,
-  })).rejects.toThrow('already pending');
+  })).rejects.toThrow('Another scan is still running');
   expect(requestId).not.toHaveBeenCalled();
   expect(save).not.toHaveBeenCalled();
 });
@@ -102,7 +102,7 @@ test('serializes concurrent begins before either can create a second UUID', asyn
   await Promise.resolve();
   await expect(beginProviderOperation({
     route: '/api/summarize', consumerKind: 'summarize', consumerRef: CONSUMER_REF,
-  })).rejects.toThrow('already pending');
+  })).rejects.toThrow('Another scan is still running');
   release();
   await first;
   expect(requestId).toHaveBeenCalledTimes(1);

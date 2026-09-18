@@ -107,11 +107,11 @@ export async function listProviderOperations(): Promise<ProviderOperationRecord[
 }
 
 export async function beginProviderOperation(input: ProviderOperationStart): Promise<ProviderOperationRecord> {
-  if (beginInFlight) throw new Error('A provider operation is already pending.');
+  if (beginInFlight) throw new Error('Another scan is still running. Wait for it to finish, then try again.');
   beginInFlight = true;
   try {
     if ((await listProviderOperations()).length > 0) {
-      throw new Error('A provider operation is already pending.');
+      throw new Error('Another scan is still running. Wait for it to finish, then try again.');
     }
     const deps = dependencies();
     const record = parseProviderOperation({
