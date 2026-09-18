@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { promises as fs } from 'node:fs';
 import { parseICSContent } from '../src/services/icsParser';
-import { eventCards, mockAuth, mockSummarize, mockURLDetection, scanButton } from './helpers';
+import { eventCards, mockAuth, mockSummarize, mockURLDetection, scanButton, mockTriage } from './helpers';
 
 interface StoredCalendarEvent {
   id: string;
@@ -49,6 +49,7 @@ async function openSeededPage(
   saved: StoredCalendarEvent[] = [],
 ): Promise<void> {
   await mockAuth(page);
+  await mockTriage(page);
   await mockURLDetection(page);
   await mockSummarize(page);
   await page.addInitScript(({ temporaryEvents, savedEvents }) => {
@@ -228,6 +229,9 @@ test.describe('CalendarEvent regressions', () => {
     })]);
     const card = page.getByTestId('event-card').filter({ hasText: 'Planning' });
 
+    // Under a fully parallel run the card can still be settling; clicking before
+    // it is visible left the time editor closed and the fill waiting (flake).
+    await expect(card.getByText('12:00 PM')).toBeVisible();
     await card.getByText('12:00 PM').click();
     await card.getByTestId('event-card-time-input').fill('14:00');
     await card.getByTestId('event-card-time-input').press('Enter');
@@ -250,6 +254,9 @@ test.describe('CalendarEvent regressions', () => {
     })]);
     const card = page.getByTestId('event-card').filter({ hasText: 'Planning' });
 
+    // Under a fully parallel run the card can still be settling; clicking before
+    // it is visible left the time editor closed and the fill waiting (flake).
+    await expect(card.getByText('12:00 PM')).toBeVisible();
     await card.getByText('12:00 PM').click();
     await card.getByTestId('event-card-time-input').fill('17:00');
     await card.getByTestId('event-card-time-input').press('Enter');

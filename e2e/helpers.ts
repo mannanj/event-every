@@ -145,10 +145,23 @@ export async function waitForSmartInputReady(page: Page) {
   ), undefined, { timeout: 20000 });
 }
 
+/**
+ * Pre-scan triage (Task 212) runs for real against the dev server when the
+ * TypeSafe key is present, and would skip or split the plain test texts. The
+ * suite pins it to "unavailable" so every scan behaves as it did before triage;
+ * the triage spec overrides this with explicit verdicts.
+ */
+export async function mockTriage(page: Page, body: unknown = { available: false }) {
+  await page.route('**/api/triage', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+  });
+}
+
 export async function setupLocal(page: Page) {
   await mockAuth(page);
   await mockURLDetection(page);
   await mockSummarize(page);
+  await mockTriage(page);
   await page.addInitScript(() => localStorage.clear());
   await page.goto('/');
   await waitForSmartInputReady(page);

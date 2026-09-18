@@ -44,10 +44,12 @@ import { reviewDraftsToCalendarEvents } from '@/services/reviewEvent';
 import { ScanResponseSchema, type ScanRequest } from '@/types/scannerHttp';
 import AuthWrapper from '@/components/AuthWrapper';
 
-// Matches the processing queue's own ceiling; more in flight than that only
-// queues at the provider.
-const IMAGE_SCAN_CONCURRENCY = 3;
-const TEXT_SCAN_CONCURRENCY = 3;
+// One at a time, on purpose. `beginProviderOperation` keeps exactly one durable
+// pending record and throws on a second, so a higher limit fails the batch on
+// its second scan (caught by the two-image e2e test). Raising this needs a
+// per-operation record store first; the batch plumbing is already in place.
+const IMAGE_SCAN_CONCURRENCY = 1;
+const TEXT_SCAN_CONCURRENCY = 1;
 
 function providerScanDrafts(response: ReturnType<typeof ScanResponseSchema.parse>, operation: ProviderOperationRecord): ReviewDraft[] {
   const createdAt = new Date(operation.createdAtMs).toISOString();

@@ -18,6 +18,7 @@ import {
   submitText,
   TINY_PNG_BASE64,
   waitForCards,
+  mockTriage,
 } from './helpers';
 
 /**
@@ -597,6 +598,7 @@ test('multiple Scanner candidates export exactly the selected subset in one cale
 test('a card with no source start survives a reload, and an unselected card does not survive a save', async ({ page }) => {
   await mockScanAPI(page, await partialRetentionScanResponse());
   await mockAuth(page);
+  await mockTriage(page);
   await mockURLDetection(page);
   await mockSummarize(page);
   await page.goto('/');
@@ -719,6 +721,7 @@ test('narrow viewport keeps every card control keyboard reachable with stable ac
 test('reload restores the unsaved cards without storing the raw submission', async ({ page }) => {
   await mockScanAPI(page, await missingStartScanResponse());
   await mockAuth(page);
+  await mockTriage(page);
   await mockURLDetection(page);
   await mockSummarize(page);
   await page.goto('/');
