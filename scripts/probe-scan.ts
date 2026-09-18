@@ -105,7 +105,7 @@ try {
   console.log(`model=${model} kind=${kind} context=${!noContext} guided=${guided} ms=${Date.now() - startedAt}`);
   for (const c of result.candidates) {
     const t = c.temporal.value;
-    console.log(JSON.stringify({ title: c.title.value, start: t?.start, end: t?.end, allDay: t?.allDay, location: c.location.value, url: c.url.value }));
+    console.log(JSON.stringify({ title: c.title.value, start: t?.start, end: t?.end, allDay: t?.allDay, location: c.location.value, url: c.url.value, recurrence: c.recurrence.value }));
   }
   if (result.candidates.length === 0) console.log('(no candidates)');
 } catch (error) {
