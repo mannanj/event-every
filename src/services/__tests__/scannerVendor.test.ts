@@ -27,8 +27,8 @@ import {
 import { createOpenRouterTextLinkProvider } from '@event-every/scanner/openrouter';
 
 const vendorRoot = path.resolve(import.meta.dir, '../../../vendor/event-every-scanner');
-const pinnedCommit = '6687118e22eccbafc3e565be2365a9886f8fab39';
-const pinnedPackDigest = '44c80d6890ce5c90cadd3c55b47d4c4621fb8d448f7f25f89a64af1d00affb27';
+const pinnedCommit = '9a8f6f78a9560ec5b206177437d297aa9adc70c6';
+const pinnedPackDigest = 'f801e26067865f0eee2e4e39b2ccdc94f3426ad2cb3aa0d9668c327c19c9b549';
 
 type Provenance = Readonly<{
   schemaVersion: number;
@@ -93,7 +93,7 @@ const fixturePackPolicy = {
     entryCount: 138,
     sha256: '787bde7bb0279636549342518b143397ca83698ae1ef592ca939362641eee6f2',
   },
-  artifactSha256: 'cd7781da1080e89324e0f9b69ed946b5fb366c0e6efd53d97ac744a606d3b4ef',
+  artifactSha256: 'de768b8b80b38a4aeae3f1a26cee87d30e5baa087c44502e8ded581842a5feac',
   tools: { node: 'v25.2.1', bun: '1.3.13', npm: '11.6.2' },
   packPolicy: { offline: true, ignoreScripts: true, audit: false, fund: false },
 } as const;
@@ -296,13 +296,13 @@ describe('vendored Event Scanner package', () => {
     expect(provenance.packageName).toBe('@event-every/scanner');
     expect(provenance.pack).toEqual({
       filename: 'event-every-scanner-0.0.0.tgz',
-      integrity: 'sha512-ATnHtxIuftX4+ym7wQVJsuQuK8+59Dw6rf3aj08tt49ic4goWxkXpW0cdV18/lZ9ldrvkhK5zc83roUmrpOE3Q==',
+      integrity: 'sha512-FuKnR9SBtFbTeFGfnZ2Qcvx3/1mEq+k2L6SRSBHLk5fNmKjN7P1SBAZBBpbMXgekkcyWc5h0zg/vVTuIgNsBKg==',
       entryCount: 138,
       sha256: pinnedPackDigest,
     });
     expect(provenance.tools).toEqual({ node: 'v25.2.1', bun: '1.3.13', npm: '11.6.2' });
     expect(provenance.packPolicy).toEqual({ offline: true, ignoreScripts: true, audit: false, fund: false });
-    expect(provenance.artifactSha256).toBe('cd7781da1080e89324e0f9b69ed946b5fb366c0e6efd53d97ac744a606d3b4ef');
+    expect(provenance.artifactSha256).toBe('de768b8b80b38a4aeae3f1a26cee87d30e5baa087c44502e8ded581842a5feac');
 
     const listedPaths = provenance.files.map((entry) => entry.path);
     expect(listedPaths).toEqual([...listedPaths].sort());
@@ -510,8 +510,8 @@ describe('vendored Event Scanner package', () => {
       });
       const changedPolicy = {
         ...fixturePackPolicy,
-        pack: { ...fixturePackPolicy.pack, sha256: '425b99d094eb62e894a8b58092eaf21b41df32cfd0e40f0a51e3963ce3235a03' },
-        artifactSha256: 'e6cdd31e1bffe923a339fc202acc1a281ecaec457bc2bcf496bf1e2ebf5458e8',
+        pack: { ...fixturePackPolicy.pack, sha256: '37147904a1384b9275c348c0552b89d6f9b950f83d1f49bd586b774e2bdaaa44' },
+        artifactSha256: '5b60c5413de0519935a7d2ba14b60e268de4eb8e252b1130bbb47713b8147966',
       };
 
       await stageContainedScannerPack(staging, { ...pack, sha256: changedPolicy.pack.sha256 }, changedPolicy);

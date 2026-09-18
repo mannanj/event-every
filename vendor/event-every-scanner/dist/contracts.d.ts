@@ -24,6 +24,34 @@ export declare const CompleteTimeSchema: z.ZodReadonly<z.ZodObject<{
     second: z.ZodNumber;
 }, z.core.$strict>>;
 export type CompleteTime = z.infer<typeof CompleteTimeSchema>;
+export declare const DatePointSchema: z.ZodReadonly<z.ZodObject<{
+    kind: z.ZodLiteral<"date">;
+    year: z.ZodNullable<z.ZodNumber>;
+    month: z.ZodNumber;
+    day: z.ZodNumber;
+}, z.core.$strict>>;
+export declare const FloatingPointSchema: z.ZodReadonly<z.ZodObject<{
+    kind: z.ZodLiteral<"floating">;
+    date: z.ZodReadonly<z.ZodObject<{
+        year: z.ZodNumber;
+        month: z.ZodNumber;
+        day: z.ZodNumber;
+    }, z.core.$strict>>;
+    time: z.ZodReadonly<z.ZodObject<{
+        hour: z.ZodNumber;
+        minute: z.ZodNumber;
+        second: z.ZodNumber;
+    }, z.core.$strict>>;
+}, z.core.$strict>>;
+export declare const PartialPointSchema: z.ZodReadonly<z.ZodObject<{
+    kind: z.ZodLiteral<"partial">;
+    year: z.ZodNullable<z.ZodNumber>;
+    month: z.ZodNullable<z.ZodNumber>;
+    day: z.ZodNullable<z.ZodNumber>;
+    hour: z.ZodNullable<z.ZodNumber>;
+    minute: z.ZodNullable<z.ZodNumber>;
+    second: z.ZodNullable<z.ZodNumber>;
+}, z.core.$strict>>;
 export declare const TemporalPointSchema: z.ZodDiscriminatedUnion<[z.ZodReadonly<z.ZodObject<{
     kind: z.ZodLiteral<"date">;
     year: z.ZodNullable<z.ZodNumber>;

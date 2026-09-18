@@ -63,7 +63,7 @@ const ONLY = (process.env.EVAL_ONLY ?? '').split(',').filter(Boolean);
 const IMAGE_DIR = `${import.meta.dir}/eval-images`;
 // The Worker sends the reader's zone and the admission instant; the eval pins both.
 const CONTEXT = { nowMs: Date.parse('2026-09-15T16:00:00-04:00'), timeZone: 'America/New_York' } as const;
-const CONCURRENCY = 6;
+const CONCURRENCY = Number(process.env.EVAL_CONCURRENCY ?? 6);
 
 function apiKey(): string {
   const line = readFileSync(`${import.meta.dir}/../.env.local`, 'utf8')
@@ -191,7 +191,10 @@ const key = apiKey();
 // Real scans from the owner's own history live in eval-images/real/, which is
 // gitignored because the repo is public and the screenshots carry names and
 // emails. Their answer key sits beside them and is merged in when present.
-const REAL_CASES_PATH = `${IMAGE_DIR}/real/cases.json`;
+// EVAL_REAL_DIR selects a sibling folder holding the same cases at a different
+// resolution, so a downscale can be scored against the untouched originals.
+const REAL_DIR = process.env.EVAL_REAL_DIR ?? 'real';
+const REAL_CASES_PATH = `${IMAGE_DIR}/${REAL_DIR}/cases.json`;
 const REAL_CASES: EvalCase[] = existsSync(REAL_CASES_PATH) ? JSON.parse(readFileSync(REAL_CASES_PATH, 'utf8')) as EvalCase[] : [];
 const ALL_CASES = [...EVAL_CASES, ...REAL_CASES];
 const selected = ALL_CASES.filter((c) => ONLY.length === 0 || ONLY.includes(c.id));

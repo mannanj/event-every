@@ -12,14 +12,14 @@ import os from 'node:os';
 import path from 'node:path';
 import { gunzipSync } from 'node:zlib';
 
-const SCANNER_COMMIT = '6687118e22eccbafc3e565be2365a9886f8fab39';
+const SCANNER_COMMIT = '9a8f6f78a9560ec5b206177437d297aa9adc70c6';
 const ACCEPTED_PACK = {
   filename: 'event-every-scanner-0.0.0.tgz',
-  integrity: 'sha512-ATnHtxIuftX4+ym7wQVJsuQuK8+59Dw6rf3aj08tt49ic4goWxkXpW0cdV18/lZ9ldrvkhK5zc83roUmrpOE3Q==',
+  integrity: 'sha512-FuKnR9SBtFbTeFGfnZ2Qcvx3/1mEq+k2L6SRSBHLk5fNmKjN7P1SBAZBBpbMXgekkcyWc5h0zg/vVTuIgNsBKg==',
   entryCount: 138,
-  sha256: '44c80d6890ce5c90cadd3c55b47d4c4621fb8d448f7f25f89a64af1d00affb27',
+  sha256: 'f801e26067865f0eee2e4e39b2ccdc94f3426ad2cb3aa0d9668c327c19c9b549',
 } as const;
-const ACCEPTED_ARTIFACT_SHA256 = 'cd7781da1080e89324e0f9b69ed946b5fb366c0e6efd53d97ac744a606d3b4ef';
+const ACCEPTED_ARTIFACT_SHA256 = 'de768b8b80b38a4aeae3f1a26cee87d30e5baa087c44502e8ded581842a5feac';
 const ACCEPTED_TOOLS = { node: 'v25.2.1', bun: '1.3.13', npm: '11.6.2' } as const;
 const PACK_POLICY = { offline: true, ignoreScripts: true, audit: false, fund: false } as const;
 const UPSTREAM_PACK_FILES = ['dist', 'README.md'] as const;

@@ -41,10 +41,7 @@ declare const WireIssueSchema: z.ZodReadonly<z.ZodObject<{
     message: z.ZodString;
     evidence: z.ZodReadonly<z.ZodArray<z.ZodReadonly<z.ZodObject<{
         sourceId: z.ZodString;
-        locator: z.ZodNullable<z.ZodString>;
         excerpt: z.ZodNullable<z.ZodString>;
-        startOffset: z.ZodNullable<z.ZodNumber>;
-        endOffset: z.ZodNullable<z.ZodNumber>;
     }, z.core.$strict>>>>;
 }, z.core.$strict>>;
 export type WireIssue = z.infer<typeof WireIssueSchema>;
@@ -56,10 +53,7 @@ export declare const WireProviderScanObservationSchema: z.ZodReadonly<z.ZodObjec
             confidence: z.ZodNullable<z.ZodNumber>;
             evidence: z.ZodReadonly<z.ZodArray<z.ZodReadonly<z.ZodObject<{
                 sourceId: z.ZodString;
-                locator: z.ZodNullable<z.ZodString>;
                 excerpt: z.ZodNullable<z.ZodString>;
-                startOffset: z.ZodNullable<z.ZodNumber>;
-                endOffset: z.ZodNullable<z.ZodNumber>;
             }, z.core.$strict>>>>;
         }, z.core.$strict>>;
         description: z.ZodReadonly<z.ZodObject<{
@@ -67,10 +61,7 @@ export declare const WireProviderScanObservationSchema: z.ZodReadonly<z.ZodObjec
             confidence: z.ZodNullable<z.ZodNumber>;
             evidence: z.ZodReadonly<z.ZodArray<z.ZodReadonly<z.ZodObject<{
                 sourceId: z.ZodString;
-                locator: z.ZodNullable<z.ZodString>;
                 excerpt: z.ZodNullable<z.ZodString>;
-                startOffset: z.ZodNullable<z.ZodNumber>;
-                endOffset: z.ZodNullable<z.ZodNumber>;
             }, z.core.$strict>>>>;
         }, z.core.$strict>>;
         location: z.ZodReadonly<z.ZodObject<{
@@ -78,10 +69,7 @@ export declare const WireProviderScanObservationSchema: z.ZodReadonly<z.ZodObjec
             confidence: z.ZodNullable<z.ZodNumber>;
             evidence: z.ZodReadonly<z.ZodArray<z.ZodReadonly<z.ZodObject<{
                 sourceId: z.ZodString;
-                locator: z.ZodNullable<z.ZodString>;
                 excerpt: z.ZodNullable<z.ZodString>;
-                startOffset: z.ZodNullable<z.ZodNumber>;
-                endOffset: z.ZodNullable<z.ZodNumber>;
             }, z.core.$strict>>>>;
         }, z.core.$strict>>;
         url: z.ZodReadonly<z.ZodObject<{
@@ -89,10 +77,7 @@ export declare const WireProviderScanObservationSchema: z.ZodReadonly<z.ZodObjec
             confidence: z.ZodNullable<z.ZodNumber>;
             evidence: z.ZodReadonly<z.ZodArray<z.ZodReadonly<z.ZodObject<{
                 sourceId: z.ZodString;
-                locator: z.ZodNullable<z.ZodString>;
                 excerpt: z.ZodNullable<z.ZodString>;
-                startOffset: z.ZodNullable<z.ZodNumber>;
-                endOffset: z.ZodNullable<z.ZodNumber>;
             }, z.core.$strict>>>>;
         }, z.core.$strict>>;
         temporal: z.ZodReadonly<z.ZodObject<{
@@ -127,15 +112,7 @@ export declare const WireProviderScanObservationSchema: z.ZodReadonly<z.ZodObjec
                         second: z.ZodNumber;
                     }, z.core.$strict>>;
                     timeZone: z.ZodString;
-                    resolution: z.ZodEnum<{
-                        exact: "exact";
-                        gap: "gap";
-                        fold: "fold";
-                        offset_resolved: "offset_resolved";
-                    }>;
-                    possibleOffsets: z.ZodReadonly<z.ZodArray<z.ZodString>>;
                     sourceOffset: z.ZodNullable<z.ZodString>;
-                    chosenOffset: z.ZodNullable<z.ZodString>;
                 }, z.core.$strict>>, z.ZodReadonly<z.ZodObject<{
                     kind: z.ZodLiteral<"partial">;
                     year: z.ZodNullable<z.ZodNumber>;
@@ -175,15 +152,7 @@ export declare const WireProviderScanObservationSchema: z.ZodReadonly<z.ZodObjec
                         second: z.ZodNumber;
                     }, z.core.$strict>>;
                     timeZone: z.ZodString;
-                    resolution: z.ZodEnum<{
-                        exact: "exact";
-                        gap: "gap";
-                        fold: "fold";
-                        offset_resolved: "offset_resolved";
-                    }>;
-                    possibleOffsets: z.ZodReadonly<z.ZodArray<z.ZodString>>;
                     sourceOffset: z.ZodNullable<z.ZodString>;
-                    chosenOffset: z.ZodNullable<z.ZodString>;
                 }, z.core.$strict>>, z.ZodReadonly<z.ZodObject<{
                     kind: z.ZodLiteral<"partial">;
                     year: z.ZodNullable<z.ZodNumber>;
@@ -199,10 +168,7 @@ export declare const WireProviderScanObservationSchema: z.ZodReadonly<z.ZodObjec
             confidence: z.ZodNullable<z.ZodNumber>;
             evidence: z.ZodReadonly<z.ZodArray<z.ZodReadonly<z.ZodObject<{
                 sourceId: z.ZodString;
-                locator: z.ZodNullable<z.ZodString>;
                 excerpt: z.ZodNullable<z.ZodString>;
-                startOffset: z.ZodNullable<z.ZodNumber>;
-                endOffset: z.ZodNullable<z.ZodNumber>;
             }, z.core.$strict>>>>;
         }, z.core.$strict>>;
         recurrence: z.ZodReadonly<z.ZodObject<{
@@ -246,15 +212,7 @@ export declare const WireProviderScanObservationSchema: z.ZodReadonly<z.ZodObjec
                             second: z.ZodNumber;
                         }, z.core.$strict>>;
                         timeZone: z.ZodString;
-                        resolution: z.ZodEnum<{
-                            exact: "exact";
-                            gap: "gap";
-                            fold: "fold";
-                            offset_resolved: "offset_resolved";
-                        }>;
-                        possibleOffsets: z.ZodReadonly<z.ZodArray<z.ZodString>>;
                         sourceOffset: z.ZodNullable<z.ZodString>;
-                        chosenOffset: z.ZodNullable<z.ZodString>;
                     }, z.core.$strict>>, z.ZodReadonly<z.ZodObject<{
                         kind: z.ZodLiteral<"partial">;
                         year: z.ZodNullable<z.ZodNumber>;
@@ -318,15 +276,7 @@ export declare const WireProviderScanObservationSchema: z.ZodReadonly<z.ZodObjec
                         second: z.ZodNumber;
                     }, z.core.$strict>>;
                     timeZone: z.ZodString;
-                    resolution: z.ZodEnum<{
-                        exact: "exact";
-                        gap: "gap";
-                        fold: "fold";
-                        offset_resolved: "offset_resolved";
-                    }>;
-                    possibleOffsets: z.ZodReadonly<z.ZodArray<z.ZodString>>;
                     sourceOffset: z.ZodNullable<z.ZodString>;
-                    chosenOffset: z.ZodNullable<z.ZodString>;
                 }, z.core.$strict>>, z.ZodReadonly<z.ZodObject<{
                     kind: z.ZodLiteral<"partial">;
                     year: z.ZodNullable<z.ZodNumber>;
@@ -366,15 +316,7 @@ export declare const WireProviderScanObservationSchema: z.ZodReadonly<z.ZodObjec
                         second: z.ZodNumber;
                     }, z.core.$strict>>;
                     timeZone: z.ZodString;
-                    resolution: z.ZodEnum<{
-                        exact: "exact";
-                        gap: "gap";
-                        fold: "fold";
-                        offset_resolved: "offset_resolved";
-                    }>;
-                    possibleOffsets: z.ZodReadonly<z.ZodArray<z.ZodString>>;
                     sourceOffset: z.ZodNullable<z.ZodString>;
-                    chosenOffset: z.ZodNullable<z.ZodString>;
                 }, z.core.$strict>>, z.ZodReadonly<z.ZodObject<{
                     kind: z.ZodLiteral<"partial">;
                     year: z.ZodNullable<z.ZodNumber>;
@@ -388,10 +330,7 @@ export declare const WireProviderScanObservationSchema: z.ZodReadonly<z.ZodObjec
             confidence: z.ZodNullable<z.ZodNumber>;
             evidence: z.ZodReadonly<z.ZodArray<z.ZodReadonly<z.ZodObject<{
                 sourceId: z.ZodString;
-                locator: z.ZodNullable<z.ZodString>;
                 excerpt: z.ZodNullable<z.ZodString>;
-                startOffset: z.ZodNullable<z.ZodNumber>;
-                endOffset: z.ZodNullable<z.ZodNumber>;
             }, z.core.$strict>>>>;
         }, z.core.$strict>>;
         issues: z.ZodReadonly<z.ZodArray<z.ZodReadonly<z.ZodObject<{
@@ -434,10 +373,7 @@ export declare const WireProviderScanObservationSchema: z.ZodReadonly<z.ZodObjec
             message: z.ZodString;
             evidence: z.ZodReadonly<z.ZodArray<z.ZodReadonly<z.ZodObject<{
                 sourceId: z.ZodString;
-                locator: z.ZodNullable<z.ZodString>;
                 excerpt: z.ZodNullable<z.ZodString>;
-                startOffset: z.ZodNullable<z.ZodNumber>;
-                endOffset: z.ZodNullable<z.ZodNumber>;
             }, z.core.$strict>>>>;
         }, z.core.$strict>>>>;
     }, z.core.$strict>>>>;
@@ -481,10 +417,7 @@ export declare const WireProviderScanObservationSchema: z.ZodReadonly<z.ZodObjec
         message: z.ZodString;
         evidence: z.ZodReadonly<z.ZodArray<z.ZodReadonly<z.ZodObject<{
             sourceId: z.ZodString;
-            locator: z.ZodNullable<z.ZodString>;
             excerpt: z.ZodNullable<z.ZodString>;
-            startOffset: z.ZodNullable<z.ZodNumber>;
-            endOffset: z.ZodNullable<z.ZodNumber>;
         }, z.core.$strict>>>>;
     }, z.core.$strict>>>>;
 }, z.core.$strict>>;

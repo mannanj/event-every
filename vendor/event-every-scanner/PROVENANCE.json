@@ -1,12 +1,12 @@
 {
   "schemaVersion": 2,
   "packageName": "@event-every/scanner",
-  "sourceCommit": "6687118e22eccbafc3e565be2365a9886f8fab39",
+  "sourceCommit": "9a8f6f78a9560ec5b206177437d297aa9adc70c6",
   "pack": {
     "filename": "event-every-scanner-0.0.0.tgz",
-    "integrity": "sha512-ATnHtxIuftX4+ym7wQVJsuQuK8+59Dw6rf3aj08tt49ic4goWxkXpW0cdV18/lZ9ldrvkhK5zc83roUmrpOE3Q==",
+    "integrity": "sha512-FuKnR9SBtFbTeFGfnZ2Qcvx3/1mEq+k2L6SRSBHLk5fNmKjN7P1SBAZBBpbMXgekkcyWc5h0zg/vVTuIgNsBKg==",
     "entryCount": 138,
-    "sha256": "44c80d6890ce5c90cadd3c55b47d4c4621fb8d448f7f25f89a64af1d00affb27"
+    "sha256": "f801e26067865f0eee2e4e39b2ccdc94f3426ad2cb3aa0d9668c327c19c9b549"
   },
   "tools": {
     "node": "v25.2.1",
@@ -19,7 +19,7 @@
     "audit": false,
     "fund": false
   },
-  "artifactSha256": "cd7781da1080e89324e0f9b69ed946b5fb366c0e6efd53d97ac744a606d3b4ef",
+  "artifactSha256": "de768b8b80b38a4aeae3f1a26cee87d30e5baa087c44502e8ded581842a5feac",
   "files": [
     {
       "path": "README.md",
@@ -139,19 +139,19 @@
     },
     {
       "path": "dist/contracts.d.ts",
-      "sha256": "1f6867db3499d0fd3b271b2cdbe206e3b01da94ba95d6d23169c9ecf2160c345"
+      "sha256": "8bab6a73c66d034fec545e65242be656043c4d60654c929147cd78eec024c729"
     },
     {
       "path": "dist/contracts.d.ts.map",
-      "sha256": "b58731efd8021d8628bb7e6c37da573cb1f83d23f762f349909ac051e15db594"
+      "sha256": "a4bda382dc81480c7846c060db1af88530b98201b382af9fa348d6b61893cddb"
     },
     {
       "path": "dist/contracts.js",
-      "sha256": "13316adb0b5aa89dc8187bd2e64a1e84272be31401a1319ef02907311eeebdb0"
+      "sha256": "931b9d104351f4421526cddcefbf02d9ee32ec7efe29967b97f229cbfad68c6a"
     },
     {
       "path": "dist/contracts.js.map",
-      "sha256": "1938a95d922897388a3c7fc505b93d198cede4b49ad3f7f3dab1c9d3b46782eb"
+      "sha256": "80be54dcaf7e74f0a27c4ffddc8923a8880f6e500c50705d62d5e947a005d2d4"
     },
     {
       "path": "dist/eval/contracts.d.ts",
@@ -447,15 +447,15 @@
     },
     {
       "path": "dist/openrouter/prompt.d.ts.map",
-      "sha256": "86c6ebbdbde4d71dd943c525ad9f82b91161b688f66526f070d84917cd603c24"
+      "sha256": "ceb6f10a73b72395101587d2f2de79e4ea783d0b6005c0ea51bf8823896ae942"
     },
     {
       "path": "dist/openrouter/prompt.js",
-      "sha256": "e2587872689c0693ca5a3a06a82bc1c0016b523f8f716eae81462b49fdb4f284"
+      "sha256": "150e1d10af682ab84d9c289fb8404e10f710ba8a9a5800ccb0ab64a3286cc109"
     },
     {
       "path": "dist/openrouter/prompt.js.map",
-      "sha256": "b6e51d202914e5d41cc7fb90908fce9273f9da71103bd814cce467c046032a62"
+      "sha256": "d7689e09f36f332e68c3090b15bf280ffa1d640ac5a79856fa2aac792a5767f5"
     },
     {
       "path": "dist/openrouter/request.d.ts",
@@ -507,19 +507,19 @@
     },
     {
       "path": "dist/openrouter/wire-schema.d.ts",
-      "sha256": "abc8575ecade2c4b029bc0a6535843f2bbb04513ac30da1358cffecee97b8445"
+      "sha256": "8a8b1f7801bc0ef7bb5aceb10a1ab565268440d9e8a5a070527930cc41ce68aa"
     },
     {
       "path": "dist/openrouter/wire-schema.d.ts.map",
-      "sha256": "655710987065aded667da4359175af113b7face3bfa63b530ee7b10d1ef75450"
+      "sha256": "c86e23237b1bfee5b8ccccdd60c6c213b3edfe417064d187d71c4f72c5a647bb"
     },
     {
       "path": "dist/openrouter/wire-schema.js",
-      "sha256": "1a161b362c5a1d14931aabfa960cfb5286d6fc553f4eec632c753221f431b3bd"
+      "sha256": "2cde1de2b2e8dc7a2cdf702848899596539e796f8f3ec313c107dbc86f39723b"
     },
     {
       "path": "dist/openrouter/wire-schema.js.map",
-      "sha256": "460d18afb99c4b76e9ea22d137b132c6b068e5b8265da1d45f3aa9607fd8d1c0"
+      "sha256": "f53996d4a0efb042306b00ac91ff2fe76c656bce3e960ff3c5feb92eff10f622"
     },
     {
       "path": "dist/provider-ports.d.ts",

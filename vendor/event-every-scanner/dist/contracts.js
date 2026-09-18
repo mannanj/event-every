@@ -36,7 +36,7 @@ export const CompleteTimeSchema = z
     second: z.number().int().min(0).max(59),
 })
     .readonly();
-const DatePointSchema = z
+export const DatePointSchema = z
     .strictObject({
     kind: z.literal("date"),
     year: nullableInteger(1, 9999),
@@ -44,7 +44,7 @@ const DatePointSchema = z
     day: z.number().int().min(1).max(31),
 })
     .readonly();
-const FloatingPointSchema = z
+export const FloatingPointSchema = z
     .strictObject({
     kind: z.literal("floating"),
     date: CompleteDateSchema,
@@ -63,7 +63,7 @@ const ZonedPointSchema = z
     chosenOffset: z.string().min(1).nullable(),
 })
     .readonly();
-const PartialPointSchema = z
+export const PartialPointSchema = z
     .strictObject({
     kind: z.literal("partial"),
     year: nullableInteger(1, 9999),

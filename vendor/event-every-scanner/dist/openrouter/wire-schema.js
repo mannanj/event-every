@@ -1,24 +1,100 @@
 import { z } from "zod";
-import { CandidateFieldSchema, ISSUE_TRAITS, IssueCodeSchema, ProviderScanObservationSchema, RecurrenceClaimSchema, TemporalClaimSchema, } from "../contracts.js";
+import { ByDaySchema, CandidateFieldSchema, CompleteDateSchema, CompleteTimeSchema, DatePointSchema, FloatingPointSchema, ISSUE_TRAITS, IssueCodeSchema, PartialPointSchema, ProviderScanObservationSchema, } from "../contracts.js";
 import { assertUniqueProviderSourceIds } from "../provider-ports.js";
 // ---------------------------------------------------------------------------
 // 1. Wire-only strict schemas (no kind/severity – those are derived)
 // ---------------------------------------------------------------------------
+// The wire is what the model must WRITE, and every token it writes is billed
+// at four times the input rate. Measured on real scans: evidence bookkeeping
+// (locator, character offsets) and zone-resolution fields were over half of
+// every answer, and no consumer ever read them - hosts project evidence to []
+// and the resolver recomputes offsets from the zone. So the wire carries only
+// what a model can actually know: which source, and the words it read.
 const WireEvidenceRefSchema = z
     .strictObject({
     sourceId: z.string().min(1),
-    locator: z.string().min(1).max(240).nullable(),
     excerpt: z.string().max(240).nullable(),
-    startOffset: z.number().int().nonnegative().nullable(),
-    endOffset: z.number().int().nonnegative().nullable(),
-})
-    .refine(({ startOffset, endOffset }) => (startOffset === null && endOffset === null) ||
-    (startOffset !== null &&
-        endOffset !== null &&
-        endOffset >= startOffset), {
-    message: "Evidence offsets must both be null or form a non-negative ordered range.",
 })
     .readonly();
+function evidenceFromWire(ev) {
+    return { sourceId: ev.sourceId, locator: null, excerpt: ev.excerpt, startOffset: null, endOffset: null };
+}
+// A zoned point on the wire is the local date, time, and zone the source
+// stated, plus the UTC offset if the source printed one. Whether that local
+// time exists once, twice, or not at all in that zone is the resolver's job
+// (resolveZonedPoint), never the model's.
+const WireZonedPointSchema = z
+    .strictObject({
+    kind: z.literal("zoned"),
+    date: CompleteDateSchema,
+    time: CompleteTimeSchema,
+    timeZone: z.string().min(1),
+    sourceOffset: z.string().min(1).nullable(),
+})
+    .readonly();
+const WireTemporalPointSchema = z.discriminatedUnion("kind", [
+    DatePointSchema,
+    FloatingPointSchema,
+    WireZonedPointSchema,
+    PartialPointSchema,
+]);
+const WireTemporalClaimSchema = z
+    .strictObject({
+    start: WireTemporalPointSchema.nullable(),
+    end: WireTemporalPointSchema.nullable(),
+    duration: z.string().min(1).nullable(),
+    allDay: z.union([z.boolean(), z.literal("unknown")]),
+})
+    .readonly();
+const WireRecurrenceRuleSchema = z
+    .strictObject({
+    frequency: z.enum(["DAILY", "WEEKLY", "MONTHLY", "YEARLY"]),
+    interval: z.number().int().positive().nullable(),
+    count: z.number().int().positive().nullable(),
+    until: WireTemporalPointSchema.nullable(),
+    byMonth: z.array(z.number().int().min(1).max(12)).readonly(),
+    byMonthDay: z
+        .array(z.number().int().min(-31).max(31).refine((day) => day !== 0))
+        .readonly(),
+    byDay: z.array(ByDaySchema).readonly(),
+    weekStart: z.enum(["MO", "TU", "WE", "TH", "FR", "SA", "SU"]).nullable(),
+})
+    .readonly();
+const WireRecurrenceClaimSchema = z
+    .strictObject({
+    rule: WireRecurrenceRuleSchema,
+    rDates: z.array(WireTemporalPointSchema).readonly(),
+    exDates: z.array(WireTemporalPointSchema).readonly(),
+})
+    .readonly();
+function pointFromWire(point) {
+    if (point === null || point.kind !== "zoned")
+        return point;
+    return {
+        kind: "zoned",
+        date: point.date,
+        time: point.time,
+        timeZone: point.timeZone,
+        resolution: "exact",
+        possibleOffsets: [],
+        sourceOffset: point.sourceOffset,
+        chosenOffset: null,
+    };
+}
+function temporalFromWire(claim) {
+    if (claim === null)
+        return null;
+    return { ...claim, start: pointFromWire(claim.start), end: pointFromWire(claim.end) };
+}
+function recurrenceFromWire(claim) {
+    if (claim === null)
+        return null;
+    return {
+        rule: { ...claim.rule, until: pointFromWire(claim.rule.until) },
+        rDates: claim.rDates.map((point) => pointFromWire(point)),
+        exDates: claim.exDates.map((point) => pointFromWire(point)),
+    };
+}
 const wireClaimedFieldSchema = (valueSchema) => z
     .strictObject({
     value: valueSchema.nullable(),
@@ -45,8 +121,8 @@ const WireCandidateObservationSchema = z
     description: wireClaimedFieldSchema(z.string()),
     location: wireClaimedFieldSchema(z.string()),
     url: wireClaimedFieldSchema(z.string()),
-    temporal: wireClaimedFieldSchema(TemporalClaimSchema),
-    recurrence: wireClaimedFieldSchema(RecurrenceClaimSchema),
+    temporal: wireClaimedFieldSchema(WireTemporalClaimSchema),
+    recurrence: wireClaimedFieldSchema(WireRecurrenceClaimSchema),
     issues: z.array(WireIssueSchema).readonly(),
 })
     .readonly();
@@ -89,8 +165,7 @@ export function observationFromWire(input, sources) {
     }
     // Step 3: Helper to validate a single evidence ref
     function validateEvidence(ev, candidateLabel) {
-        const source = sourceMap.get(ev.sourceId);
-        if (!source) {
+        if (!sourceMap.has(ev.sourceId)) {
             throw new z.ZodError([
                 {
                     code: "custom",
@@ -99,33 +174,7 @@ export function observationFromWire(input, sources) {
                 },
             ]);
         }
-        if (source.kind === "image") {
-            // Image evidence must have null offsets
-            if (ev.startOffset !== null || ev.endOffset !== null) {
-                throw new z.ZodError([
-                    {
-                        code: "custom",
-                        message: `Image evidence must have null offsets, got startOffset=${ev.startOffset} endOffset=${ev.endOffset}`,
-                        path: [candidateLabel, "evidence", ev.sourceId, "startOffset"],
-                    },
-                ]);
-            }
-        }
-        else if (ev.startOffset !== null && ev.endOffset !== null) {
-            // Text/link offsets must be within bounds - but an offset is a citation,
-            // not the value. It says WHERE a value was read from. Models get the value
-            // right and miscount the position, and rejecting the observation for that
-            // throws away a correct extraction over a bad footnote.
-            //
-            // So an out-of-range position is dropped rather than fatal. Both offsets
-            // go to null together, which the wire schema requires and which reads as
-            // "location unknown"; clamping to the source length would instead assert a
-            // position the model never claimed.
-            if (ev.endOffset > source.text.length) {
-                return { ...ev, startOffset: null, endOffset: null };
-            }
-        }
-        return ev;
+        return evidenceFromWire(ev);
     }
     // Step 4: Validate all evidence across candidates and scan-level issues
     function collectAndValidateIssues(wireIssues, label) {
@@ -153,8 +202,8 @@ export function observationFromWire(input, sources) {
             description: { ...wc.description, evidence: checked(wc.description.evidence) },
             location: { ...wc.location, evidence: checked(wc.location.evidence) },
             url: { ...wc.url, evidence: checked(wc.url.evidence) },
-            temporal: { ...wc.temporal, evidence: checked(wc.temporal.evidence) },
-            recurrence: { ...wc.recurrence, evidence: checked(wc.recurrence.evidence) },
+            temporal: { ...wc.temporal, value: temporalFromWire(wc.temporal.value), evidence: checked(wc.temporal.evidence) },
+            recurrence: { ...wc.recurrence, value: recurrenceFromWire(wc.recurrence.value), evidence: checked(wc.recurrence.evidence) },
             issues: candidateIssues,
         };
     });
