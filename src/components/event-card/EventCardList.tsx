@@ -1,9 +1,12 @@
 'use client';
 
+import { Fragment } from 'react';
 import { CalendarEvent } from '@/types/event';
 import { exportMultipleToICS } from '@/services/exporter';
 import { EventSelection } from '@/hooks/useEventSelection';
+import { PendingRemoval } from '@/hooks/useUndoableRemoval';
 import EventCard from './EventCard';
+import UndoRemovalRow from './UndoRemovalRow';
 
 interface EventCardListProps {
   events: CalendarEvent[];
@@ -11,6 +14,9 @@ interface EventCardListProps {
   isProcessing: boolean;
   onEdit: (event: CalendarEvent) => void;
   onDelete: (eventId: string) => void;
+  onRemove: (eventId: string) => void;
+  pendingRemoval: PendingRemoval | null;
+  onUndoRemoval: () => void;
   onExport: (event: CalendarEvent) => void;
   onCancel: () => void;
   onExportComplete: (events: CalendarEvent[]) => void;
@@ -34,6 +40,9 @@ export default function EventCardList({
   selection,
   isProcessing,
   onEdit,
+  onRemove,
+  pendingRemoval,
+  onUndoRemoval,
   onExportComplete,
   onCancel,
   tzSuggestions,
@@ -59,27 +68,35 @@ export default function EventCardList({
     }
   };
 
+  const undoRow = pendingRemoval === null ? null : (
+    <UndoRemovalRow title={pendingRemoval.event.title} onUndo={onUndoRemoval} />
+  );
+
   const moreThanHalfSelected = selectedCount > events.length / 2;
   const selectAllLabel = moreThanHalfSelected ? 'Unselect all' : 'Select all';
 
   return (
     <>
-      {/* Event list */}
+      {/* Event list, with the undo row held in the removed card's place */}
       <div className="max-h-[80vh] overflow-y-auto">
         {events.map((event, index) => (
-          <EventCard
-            key={event.id}
-            event={event}
-            selected={selectedIds.has(event.id)}
-            isNew={index === events.length - 1 && isProcessing}
-            onToggleSelect={toggle}
-            onEdit={onEdit}
-            tzSuggestion={tzSuggestions?.[event.id]}
-            onTzSuggestionApply={onTzSuggestionApply}
-            onTzSuggestionDismiss={onTzSuggestionDismiss}
-            onTimezoneUserChange={onTimezoneUserChange}
-          />
+          <Fragment key={event.id}>
+            {undoRow !== null && pendingRemoval?.index === index && undoRow}
+            <EventCard
+              event={event}
+              selected={selectedIds.has(event.id)}
+              isNew={index === events.length - 1 && isProcessing}
+              onToggleSelect={toggle}
+              onEdit={onEdit}
+              onRemove={onRemove}
+              tzSuggestion={tzSuggestions?.[event.id]}
+              onTzSuggestionApply={onTzSuggestionApply}
+              onTzSuggestionDismiss={onTzSuggestionDismiss}
+              onTimezoneUserChange={onTimezoneUserChange}
+            />
+          </Fragment>
         ))}
+        {undoRow !== null && pendingRemoval !== null && pendingRemoval.index >= events.length && undoRow}
       </div>
 
       {/* Save/Delete button */}

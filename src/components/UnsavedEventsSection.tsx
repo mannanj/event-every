@@ -3,6 +3,7 @@
 import { CalendarEvent } from '@/types/event';
 import { ImageProcessingStatus, URLProcessingStatus } from '@/types/processing';
 import { EventSelection } from '@/hooks/useEventSelection';
+import { PendingRemoval } from '@/hooks/useUndoableRemoval';
 import ProcessingShimmer from './ProcessingShimmer';
 import EventCardList from './event-card/EventCardList';
 
@@ -14,6 +15,9 @@ interface UnsavedEventsSectionProps {
   isProcessing: boolean;
   onEdit: (event: CalendarEvent) => void;
   onDelete: (eventId: string) => void;
+  onRemove: (eventId: string) => void;
+  pendingRemoval: PendingRemoval | null;
+  onUndoRemoval: () => void;
   onExport: (event: CalendarEvent) => void;
   onCancelAll: () => void;
   onExportComplete: (events: CalendarEvent[]) => void;
@@ -31,6 +35,9 @@ export default function UnsavedEventsSection({
   isProcessing,
   onEdit,
   onDelete,
+  onRemove,
+  pendingRemoval,
+  onUndoRemoval,
   onExport,
   onCancelAll,
   onExportComplete,
@@ -46,7 +53,9 @@ export default function UnsavedEventsSection({
     (urlProcessingStatus !== null && urlProcessingStatus.phase !== 'complete') ||
     isProcessing;
 
-  if (events.length === 0 && !hasActiveProcessing) {
+  // The section stays open while an undo is still on offer, so removing the last
+  // card leaves the row rather than closing the panel out from under it.
+  if (events.length === 0 && !hasActiveProcessing && pendingRemoval === null) {
     return null;
   }
 
@@ -64,13 +73,16 @@ export default function UnsavedEventsSection({
         )}
 
         {/* Unsaved events list */}
-        {events.length > 0 && (
+        {(events.length > 0 || pendingRemoval !== null) && (
           <EventCardList
             events={events}
             selection={selection}
             isProcessing={isProcessing}
             onEdit={onEdit}
             onDelete={onDelete}
+            onRemove={onRemove}
+            pendingRemoval={pendingRemoval}
+            onUndoRemoval={onUndoRemoval}
             onExport={onExport}
             onCancel={onCancelAll}
             onExportComplete={onExportComplete}

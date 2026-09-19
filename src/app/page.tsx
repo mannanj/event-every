@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import SmartInput, { SmartInputHandle } from '@/components/SmartInput';
 import UnsavedEventsSection from '@/components/UnsavedEventsSection';
+import { useUndoableRemoval } from '@/hooks/useUndoableRemoval';
 import InputHistoryModal from '@/components/InputHistoryModal';
 import ErrorNotification from '@/components/ErrorNotification';
 import RateLimitBanner from '@/components/RateLimitBanner';
@@ -660,6 +661,13 @@ function Home({ processingDisabled }: { processingDisabled: boolean }) {
     setUnsavedEvents(prev => prev.filter(e => e.id !== eventId));
   };
 
+  const undoableRemoval = useUndoableRemoval({
+    events: unsavedEvents,
+    setEvents: setUnsavedEvents,
+    isSelected: (id) => selection.selectedIds.has(id),
+    setSelected: selection.setSelected,
+  });
+
   const handleBatchEventExport = (event: CalendarEvent) => {
     exportToICS(event);
   };
@@ -933,6 +941,9 @@ function Home({ processingDisabled }: { processingDisabled: boolean }) {
           isProcessing={batchProcessing?.isProcessing || false}
           onEdit={handleBatchEventEdit}
           onDelete={handleBatchEventDelete}
+          onRemove={undoableRemoval.remove}
+          pendingRemoval={undoableRemoval.pending}
+          onUndoRemoval={undoableRemoval.undo}
           onExport={handleBatchEventExport}
           onCancelAll={handleCancelBatch}
           onExportComplete={(events) => {

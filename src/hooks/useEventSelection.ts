@@ -30,6 +30,7 @@ export interface EventSelection {
   selectedCount: number;
   toggle: (id: string) => void;
   toggleAll: () => void;
+  setSelected: (id: string, selected: boolean) => void;
 }
 
 /**
@@ -68,6 +69,18 @@ export function useEventSelection(events: { id: string }[]): EventSelection {
     });
   }, []);
 
+  // Undo needs this: `reconcileSelection` only auto-selects ids it has not seen
+  // before, so an event that leaves the list and comes back would return
+  // unselected however it was left.
+  const setSelected = useCallback((id: string, selected: boolean) => {
+    setSelectedIds((prev) => {
+      if (prev.has(id) === selected) return prev;
+      const next = new Set(prev);
+      if (selected) next.add(id); else next.delete(id);
+      return next;
+    });
+  }, []);
+
   const toggleAll = useCallback(() => {
     setSelectedIds((prev) => {
       const moreThanHalf = prev.size > events.length / 2;
@@ -75,5 +88,5 @@ export function useEventSelection(events: { id: string }[]): EventSelection {
     });
   }, [events]);
 
-  return { selectedIds, selectedCount: selectedIds.size, toggle, toggleAll };
+  return { selectedIds, selectedCount: selectedIds.size, toggle, toggleAll, setSelected };
 }
