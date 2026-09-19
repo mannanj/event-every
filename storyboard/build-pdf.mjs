@@ -16,11 +16,12 @@ const pages = shots.map((shot, index) => {
   return `
   <section class="page">
     <header><span>${title}</span><span>${index + 1} of ${shots.length}</span></header>
-    <div class="shot"><img src="data:image/png;base64,${data}" alt=""></div>
     <p class="caption${last ? ' ending' : ''}">${shot.caption
       .replace(/&/g, '&amp;').replace(/</g, '&lt;')
       .replace(/^We see/, '<b>We see</b>')
-      .replace(/Next, we will/, '<b>Next, we will</b>')}</p>
+      .replace(/Next, we will/, '<b>Next, we will</b>')
+      .replace(/This will/, '<b>This will</b>')}</p>
+    <div class="shot"><img src="data:image/png;base64,${data}" alt=""></div>
   </section>`;
 }).join('\n');
 
@@ -33,11 +34,11 @@ const html = `<!doctype html><html><head><meta charset="utf-8"><title>${title}</
           page-break-after: always; break-after: page; background: #fff; }
   .page:last-child { page-break-after: auto; break-after: auto; }
   header { display: flex; justify-content: space-between; font-size: 8pt; letter-spacing: .08em;
-           text-transform: uppercase; color: #8a8a8a; padding-bottom: 5mm; }
+           text-transform: uppercase; color: #8a8a8a; padding-bottom: 4mm; }
   .shot { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center;
           border: 1px solid #e4e4e4; background: #fbfbfb; }
   .shot img { max-width: 100%; max-height: 100%; object-fit: contain; display: block; }
-  .caption { margin: 6mm 0 0; font-size: 12.5pt; line-height: 1.5; max-width: 250mm; }
+  .caption { margin: 0 0 6mm; font-size: 12.5pt; line-height: 1.5; max-width: 250mm; }
   .caption b { font-weight: 650; }
   .caption.ending { border-left: 3px solid #111; padding-left: 5mm; }
 </style></head><body>${pages}</body></html>`;
