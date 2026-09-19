@@ -9,6 +9,26 @@ const title = process.argv[4] ?? 'Storyboard';
 const shots = JSON.parse(readFileSync(path.join(shotsDir, 'captions.json'), 'utf8'));
 const available = new Set(readdirSync(shotsDir));
 
+/**
+ * v1's fixed openers are structural, so they carry the emphasis. v2 has no
+ * openers, so the emphasis goes on the control being acted on instead: only a
+ * quoted label in the sentence that names the interaction, which is at most one
+ * per page. Emphasising the quoted labels in the opening description as well
+ * would light up half the sentence and stop meaning anything.
+ */
+function emphasise(caption) {
+  const escaped = caption.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+  const intent = escaped.indexOf('We want to');
+  if (intent === -1) {
+    return escaped
+      .replace(/^We see/, '<b>We see</b>')
+      .replace(/Next, we will/, '<b>Next, we will</b>')
+      .replace(/This will/, '<b>This will</b>');
+  }
+  return escaped.slice(0, intent)
+    + escaped.slice(intent).replace(/"([^"]+)"/g, '"<b>$1</b>"');
+}
+
 const pages = shots.map((shot, index) => {
   if (!available.has(shot.file)) throw new Error(`missing shot ${shot.file}`);
   const data = readFileSync(path.join(shotsDir, shot.file)).toString('base64');
@@ -16,12 +36,7 @@ const pages = shots.map((shot, index) => {
   return `
   <section class="page">
     <header><span>${title}</span><span>${index + 1} of ${shots.length}</span></header>
-    <p class="caption${last ? ' ending' : ''}">${shot.caption
-      .replace(/&/g, '&amp;').replace(/</g, '&lt;')
-      .replace(/^We see/, '<b>We see</b>')
-      .replace(/Next, we will/, '<b>Next, we will</b>')
-      .replace(/This will/, '<b>This will</b>')
-      .replace(/We want to/, '<b>We want to</b>')}</p>
+    <p class="caption${last ? ' ending' : ''}">${emphasise(shot.caption)}</p>
     <div class="shot"><img src="data:image/png;base64,${data}" alt=""></div>
   </section>`;
 }).join('\n');
