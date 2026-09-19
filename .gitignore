@@ -54,3 +54,6 @@ yarn.lock
 .claude/worktrees/
 .claude/settings.local.json
 scripts/eval-images/
+
+# Storyboard capture output (the PDF is generated, the shots are not tracked)
+storyboard-shots/
