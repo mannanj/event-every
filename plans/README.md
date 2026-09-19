@@ -36,6 +36,12 @@ Each executor: read your plan fully before starting, honor its STOP conditions, 
 | 014  | Consolidate event-editing family → `<EventFields>` + promoted `<EditableField>` + shared validation/`<AttachmentList>`; fixes lost-keystroke / all-day / double-fire bugs (~770 fewer lines) | P2 | M–L | 009 | DONE (979 lines of 3 dead/dup editors deleted; `<EventFields>`+`<TimezonePicker>`(single)+`<AttachmentList>`+`validation.ts`; 3 bugs each pinned fail-on-old; +9 unit, +2 e2e → 50 e2e) |
 | 015  | Consolidate list/card family → `<EventCard>`/`<EventCardList>` + `useEventSelection` + `<ProcessingShimmer>` + `<TimezonePicker>`; memoize rows (~495 fewer lines) | P2 | M–L | 009, 010, 014 | DONE (584-line `BatchEventList` god-component split into memoized `<EventCard>`/`<EventCardList>`/`useEventSelection`/`<ProcessingShimmer>`; testids migrated; tz `<select>` onto shared `<TimezonePicker>`; pure `reconcileSelection` +7 tests; 50 e2e) |
 
+### Feature plans (maintainer-initiated, outside the advisor waves)
+
+| Plan | Title | Priority | Effort | Depends on | Status |
+|------|-------|----------|--------|------------|--------|
+| 016  | No Network Mode: run the scanner on a local model in the browser | feature | L | — | DESIGN (research in flight; not executable — revision 2 pending model/runtime findings) |
+
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (one-line reason) | REJECTED (one-line rationale)
 
 ## Recommended sequence
