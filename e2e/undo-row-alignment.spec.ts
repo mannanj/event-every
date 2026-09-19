@@ -61,5 +61,8 @@ test('the undo row lines up with the card columns above it', async ({ page }) =>
   expect(await removedText.evaluate((n) => getComputedStyle(n).fontSize)).toBe('14px');
   expect(await undoWord.evaluate((n) => getComputedStyle(n).fontSize)).toBe('14px');
   expect(await removedText.evaluate((n) => getComputedStyle(n).fontStyle)).toBe('italic');
+  // "Undo" is set like the name beside it: same size, same italic, no underline.
+  expect(await undoWord.evaluate((n) => getComputedStyle(n).fontStyle)).toBe('italic');
+  expect(await undoWord.evaluate((n) => getComputedStyle(n).textDecorationLine)).toBe('none');
   await expect(page.getByTestId('undo-removal-button').locator('svg')).toBeVisible();
 });

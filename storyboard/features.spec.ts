@@ -136,7 +136,7 @@ test('storyboard: removing a card, and one row per input', async ({ page }) => {
   await expect(undoRow(page)).toHaveCount(1);
 
   await shoot(page,
-    'We see a slim "Beta removed" row between "Alpha" and "Gamma", exactly where the card was, and "Save (2)". Next, we will click "Undo". This will put Beta back in its old spot with its tick still on.',
+    'We see a slim "Removed Beta" row between "Alpha" and "Gamma", exactly where the card was, and "Save (2)". Next, we will click "Undo". This will put Beta back in its old spot with its tick still on.',
     page.getByTestId('undo-removal-button'));
   await page.getByTestId('undo-removal-button').click();
   await expect(cards(page)).toHaveCount(3);
@@ -148,13 +148,13 @@ test('storyboard: removing a card, and one row per input', async ({ page }) => {
   await expect(undoRow(page)).toContainText('Alpha');
 
   await shoot(page,
-    'We see an "Alpha removed" row at the top of the list. Next, we will click the trash icon on "Beta". This will remove Beta as well, leaving both rows waiting on their own clocks.',
+    'We see an "Removed Alpha" row at the top of the list. Next, we will click the trash icon on "Beta". This will remove Beta as well, leaving both rows waiting on their own clocks.',
     trashIn(cardNamed(page, 'Beta')));
   await trashIn(cardNamed(page, 'Beta')).click();
   await expect(undoRow(page)).toHaveCount(2);
 
   await shoot(page,
-    'We see two rows, "Alpha removed" and "Beta removed", with only Gamma still a card. Next, we will click the trash icon on "Gamma", the last card left. This will empty the list but hold the section open for the rows.',
+    'We see two rows, "Removed Alpha" and "Removed Beta", with only Gamma still a card. Next, we will click the trash icon on "Gamma", the last card left. This will empty the list but hold the section open for the rows.',
     trashIn(cardNamed(page, 'Gamma')));
   await trashIn(cardNamed(page, 'Gamma')).click();
   await expect(cards(page)).toHaveCount(0);
