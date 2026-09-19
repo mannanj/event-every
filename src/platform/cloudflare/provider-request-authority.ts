@@ -1,6 +1,5 @@
 // @ts-expect-error cloudflare:workers is provided by Workerd, not the Next.js type graph.
 import { DurableObject } from 'cloudflare:workers';
-import { ownerBudgetLedgerName } from '@/platform/provider/policy';
 import type {
   DurableObjectStateLike,
   OwnerBudgetBinding,
@@ -29,6 +28,7 @@ import {
   OWNER_VARIANT_POLICY,
   PRE_PERMIT_LEASE_MS,
   REPLAY_RETENTION_MS,
+  ownerBudgetLedgerName,
 } from '../provider/policy';
 import {
   DurableScanReplaySchema,
