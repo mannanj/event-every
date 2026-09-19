@@ -693,11 +693,12 @@ test('narrow viewport keeps every card control keyboard reachable with stable ac
   const selection = card.getByRole('checkbox', { name: 'Select Narrow accessibility candidate' });
   const timezone = card.getByRole('combobox', { name: 'Timezone' });
   const timezoneInfo = card.getByRole('button', { name: 'Timezone info' });
+  const remove = card.getByRole('button', { name: 'Remove Narrow accessibility candidate' });
   const expand = card.getByRole('button', { name: 'Expand' });
   const save = page.getByTestId('save-events-button');
   const selectAll = page.getByRole('button', { name: 'Unselect all' });
 
-  for (const control of [selection, timezone, timezoneInfo, expand, save, selectAll]) {
+  for (const control of [selection, timezone, timezoneInfo, remove, expand, save, selectAll]) {
     await expect(control).toBeEnabled();
   }
   await expect(save).toHaveAccessibleName('Save 1 event');
@@ -707,7 +708,7 @@ test('narrow viewport keeps every card control keyboard reachable with stable ac
   const forwardKey = browserName === 'webkit' ? 'Alt+Tab' : 'Tab';
   await selection.focus();
   await expect(selection).toBeFocused();
-  for (const control of [timezone, timezoneInfo, expand, save, selectAll]) {
+  for (const control of [timezone, timezoneInfo, remove, expand, save, selectAll]) {
     await page.keyboard.press(forwardKey);
     await expect(control).toBeFocused();
     await expect(control).toBeInViewport();
