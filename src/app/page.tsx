@@ -481,15 +481,15 @@ function Home({ processingDisabled }: { processingDisabled: boolean }) {
     if (!trimmed && images.length === 0 && calendarFiles.length === 0) return undefined;
     const hasFiles = images.length + calendarFiles.length > 0;
     const source: InputSource = trimmed && hasFiles ? 'mixed' : hasFiles ? 'image' : 'text';
-    const id = createHistoryEntryId();
-    await addInputHistory({
-      id,
+    // Re-running an input reuses its existing row, so the id that comes back is
+    // the one the summary must be hung on, not the one minted here.
+    return addInputHistory({
+      id: createHistoryEntryId(),
       createdAt: Date.now(),
       text: trimmed,
       files: buildHistoryFiles(images, calendarFiles),
       source,
     });
-    return id;
   };
 
   const handleApplyInput = async (entry: InputHistoryEntry) => {

@@ -1,4 +1,5 @@
 import { InputDraft, InputHistoryEntry } from '@/types/input';
+import { findDuplicateEntry } from '@/utils/inputIdentity';
 import type { StoredInputFile } from '@/types/input';
 
 // Internal IndexedDB name. Kept stable across the Event Every ↔ Summon renames so existing
@@ -223,14 +224,30 @@ export const inputStorage = {
       .sort((a, b) => b.createdAt - a.createdAt);
   },
 
-  async addHistoryEntry(entry: InputHistoryEntry): Promise<void> {
+  /**
+   * Store an input, or move the identical one already stored up to now.
+   *
+   * Returns the id that survived, which is not the incoming id when an existing
+   * entry was reused. The caller attaches the summary by that id, so returning
+   * the wrong one would strand the summary on a row that does not exist.
+   */
+  async addHistoryEntry(entry: InputHistoryEntry): Promise<string> {
+    const all = await inputStorage.getAllHistory();
+    const duplicate = findDuplicateEntry(all, entry);
+    if (duplicate) {
+      // Its summary still describes this input, so it is kept rather than recomputed.
+      await inputStorage.updateHistoryEntry(duplicate.id, { createdAt: entry.createdAt });
+      return duplicate.id;
+    }
+
     const persisted = await persistHistoryEntry(entry);
     await runWrite(HISTORY_STORE, (store) => store.put(persisted));
-    const all = await inputStorage.getAllHistory();
-    if (all.length > HISTORY_LIMIT) {
-      const stale = all.slice(HISTORY_LIMIT);
+    const stored = await inputStorage.getAllHistory();
+    if (stored.length > HISTORY_LIMIT) {
+      const stale = stored.slice(HISTORY_LIMIT);
       await Promise.all(stale.map((e) => inputStorage.deleteHistoryEntry(e.id)));
     }
+    return entry.id;
   },
 
   async updateHistoryEntry(id: string, patch: Partial<InputHistoryEntry>): Promise<boolean> {

@@ -16,10 +16,14 @@ export function useInputHistory() {
     refresh();
   }, [refresh]);
 
+  // Resolves to the id that survived: an input identical to one already stored
+  // reuses that entry rather than adding a second row, and the caller needs the
+  // surviving id to hang the summary on.
   const addEntry = useCallback(
-    async (entry: InputHistoryEntry) => {
-      await inputStorage.addHistoryEntry(entry);
+    async (entry: InputHistoryEntry): Promise<string> => {
+      const id = await inputStorage.addHistoryEntry(entry);
       await refresh();
+      return id;
     },
     [refresh]
   );
