@@ -38,9 +38,67 @@ export const ACCOUNTING_RETENTION_MS = 72 * 60 * 60_000;
 export const OWNER_MODELS = Object.freeze({
   'scan-text': 'mistralai/mistral-small-2603',
   'scan-image': 'mistralai/mistral-small-2603',
-  'resolve-timezone': 'deepseek/deepseek-v4-flash',
-  summarize: 'deepseek/deepseek-v4-flash',
+  'resolve-timezone': 'deepseek/deepseek-v4.1-flash',
+  summarize: 'deepseek/deepseek-v4.1-flash',
 } satisfies Record<ProviderVariant, string>);
+
+/**
+ * The ordered model chain sent as OpenRouter's `models` array.
+ *
+ * A single pinned model makes one upstream outage a total outage: on 2026-09-18
+ * `mistral-small-2603` rate-limited upstream on OpenRouter's shared pool
+ * (`limit_source: upstream_provider_shared_pool`) and every scan failed, text
+ * and image alike, because Task 208 pointed both variants at it. OpenRouter
+ * retries the next entry on any error from the one before, so the chain is what
+ * keeps a throttled primary from taking the feature down.
+ *
+ * Each chain leads with OWNER_MODELS[variant]: the head is the measured model
+ * and the rest are only ever reached after it has already failed, so the
+ * accuracy the primary was chosen on is unchanged.
+ *
+ * Backups were picked by running scripts/measure-scan-reliability.ts on every
+ * non-US model OpenRouter serves under this app's own request body, at or near
+ * the primary's price. Measured 2026-09-18, one run each, correct/schema:
+ *
+ *   model                            text        image       price
+ *   mistral-small-3.2-24b-instruct   89% / 100%  74% / 100%  0.63x
+ *   bytedance-seed/seed-2.0-mini     86% /  96%  52% /  85%  0.67x
+ *   qwen3-vl-235b-a22b-instruct      75% /  89%  81% /  96%  1.4x
+ *   deepseek-v4.1-flash              75% /  82%  44% /  52%  1.0x
+ *   glm-5.3-flash                    71% /  75%  -           0.9x
+ *   qwen3-vl-30b-a3b-instruct        39% /  50%  -           1.3x
+ *   mistral-medium-3-5               75% / 100%  59% /  96%  11.5x
+ *
+ * mistral-small-3.2 is second on both variants: it leads on text, never
+ * returned malformed output in 55 calls, and costs less than the primary. The
+ * third slot differs because the variants reward different things - qwen reads
+ * posters best of anything at this price, while seed-2.0-mini is strong on text
+ * and collapses on images. mistral-medium-3-5 measured well on text schema but
+ * is 11.5x the primary and drops the stated hour, which would spend the $1 day
+ * cap ten times faster to return worse events. deepseek-v4.1-flash serves the
+ * two non-scan variants, where it is text-only work, but its vision is not
+ * reliable enough to scan with.
+ */
+export const OWNER_MODEL_CHAINS = Object.freeze({
+  'scan-text': Object.freeze([
+    OWNER_MODELS['scan-text'],
+    'mistralai/mistral-small-3.2-24b-instruct',
+    'bytedance-seed/seed-2.0-mini',
+  ]),
+  'scan-image': Object.freeze([
+    OWNER_MODELS['scan-image'],
+    'mistralai/mistral-small-3.2-24b-instruct',
+    'qwen/qwen3-vl-235b-a22b-instruct',
+  ]),
+  'resolve-timezone': Object.freeze([
+    OWNER_MODELS['resolve-timezone'],
+    'deepseek/deepseek-v4-flash',
+  ]),
+  summarize: Object.freeze([
+    OWNER_MODELS.summarize,
+    'deepseek/deepseek-v4-flash',
+  ]),
+} satisfies Record<ProviderVariant, readonly string[]>);
 
 export type OwnerVariantPolicy = Readonly<{ route: ProviderRoute; model: string; reservationNanodollars: number }>;
 export const OWNER_VARIANT_POLICY: Readonly<Record<ProviderVariant, OwnerVariantPolicy>> = Object.freeze({

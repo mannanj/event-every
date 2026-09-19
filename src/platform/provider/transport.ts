@@ -1,6 +1,6 @@
 import type { CostOutcome, StoredProviderFailure } from './contracts';
 import { parseBoundedProviderJson, parseCostLexeme, PROVIDER_BODY_MAX_BYTES } from './cost';
-import { OWNER_MODELS, OWNER_PROVIDER_URL } from './policy';
+import { OWNER_MODEL_CHAINS, OWNER_MODELS, OWNER_PROVIDER_URL } from './policy';
 
 export type ConsumerKind = 'scan_text' | 'scan_image' | 'resolve_timezone' | 'summarize';
 
@@ -107,7 +107,14 @@ function fixedProviderBody(
   modelOverride?: string,
 ): Readonly<Record<string, unknown>> | null {
   if (!Array.isArray(providerBody.messages)) return null;
-  const model = modelOverride ?? OWNER_MODELS[VARIANT_BY_CONSUMER[consumerKind]];
+  const variant = VARIANT_BY_CONSUMER[consumerKind];
+  const model = modelOverride ?? OWNER_MODELS[variant];
+  // `models` is OpenRouter's fallback chain, tried in order, the next one taken
+  // on any error from the one before. It leads with `model`, so a healthy
+  // primary still serves every request and the rest are unreachable until it
+  // fails. An override measures one named model, so it sends no chain at all -
+  // otherwise an eval silently reports a fallback's answer as the model's.
+  const models = modelOverride === undefined ? OWNER_MODEL_CHAINS[variant] : undefined;
   if (consumerKind === 'scan_text' || consumerKind === 'scan_image') {
     const responseFormat = providerBody.response_format;
     if (!responseFormat || typeof responseFormat !== 'object' || Array.isArray(responseFormat)) return null;
@@ -117,6 +124,7 @@ function fixedProviderBody(
     if (!schema || typeof schema !== 'object' || Array.isArray(schema)) return null;
     return {
       model,
+      ...(models === undefined ? {} : { models }),
       messages: providerBody.messages,
       response_format: {
         type: 'json_schema',
@@ -128,8 +136,15 @@ function fixedProviderBody(
       // `require_parameters: true` below — which routes only to providers
       // supporting every parameter sent — it matches nothing and the request
       // 404s before reaching a model, whatever the model is.
+      //
+      // `reasoning: { exclude: true }` was sent here until 2026-09-18 and is
+      // gone for the same reason: under `require_parameters` it demands an
+      // endpoint that advertises reasoning, which no qwen instruct endpoint
+      // does, so every qwen entry in the chain 404'd before it could answer.
+      // Verified both ways on qwen3-vl-235b-a22b-instruct: 404 with it, 200
+      // without. The primary is not a reasoning model, so dropping it changes
+      // nothing about what mistral-small returns.
       max_tokens: 8192,
-      reasoning: { exclude: true },
       provider: FIXED_SCANNER_PROVIDER,
       stream: false,
     };
@@ -137,6 +152,7 @@ function fixedProviderBody(
   if (consumerKind === 'resolve_timezone') {
     return {
       model,
+      ...(models === undefined ? {} : { models }),
       messages: providerBody.messages,
       tools: FIXED_TIMEZONE_TOOLS,
       tool_choice: FIXED_TIMEZONE_TOOL_CHOICE,
@@ -145,6 +161,7 @@ function fixedProviderBody(
   }
   return {
     model,
+    ...(models === undefined ? {} : { models }),
     messages: providerBody.messages,
     max_tokens: 16,
     temperature: 0.2,

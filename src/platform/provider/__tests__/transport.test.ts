@@ -1,6 +1,6 @@
 import { describe, expect, mock, test } from 'bun:test';
 import { PROVIDER_BODY_MAX_BYTES } from '../cost';
-import { OWNER_MODELS, OWNER_PROVIDER_URL } from '../policy';
+import { OWNER_MODEL_CHAINS, OWNER_MODELS, OWNER_PROVIDER_URL } from '../policy';
 import {
   callOpenRouter,
   type ConsumerKind,
@@ -55,7 +55,6 @@ describe('fixed OpenRouter transport', () => {
         response_format: scannerResponseFormat,
         temperature: 0,
         max_tokens: 8192,
-        reasoning: { exclude: true },
         provider: { require_parameters: true, data_collection: 'deny', zdr: true },
         stream: false,
       },
@@ -69,7 +68,6 @@ describe('fixed OpenRouter transport', () => {
         response_format: scannerResponseFormat,
         temperature: 0,
         max_tokens: 8192,
-        reasoning: { exclude: true },
         provider: { require_parameters: true, data_collection: 'deny', zdr: true },
         stream: false,
       },
@@ -105,7 +103,7 @@ describe('fixed OpenRouter transport', () => {
     }, { fetcher });
 
     expect(result.status).toBe('success');
-    expect(sentBody).toEqual({ model: OWNER_MODELS[variant], ...expectedBody });
+    expect(sentBody).toEqual({ model: OWNER_MODELS[variant], models: OWNER_MODEL_CHAINS[variant], ...expectedBody });
   });
 
   test.each([
@@ -129,6 +127,28 @@ describe('fixed OpenRouter transport', () => {
       costOutcome: { kind: 'malformed' },
     });
     expect(fetcher).toHaveBeenCalledTimes(0);
+  });
+
+  test('sends no fallback chain when a model is named for measurement', async () => {
+    // An eval names one model to measure it. If the chain rode along, a
+    // throttled or 404ing subject would silently be answered by the next entry
+    // and the run would report that answer as the named model's.
+    let sentBody: Record<string, unknown> = {};
+    const fetcher: ProviderFetch = mock(async (_url, init) => {
+      sentBody = JSON.parse(String(init?.body));
+      return jsonResponse(successBody());
+    });
+
+    await callOpenRouter({
+      consumerKind: 'scan_text',
+      apiKey: 'synthetic-owner-key',
+      providerBody: { messages: [], response_format: callerScannerResponseFormat },
+      signal: new AbortController().signal,
+      modelOverride: 'synthetic/model-under-measurement',
+    }, { fetcher });
+
+    expect(sentBody.model).toBe('synthetic/model-under-measurement');
+    expect(sentBody).not.toHaveProperty('models');
   });
 
   test('uses only the fixed origin, exact headers/body, manual redirects, and caller signal', async () => {
@@ -164,6 +184,7 @@ describe('fixed OpenRouter transport', () => {
       },
       body: JSON.stringify({
         model: OWNER_MODELS.summarize,
+        models: OWNER_MODEL_CHAINS.summarize,
         messages: providerBody.messages,
         max_tokens: 16,
         temperature: 0.2,

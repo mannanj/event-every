@@ -7,7 +7,7 @@ import { ScanRequestSchema } from '@/types/scannerHttp';
 import { createBindingCandidates, normalizeRequestUuid } from '@/platform/provider/request-binding';
 import { fixedProviderHttp, getPlatformRuntime } from '@/platform/runtime';
 import { resolveScanTimeZone } from '@/server/scanner/scanContext';
-import { OWNER_MODELS } from '@/platform/provider/policy';
+import { OWNER_MODEL_CHAINS } from '@/platform/provider/policy';
 
 type E1SourceHandle = Extract<SourceHandle, { kind: 'text' | 'image' }>;
 
@@ -77,11 +77,11 @@ export async function POST(request: NextRequest): Promise<Response> {
       },
     }, { runOperation: runtime.runProviderOperation });
     if (result.status !== 'completed') {
-      log({ model: OWNER_MODELS[variant], status: result.status, code: 'code' in result ? result.code : null });
+      log({ models: OWNER_MODEL_CHAINS[variant], status: result.status, code: 'code' in result ? result.code : null });
       return fixed(result);
     }
     log({
-      model: OWNER_MODELS[variant],
+      models: OWNER_MODEL_CHAINS[variant],
       status: 'completed',
       candidates: result.value.candidates.length,
       starts: result.value.candidates.map((candidate) => candidate.temporal.value?.start?.kind ?? null),

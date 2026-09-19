@@ -189,8 +189,8 @@ export const C1_B_MUTATIONS: readonly MutationRow[] = Object.freeze([
   {
     id: 'C1B-M17', guarantee: 'Each provider model is fixed in source and cannot be selected by environment.',
     target: 'src/platform/provider/transport.ts',
-    before: "  const model = OWNER_MODELS[VARIANT_BY_CONSUMER[consumerKind]];",
-    after: "  const model = process.env.CI ?? OWNER_MODELS[VARIANT_BY_CONSUMER[consumerKind]];",
+    before: "  const model = modelOverride ?? OWNER_MODELS[variant];",
+    after: "  const model = process.env.CI ?? modelOverride ?? OWNER_MODELS[variant];",
     command: bunTest('src/platform/provider/__tests__/transport.test.ts', 'pins scan_text to its complete policy request shape'),
     expectedAssertion: 'pins scan_text to its complete policy request shape', timeoutMs: DEFAULT_TIMEOUT_MS,
     environment: { CI: 'synthetic/environment-selected-model' },
