@@ -20,7 +20,8 @@ const pages = shots.map((shot, index) => {
       .replace(/&/g, '&amp;').replace(/</g, '&lt;')
       .replace(/^We see/, '<b>We see</b>')
       .replace(/Next, we will/, '<b>Next, we will</b>')
-      .replace(/This will/, '<b>This will</b>')}</p>
+      .replace(/This will/, '<b>This will</b>')
+      .replace(/We want to/, '<b>We want to</b>')}</p>
     <div class="shot"><img src="data:image/png;base64,${data}" alt=""></div>
   </section>`;
 }).join('\n');
