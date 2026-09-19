@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'bun:test';
 import { CalendarEvent } from '@/types/event';
-import { restoreAt, type PendingRemoval } from './useUndoableRemoval';
+import { removalsAtPosition, restoreAt, type PendingRemoval } from './useUndoableRemoval';
 
 const event = (id: string): CalendarEvent => ({
   id,
@@ -44,5 +44,35 @@ describe('restoreAt', () => {
     const remaining = [event('a')];
     restoreAt(remaining, removalOf('b', 1));
     expect(ids(remaining)).toEqual(['a']);
+  });
+});
+
+describe('removalsAtPosition', () => {
+  const at = (id: string, index: number) => removalOf(id, index);
+
+  it('draws a row before the card that took its place', () => {
+    const pending = [at('b', 1)];
+    expect(removalsAtPosition(pending, 1, false).map((r) => r.event.id)).toEqual(['b']);
+    expect(removalsAtPosition(pending, 0, false)).toEqual([]);
+  });
+
+  it('keeps two removals that collapsed onto one position in removal order', () => {
+    // Beta went first from index 1; Gamma was pulled forward into index 1 and went next.
+    const pending = [at('beta', 1), at('gamma', 1)];
+    expect(removalsAtPosition(pending, 1, false).map((r) => r.event.id)).toEqual(['beta', 'gamma']);
+  });
+
+  it('gathers rows past the end onto the last position', () => {
+    const pending = [at('c', 2), at('d', 5)];
+    expect(removalsAtPosition(pending, 1, true).map((r) => r.event.id)).toEqual(['c', 'd']);
+  });
+
+  it('does not gather rows past the end onto an ordinary position', () => {
+    expect(removalsAtPosition([at('c', 2)], 1, false)).toEqual([]);
+  });
+
+  it('holds every row when the list has been emptied', () => {
+    const pending = [at('a', 0), at('b', 1), at('c', 2)];
+    expect(removalsAtPosition(pending, 0, true).map((r) => r.event.id)).toEqual(['a', 'b', 'c']);
   });
 });

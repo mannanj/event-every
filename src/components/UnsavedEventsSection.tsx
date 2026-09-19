@@ -16,8 +16,8 @@ interface UnsavedEventsSectionProps {
   onEdit: (event: CalendarEvent) => void;
   onDelete: (eventId: string) => void;
   onRemove: (eventId: string) => void;
-  pendingRemoval: PendingRemoval | null;
-  onUndoRemoval: () => void;
+  pendingRemovals: readonly PendingRemoval[];
+  onUndoRemoval: (eventId: string) => void;
   onExport: (event: CalendarEvent) => void;
   onCancelAll: () => void;
   onExportComplete: (events: CalendarEvent[]) => void;
@@ -36,7 +36,7 @@ export default function UnsavedEventsSection({
   onEdit,
   onDelete,
   onRemove,
-  pendingRemoval,
+  pendingRemovals,
   onUndoRemoval,
   onExport,
   onCancelAll,
@@ -55,7 +55,7 @@ export default function UnsavedEventsSection({
 
   // The section stays open while an undo is still on offer, so removing the last
   // card leaves the row rather than closing the panel out from under it.
-  if (events.length === 0 && !hasActiveProcessing && pendingRemoval === null) {
+  if (events.length === 0 && !hasActiveProcessing && pendingRemovals.length === 0) {
     return null;
   }
 
@@ -73,7 +73,7 @@ export default function UnsavedEventsSection({
         )}
 
         {/* Unsaved events list */}
-        {(events.length > 0 || pendingRemoval !== null) && (
+        {(events.length > 0 || pendingRemovals.length > 0) && (
           <EventCardList
             events={events}
             selection={selection}
@@ -81,7 +81,7 @@ export default function UnsavedEventsSection({
             onEdit={onEdit}
             onDelete={onDelete}
             onRemove={onRemove}
-            pendingRemoval={pendingRemoval}
+            pendingRemovals={pendingRemovals}
             onUndoRemoval={onUndoRemoval}
             onExport={onExport}
             onCancel={onCancelAll}

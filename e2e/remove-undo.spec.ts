@@ -69,24 +69,28 @@ test.describe('Remove a card with undo', () => {
     await expect(page.getByTestId('save-events-button')).toHaveText('Save (3)');
   });
 
-  test('only the newest removal stays undoable', async ({ page }) => {
+  test('every removal keeps its own undo row', async ({ page }) => {
     await mockScanAPI(page, await candidates(3));
     await setupLocal(page);
     await submitText(page, SOURCE_TEXT);
     await expect(cards(page)).toHaveCount(3);
 
     await removeButtonIn(cards(page).first()).click();
-    await expect(undoRow(page)).toContainText('Alpha');
+    await expect(undoRow(page)).toHaveCount(1);
 
     await removeButtonIn(cards(page).first()).click();
-    // The first removal is now permanent: one row, naming the second event only.
-    await expect(undoRow(page)).toHaveCount(1);
-    await expect(undoRow(page)).toContainText('Beta');
+    // The first removal is still undoable: two cards gone, two rows waiting.
+    await expect(undoRow(page)).toHaveCount(2);
+    await expect(undoRow(page).nth(0)).toContainText('Alpha');
+    await expect(undoRow(page).nth(1)).toContainText('Beta');
     await expect(cards(page)).toHaveCount(1);
 
-    await page.getByTestId('undo-removal-button').click();
+    // Undoing the older one leaves the newer one's row alone.
+    await page.getByTestId('undo-removal-button').first().click();
     await expect(cards(page)).toHaveCount(2);
-    await expect(page.getByText('Alpha')).toHaveCount(0);
+    await expect(cards(page).first()).toContainText('Alpha');
+    await expect(undoRow(page)).toHaveCount(1);
+    await expect(undoRow(page)).toContainText('Beta');
   });
 
   test('removing the last card keeps the section open, then closes it', async ({ page }) => {
@@ -103,6 +107,23 @@ test.describe('Remove a card with undo', () => {
     await expect(page.getByTestId('save-events-button')).toHaveCount(0);
 
     // The window closes the whole section on its own.
+    await expect(undoRow(page)).toHaveCount(0, { timeout: 15000 });
+    await expect(cards(page)).toHaveCount(0);
+  });
+
+  test('rows removed together all time out', async ({ page }) => {
+    await mockScanAPI(page, await candidates(3));
+    await setupLocal(page);
+    await submitText(page, SOURCE_TEXT);
+    await expect(cards(page)).toHaveCount(3);
+
+    await removeButtonIn(cards(page).first()).click();
+    await removeButtonIn(cards(page).first()).click();
+    await removeButtonIn(cards(page).first()).click();
+    await expect(undoRow(page)).toHaveCount(3);
+    await expect(cards(page)).toHaveCount(0);
+
+    // Each row is on its own clock; none of them needs a click to go away.
     await expect(undoRow(page)).toHaveCount(0, { timeout: 15000 });
     await expect(cards(page)).toHaveCount(0);
   });

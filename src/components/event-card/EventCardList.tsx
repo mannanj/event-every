@@ -4,7 +4,7 @@ import { Fragment } from 'react';
 import { CalendarEvent } from '@/types/event';
 import { exportMultipleToICS } from '@/services/exporter';
 import { EventSelection } from '@/hooks/useEventSelection';
-import { PendingRemoval } from '@/hooks/useUndoableRemoval';
+import { PendingRemoval, removalsAtPosition } from '@/hooks/useUndoableRemoval';
 import EventCard from './EventCard';
 import UndoRemovalRow from './UndoRemovalRow';
 
@@ -15,8 +15,8 @@ interface EventCardListProps {
   onEdit: (event: CalendarEvent) => void;
   onDelete: (eventId: string) => void;
   onRemove: (eventId: string) => void;
-  pendingRemoval: PendingRemoval | null;
-  onUndoRemoval: () => void;
+  pendingRemovals: readonly PendingRemoval[];
+  onUndoRemoval: (eventId: string) => void;
   onExport: (event: CalendarEvent) => void;
   onCancel: () => void;
   onExportComplete: (events: CalendarEvent[]) => void;
@@ -41,7 +41,7 @@ export default function EventCardList({
   isProcessing,
   onEdit,
   onRemove,
-  pendingRemoval,
+  pendingRemovals,
   onUndoRemoval,
   onExportComplete,
   onCancel,
@@ -68,20 +68,25 @@ export default function EventCardList({
     }
   };
 
-  const undoRow = pendingRemoval === null ? null : (
-    <UndoRemovalRow title={pendingRemoval.event.title} onUndo={onUndoRemoval} />
-  );
+  const undoRows = (position: number, isLastPosition: boolean) =>
+    removalsAtPosition(pendingRemovals, position, isLastPosition).map((removal) => (
+      <UndoRemovalRow
+        key={removal.event.id}
+        title={removal.event.title}
+        onUndo={() => onUndoRemoval(removal.event.id)}
+      />
+    ));
 
   const moreThanHalfSelected = selectedCount > events.length / 2;
   const selectAllLabel = moreThanHalfSelected ? 'Unselect all' : 'Select all';
 
   return (
     <>
-      {/* Event list, with the undo row held in the removed card's place */}
+      {/* Event list, with each undo row held in its own removed card's place */}
       <div className="max-h-[80vh] overflow-y-auto">
         {events.map((event, index) => (
           <Fragment key={event.id}>
-            {undoRow !== null && pendingRemoval?.index === index && undoRow}
+            {undoRows(index, false)}
             <EventCard
               event={event}
               selected={selectedIds.has(event.id)}
@@ -96,7 +101,7 @@ export default function EventCardList({
             />
           </Fragment>
         ))}
-        {undoRow !== null && pendingRemoval !== null && pendingRemoval.index >= events.length && undoRow}
+        {undoRows(events.length, true)}
       </div>
 
       {/* Save/Delete button */}

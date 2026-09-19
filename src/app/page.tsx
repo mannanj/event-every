@@ -942,7 +942,7 @@ function Home({ processingDisabled }: { processingDisabled: boolean }) {
           onEdit={handleBatchEventEdit}
           onDelete={handleBatchEventDelete}
           onRemove={undoableRemoval.remove}
-          pendingRemoval={undoableRemoval.pending}
+          pendingRemovals={undoableRemoval.pending}
           onUndoRemoval={undoableRemoval.undo}
           onExport={handleBatchEventExport}
           onCancelAll={handleCancelBatch}

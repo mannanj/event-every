@@ -83,7 +83,9 @@ async function shoot(page: Page, caption: string, target?: Locator): Promise<voi
   // about into frame before the shot; the mark is placed from the box it has
   // after that scroll, never before.
   if (target) {
-    await target.scrollIntoViewIfNeeded();
+    // Centre rather than minimally scroll: the default brings the control just
+    // inside the frame, which left the cards clipped against the bottom edge.
+    await target.evaluate((node) => node.scrollIntoView({ block: 'center' }));
     await page.waitForTimeout(250);
   }
   if (target) await mark(page, target);
@@ -128,39 +130,39 @@ test('storyboard: removing a card, and one row per input', async ({ page }) => {
 
   // ---- Act one: removing a card ----
   await shoot(page,
-    'We see three event cards in Review, all ticked, and "Save (3)" below them. Next, we will click the trash icon on "Beta", the middle card. Beta leaves the list and a slim row takes its place.',
+    'We see three event cards in Review, all ticked, and "Save (3)" below them. Next, we will click the trash icon on "Beta", the middle card. This will remove Beta from the list and leave a slim row in its place.',
     trashIn(cardNamed(page, 'Beta')));
   await trashIn(cardNamed(page, 'Beta')).click();
   await expect(undoRow(page)).toHaveCount(1);
 
   await shoot(page,
-    'We see "Removed Beta" sitting between "Alpha" and "Gamma", exactly where the card was, and "Save (2)". Next, we will click "Undo". Beta returns to its old spot with its tick still on.',
+    'We see a slim "Beta removed" row between "Alpha" and "Gamma", exactly where the card was, and "Save (2)". Next, we will click "Undo". This will put Beta back in its old spot with its tick still on.',
     page.getByTestId('undo-removal-button'));
   await page.getByTestId('undo-removal-button').click();
   await expect(cards(page)).toHaveCount(3);
 
   await shoot(page,
-    'We see Beta back between Alpha and Gamma, still ticked, and "Save (3)" again. Next, we will click the trash icon on "Alpha". Alpha leaves and its own undo row appears at the top.',
+    'We see Beta back between Alpha and Gamma, still ticked, and "Save (3)" again. Next, we will click the trash icon on "Alpha". This will remove Alpha and leave its own undo row at the top.',
     trashIn(cardNamed(page, 'Alpha')));
   await trashIn(cardNamed(page, 'Alpha')).click();
   await expect(undoRow(page)).toContainText('Alpha');
 
   await shoot(page,
-    'We see "Removed Alpha" at the top of the list. Next, we will click the trash icon on "Beta". Alpha\'s removal becomes final and only Beta can still be undone.',
+    'We see an "Alpha removed" row at the top of the list. Next, we will click the trash icon on "Beta". This will remove Beta as well, leaving both rows waiting on their own clocks.',
     trashIn(cardNamed(page, 'Beta')));
   await trashIn(cardNamed(page, 'Beta')).click();
-  await expect(undoRow(page)).toContainText('Beta');
+  await expect(undoRow(page)).toHaveCount(2);
 
   await shoot(page,
-    'We see one row, "Removed Beta", and Alpha is nowhere in the list. Next, we will click the trash icon on "Gamma", the last card left. The section stays open holding only the undo row.',
+    'We see two rows, "Alpha removed" and "Beta removed", with only Gamma still a card. Next, we will click the trash icon on "Gamma", the last card left. This will empty the list but hold the section open for the rows.',
     trashIn(cardNamed(page, 'Gamma')));
   await trashIn(cardNamed(page, 'Gamma')).click();
   await expect(cards(page)).toHaveCount(0);
-  await expect(undoRow(page)).toHaveCount(1);
+  await expect(undoRow(page)).toHaveCount(3);
 
   await shoot(page,
-    'We see an empty list with a single "Removed Gamma" row and no Save button. Next, we will wait five seconds without touching anything. The section closes itself.',
-    undoRow(page));
+    'We see an empty list holding all three rows, and no Save button. Next, we will wait five seconds without touching anything. This will let every row time out and close the section.',
+    undoRow(page).first());
   await expect(undoRow(page)).toHaveCount(0, { timeout: 15_000 });
 
   // ---- Act two: one row per input ----
@@ -169,56 +171,56 @@ test('storyboard: removing a card, and one row per input', async ({ page }) => {
   await mockScanAPI(page, await scanResponse(['Dinner'], 'sb-2'));
 
   await shoot(page,
-    'We see the page back at rest, Review gone and the input empty. Next, we will type "dinner friday" into the input. The text is ready to scan.',
+    'We see the page back at rest, Review gone and the input empty. Next, we will type "dinner friday" into the input. This will leave the text ready to scan.',
     textarea(page));
   await textarea(page).fill('dinner friday');
 
   await shoot(page,
-    'We see "dinner friday" in the input. Next, we will press "Scan". A card appears and the input is written to Recent.',
+    'We see "dinner friday" in the input. Next, we will press "Scan". This will produce a card and write the input to Recent.',
     scanButton(page));
   await textarea(page).press('Meta+Enter');
   await expect(cards(page)).toHaveCount(1);
 
   await shoot(page,
-    'We see the card that "dinner friday" produced. Next, we will open "Recent" from the clock icon. Recent lists every input we have run.',
+    'We see the card that "dinner friday" produced. Next, we will open "Recent" from the clock icon. This will show every input we have run.',
     historyButton(page));
   await historyButton(page).click();
   await expect(historyCards(page)).toHaveCount(1);
 
   await shoot(page,
-    'We see Recent holding one row, "dinner friday". Next, we will close Recent. We go back to the input to run that same text again.',
+    'We see Recent holding one row, "dinner friday". Next, we will close Recent. This will take us back to the input to run that same text again.',
     page.locator('[data-testid="input-history-close"]'));
   await page.locator('[data-testid="input-history-close"]').click();
 
   await shoot(page,
-    'We see the input empty again. Next, we will type "dinner friday", character for character as before. The same input is ready for a second run.',
+    'We see the input empty again. Next, we will type "dinner friday", character for character as before. This will set up a second run of an input Recent already holds.',
     textarea(page));
   await textarea(page).fill('dinner friday');
 
   await shoot(page,
-    'We see "dinner friday" in the input a second time. Next, we will press "Scan". A second card appears, and Recent moves its existing row instead of adding one.',
+    'We see "dinner friday" in the input a second time. Next, we will press "Scan". This will add a second card, and move Recent\'s existing row rather than adding one.',
     scanButton(page));
   await textarea(page).press('Meta+Enter');
   await expect(cards(page)).toHaveCount(2);
 
   await shoot(page,
-    'We see two cards now, one from each run. Next, we will open "Recent" again. Recent still holds a single row for "dinner friday".',
+    'We see two cards now, one from each run. Next, we will open "Recent" again. This will show whether the repeat added a row.',
     historyButton(page));
   await historyButton(page).click();
   await expect(historyCards(page)).toHaveCount(1);
 
   await shoot(page,
-    'We see Recent with one row after two identical runs. Next, we will close Recent. This time we will change the text before running it.',
+    'We see Recent still holding a single row after two identical runs. Next, we will close Recent. This will return us to the input, where we will change the text this time.',
     page.locator('[data-testid="input-history-close"]'));
   await page.locator('[data-testid="input-history-close"]').click();
 
   await shoot(page,
-    'We see the input empty once more. Next, we will type "dinner friday at 8", the same line with an ending added. An input we edited is a different input.',
+    'We see the input empty once more. Next, we will type "dinner friday at 8", the same line with an ending added. This will make an input Recent has not seen before.',
     textarea(page));
   await textarea(page).fill('dinner friday at 8');
 
   await shoot(page,
-    'We see "dinner friday at 8" in the input. Next, we will press "Scan". Recent gains a second row rather than moving the first.',
+    'We see "dinner friday at 8" in the input. Next, we will press "Scan". This will give Recent a second row rather than moving the first.',
     scanButton(page));
   await textarea(page).press('Meta+Enter');
   await expect(cards(page)).toHaveCount(3);
@@ -227,7 +229,7 @@ test('storyboard: removing a card, and one row per input', async ({ page }) => {
 
   // ---- The ending: nothing marked, no "next" ----
   await shoot(page,
-    'We see Recent holding two rows, "dinner friday at 8" above "dinner friday". Three runs of two inputs left two rows, where before every run left one of its own.');
+    'We see Recent holding two rows, "dinner friday at 8" above "dinner friday". Three runs of two inputs left two rows, where before this change every run left one of its own.');
 
   writeFileSync(`${OUT}/captions.json`, JSON.stringify(shots, null, 2));
 });

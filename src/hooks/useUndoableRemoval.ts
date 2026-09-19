@@ -23,6 +23,23 @@ export function restoreAt(events: CalendarEvent[], removal: PendingRemoval): Cal
   return next;
 }
 
+/**
+ * The rows to draw before the card at `position`, in the order they were removed.
+ *
+ * Several removals can be waiting at once and two of them can name the same
+ * position, because removing a card pulls the ones behind it forward. Removal
+ * order breaks that tie, which happens to be their original order too.
+ */
+export function removalsAtPosition(
+  pending: readonly PendingRemoval[],
+  position: number,
+  isLastPosition: boolean,
+): readonly PendingRemoval[] {
+  return pending.filter((removal) => (
+    removal.index === position || (isLastPosition && removal.index > position)
+  ));
+}
+
 interface UndoableRemovalInput {
   events: CalendarEvent[];
   setEvents: (update: (previous: CalendarEvent[]) => CalendarEvent[]) => void;
@@ -32,9 +49,9 @@ interface UndoableRemovalInput {
 }
 
 export interface UndoableRemoval {
-  pending: PendingRemoval | null;
+  pending: readonly PendingRemoval[];
   remove: (id: string) => void;
-  undo: () => void;
+  undo: (id: string) => void;
 }
 
 /**
@@ -44,9 +61,9 @@ export interface UndoableRemoval {
  * a card awaiting undo can never be counted by the footer or swept into an
  * export. The snapshot needed to put it back lives here instead.
  *
- * Only one removal is undoable at a time: removing a second card makes the
- * first permanent, so the row never has to explain which event it would bring
- * back.
+ * Every removal is undoable on its own clock. Removing a second card does not
+ * retire the first: each row simply times out five seconds after the card it
+ * names was removed.
  */
 export function useUndoableRemoval({
   events,
@@ -55,53 +72,58 @@ export function useUndoableRemoval({
   setSelected,
   windowMs = UNDO_WINDOW_MS,
 }: UndoableRemovalInput): UndoableRemoval {
-  const [pending, setPending] = useState<PendingRemoval | null>(null);
-  const pendingRef = useRef<PendingRemoval | null>(null);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [pending, setPending] = useState<readonly PendingRemoval[]>([]);
+  const pendingRef = useRef<readonly PendingRemoval[]>([]);
+  const timersRef = useRef(new Map<string, ReturnType<typeof setTimeout>>());
   // `remove` reaches the memoized cards, so it must not change identity when the
   // list or the selection does - that would re-render every card on every edit.
   const latest = useRef({ events, isSelected });
   latest.current = { events, isSelected };
 
-  const clearTimer = useCallback(() => {
-    if (timerRef.current !== null) {
-      clearTimeout(timerRef.current);
-      timerRef.current = null;
+  const forget = useCallback((id: string) => {
+    const timer = timersRef.current.get(id);
+    if (timer !== undefined) {
+      clearTimeout(timer);
+      timersRef.current.delete(id);
     }
   }, []);
 
-  useEffect(() => clearTimer, [clearTimer]);
+  useEffect(() => {
+    const timers = timersRef.current;
+    return () => { timers.forEach(clearTimeout); timers.clear(); };
+  }, []);
+
+  const drop = useCallback((id: string) => {
+    pendingRef.current = pendingRef.current.filter((removal) => removal.event.id !== id);
+    setPending(pendingRef.current);
+  }, []);
 
   const remove = useCallback((id: string) => {
     const current = latest.current;
     const index = current.events.findIndex((candidate) => candidate.id === id);
     if (index === -1) return;
-    const event = current.events[index];
 
-    clearTimer();
-    const removal = { event, index, wasSelected: current.isSelected(id) };
-    pendingRef.current = removal;
-    setPending(removal);
+    const removal = { event: current.events[index], index, wasSelected: current.isSelected(id) };
+    pendingRef.current = [...pendingRef.current, removal];
+    setPending(pendingRef.current);
     setEvents((previous) => previous.filter((candidate) => candidate.id !== id));
-    timerRef.current = setTimeout(() => {
-      timerRef.current = null;
-      pendingRef.current = null;
-      setPending(null);
-    }, windowMs);
-  }, [setEvents, clearTimer, windowMs]);
+    timersRef.current.set(id, setTimeout(() => {
+      timersRef.current.delete(id);
+      drop(id);
+    }, windowMs));
+  }, [setEvents, drop, windowMs]);
 
-  const undo = useCallback(() => {
+  const undo = useCallback((id: string) => {
     // Read the snapshot from a ref, never from inside a state updater: React
     // invokes updaters twice under StrictMode, which restored the event twice
     // and left a duplicate card behind.
-    const current = pendingRef.current;
-    if (current === null) return;
-    clearTimer();
-    pendingRef.current = null;
-    setPending(null);
-    setEvents((previous) => restoreAt(previous, current));
-    setSelected(current.event.id, current.wasSelected);
-  }, [setEvents, setSelected, clearTimer]);
+    const removal = pendingRef.current.find((candidate) => candidate.event.id === id);
+    if (removal === undefined) return;
+    forget(id);
+    drop(id);
+    setEvents((previous) => restoreAt(previous, removal));
+    setSelected(removal.event.id, removal.wasSelected);
+  }, [setEvents, setSelected, forget, drop]);
 
   return { pending, remove, undo };
 }

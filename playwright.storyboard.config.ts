@@ -11,10 +11,10 @@ export default defineConfig({
   reporter: 'line',
   timeout: 180_000,
   use: {
+    ...devices['Desktop Chrome'],
     baseURL: 'http://localhost:3777',
     viewport: { width: 1280, height: 900 },
     deviceScaleFactor: 2,
-    ...devices['Desktop Chrome'],
   },
   webServer: {
     command: 'bun run dev',
