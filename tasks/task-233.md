@@ -4,6 +4,9 @@
 - [x] `scripts/ocr-real-images.ts` OCRs the 23 real images with Tesseract and writes them as text cases the existing scan-reliability runner scores, so the OCR route is judged by the same answer key and the same scorer as the vision route
 - [x] OCR speed and confidence measured on all 23: mean 219 ms per image, every image produced text, mean per-word confidence 74.0 to 96.5
 - [x] `EVAL_DEBUG=1` on the reliability runner now prints the provider failure, which is what surfaced the rate limit below
-- [ ] OCR accuracy against the answer key: blocked, OpenRouter is returning 429 provider_rate_limited account-wide. Re-run `EVAL_REAL_DIR=ocr EVAL_ONLY=real-01,...,real-23 bun scripts/measure-scan-reliability.ts 1` when it clears
-- [ ] Split the score by screenshot against photo-of-a-flyer, and decide by the agreed rule: 42+/46 build the cascade, 35-41 use OCR only as a prefilter, under 35 drop it
+- [x] The 429 was Mistral's shared pool on OpenRouter, not the account: key had 999 of 1000 daily cents left, and the fallback model answered fine at the same moment. Production rides its fallback chain through this; the eval pins one model and does not
+- [x] Scored head to head on `mistral-small-3.2-24b-instruct`, same answer key, same scorer, same hour: OCR text 20/23, the image path 19/23. OCR is not worse
+- [x] The two paths fail on different cases. OCR missed real-04, real-10, real-15; the image path missed real-06, real-10, real-14, real-21. Only real-10 defeats both
+- [ ] Not yet answered: one run of 23 cannot separate 20 from 19, the confidence intervals almost entirely overlap. Three repeats of each is what would settle it
+- [ ] Not tested at all: a photograph of a physical poster. All 23 cases are screenshots of digital text, so this set measures the case OCR is best at and never exercises the one it is worst at
 - Location: `src/server/typesafe/verify.ts`, `scripts/ocr-real-images.ts`, `scripts/measure-scan-reliability.ts`, `scripts/probe-scan-usage.ts`
