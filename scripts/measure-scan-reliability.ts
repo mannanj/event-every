@@ -155,14 +155,17 @@ async function runCase(model: string, testCase: EvalCase, key: string): Promise<
   const source = { sourceId: randomUUID(), kind, contentHandle: randomUUID() };
   const transport = createEventEveryOpenRouterTransport({
     context: CONTEXT,
-    invoke: async (providerBody) =>
-      callOpenRouter({
+    invoke: async (providerBody) => {
+      const out = await callOpenRouter({
         consumerKind: kind === 'image' ? 'scan_image' : 'scan_text',
         apiKey: key,
         providerBody,
         modelOverride: model,
         signal: AbortSignal.timeout(120_000),
-      }),
+      });
+      if (process.env.EVAL_DEBUG && out.status !== 'success') console.error(`\n[${testCase.id}] ${JSON.stringify(out).slice(0, 400)}`);
+      return out;
+    },
   });
   const provider = kind === 'image'
     ? createOpenRouterVisionProvider({

@@ -23,7 +23,13 @@ import {
  * client may use, and returns nothing at all when TypeSafe cannot answer.
  */
 
-export const VERIFY_TIMEOUT_MS = 1_500;
+/**
+ * This call sits on the response path: the scan waits for it. The measured
+ * answer is under 400 ms, so the budget is set just above that rather than at
+ * the 1500 ms the design assumed - a duration hint is not worth a second of
+ * someone's time, and a slow answer is dropped rather than waited for.
+ */
+export const VERIFY_TIMEOUT_MS = 900;
 export const VERIFY_MAX_CANDIDATES = 8;
 export const MAX_EXCERPT_CHARS = 2_000;
 const MAX_TEXT_CHARS = 8_000;

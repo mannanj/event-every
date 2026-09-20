@@ -26,6 +26,7 @@ globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
   try {
     const parsed = JSON.parse(text);
     last.usage = { ...(parsed.usage ?? {}), schemaChars: schema.length };
+    if (process.env.PROBE_RAW) console.log(String(parsed.choices?.[0]?.message?.content ?? ''));
     if (process.env.PROBE_DUMP) {
       const content = String(parsed.choices?.[0]?.message?.content ?? '');
       const obj = JSON.parse(content) as Record<string, unknown>;
