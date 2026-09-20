@@ -40,7 +40,7 @@ import { scan } from '@/services/scanClient';
 import { createReviewDrafts } from '@/services/scannerDraft';
 import { mapWithConcurrency } from '@/utils/concurrency';
 import { imageToScanDataUrl } from '@/utils/imageDownscale';
-import { requestTriage, withTriageDuration } from '@/services/scanTriage';
+import { requestTriage, withTypicalDuration } from '@/services/scanTriage';
 import type { ReviewDraft } from '@/types/review';
 import { reviewDraftsToCalendarEvents } from '@/services/reviewEvent';
 import { ScanResponseSchema, type ScanRequest } from '@/types/scannerHttp';
@@ -111,8 +111,17 @@ function Home({ processingDisabled }: { processingDisabled: boolean }) {
     // additionally requires - an end, a zone, a title - is applied here, which is
     // where it lived before the Scanner migration.
     const drafts = providerScanDrafts(response, operation);
-    const incoming = reviewDraftsToCalendarEvents(drafts).map((event, index) =>
-      withTriageDuration(event, drafts[index].candidate.temporal.value?.end != null, batchDurationRef.current));
+    // Verification read the scanner's own words and judged this one event, so it
+    // outranks the triage duration, which was one guess for the whole batch.
+    const verifiedDuration = new Map((response.verification ?? []).map((one) => [one.candidateId, one.durationMinutes]));
+    const incoming = reviewDraftsToCalendarEvents(drafts).map((event, index) => {
+      const { candidate } = drafts[index];
+      return withTypicalDuration(
+        event,
+        candidate.temporal.value?.end != null,
+        verifiedDuration.get(candidate.candidateId) ?? batchDurationRef.current,
+      );
+    });
     const next = mergeScannedEvents(unsavedEventsRef.current, incoming);
     unsavedEventsRef.current = next;
     setUnsavedEvents(next);

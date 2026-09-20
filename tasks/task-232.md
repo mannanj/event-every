@@ -1,0 +1,12 @@
+### Task 232: Jev reads the scanner's own evidence, so images get judged too
+- [x] Port the validated judgment wording and calendar state builder from `scripts/typesafe/judgments.ts` into `src/server/typesafe/judgments.ts`, unchanged
+- [x] Build the source text per candidate: the request text for a text scan, the concatenated `evidence[].excerpt` for an image scan, so no OCR pass is added
+- [x] One TypeSafe call per candidate: field verification nouls, the all-day resolver when the scanner said unknown, a title pick when the title is missing or carries a date, and a typical duration when the source gave no end
+- [x] `verification` becomes one optional field on `ScanResponseSchema`; the durable replay stays the scanner's own output
+- [x] Wire it into `/api/scan` after the job completes, behind the full fallback ladder: no key, failure, deadline, or a malformed answer all leave the response exactly as it is today
+- [x] The review card uses the duration to set an end time for a timed event whose source gave none, image scans included
+- [x] Structured log line per scan so the thresholds can be tuned on real traffic
+- [x] The durable replay strips all evidence on purpose, so the job keeps the excerpts in memory for the life of the request, and only when a key is present; nothing new is stored
+- [x] Probed live against `jev-latest` on the image path: 385 ms, and it scored the date 0.48 on a fixture whose weekday contradicted its date while scoring the time 0.93 and the place 0.98
+- Not built, and deliberately: the review-card confidence markers and the title pick being applied, both of which want thresholds tuned on real traffic first
+- Location: `src/server/typesafe/judgments.ts`, `src/server/typesafe/verify.ts`, `src/server/scanner/evidence.ts`, `src/server/scanner/job.ts`, `src/types/scannerHttp.ts`, `src/app/api/scan/route.ts`, `src/app/page.tsx`

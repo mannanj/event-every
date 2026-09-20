@@ -104,7 +104,7 @@ export function triageQuestions(source: TriageSource, paragraphCount: number): R
   return questions;
 }
 
-function durationOf(answer: TypeSafeAnswer | undefined): number | null {
+export function durationFromScore(answer: TypeSafeAnswer | undefined): number | null {
   if (answer?.type !== 'score' || answer.confidence < DURATION_MIN_CONFIDENCE) return null;
   let best: string | null = null;
   for (const [level, p] of Object.entries(answer.probabilities)) if (best === null || p > (answer.probabilities[best] ?? 0)) best = level;
@@ -144,7 +144,7 @@ export async function triageText(
   for (let k = 1; k < paragraphs.length; k += 1) boundaries.push(noulOf(result.answers[`boundary_${k}`]) ?? 0);
   return {
     hasEvent,
-    durationMinutes: shape.choice === 'one_event' ? durationOf(result.answers.duration) : null,
+    durationMinutes: shape.choice === 'one_event' ? durationFromScore(result.answers.duration) : null,
     complete: noulOf(result.answers.complete),
     shape, boundaries, paragraphs, ms: result.ms,
   };

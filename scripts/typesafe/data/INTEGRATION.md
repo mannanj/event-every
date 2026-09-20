@@ -1,8 +1,19 @@
 # TypeSafe in the scan path: design with a no-op fallback
 
-Status: design only. Nothing in `src/` calls TypeSafe yet. The validated
-question wording and state builders live in `scripts/typesafe/judgments.ts`
-and move into `src/server/typesafe/` unchanged when this is built.
+Status: built in Task 232, except the review-card markers (build order step 4)
+and the daily budget counter (fallback rung 4). The question wording now lives
+in `src/server/typesafe/judgments.ts`, carried over from
+`scripts/typesafe/judgments.ts` unchanged.
+
+Two things the build found that this design did not anticipate:
+
+- The durable replay projection drops ALL evidence on purpose, so the excerpts
+  are gone by the time the scan route sees a candidate. `runCoordinatedScanJob`
+  now keeps them in memory for the life of the request only, and only when a
+  TypeSafe key is present. Nothing new is written to the operation record.
+- A duration judgment was added, which this document did not list. It fills the
+  end time for a timed event whose source stated no end, the same ladder the
+  pre-scan triage uses, so images stop defaulting to one hour.
 
 ## Principle
 

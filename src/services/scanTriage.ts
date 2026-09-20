@@ -59,11 +59,12 @@ export async function requestTriage(
 }
 
 /**
- * Replaces the one-hour default end with triage's typical duration. Only for a
- * timed event whose source stated no end; a stated end or an all-day event is
- * left exactly as the scanner produced it.
+ * Replaces the one-hour default end with a typical duration, from pre-scan
+ * triage or from post-scan verification. Only for a timed event whose source
+ * stated no end; a stated end or an all-day event is left exactly as the
+ * scanner produced it.
  */
-export function withTriageDuration(event: CalendarEvent, sourceHasEnd: boolean, durationMinutes: number | null | undefined): CalendarEvent {
+export function withTypicalDuration(event: CalendarEvent, sourceHasEnd: boolean, durationMinutes: number | null | undefined): CalendarEvent {
   if (!durationMinutes || sourceHasEnd || event.allDay) return event;
   return { ...event, endDate: new Date(event.startDate.getTime() + durationMinutes * 60_000) };
 }

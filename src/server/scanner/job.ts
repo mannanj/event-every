@@ -13,6 +13,7 @@ import {
   type ProviderOperationResult,
 } from '@/platform/cloudflare/provider-operation';
 import { materializeScanReplay, toDurableScanReplay } from '@/platform/provider/replay';
+import { evidenceByCandidate } from './evidence';
 import { createEventEveryOpenRouterTransport } from '@/server/scanner/transport';
 import type { ScanContext } from '@/server/scanner/scanContext';
 import { scanSource, type HostScanJob } from '@/server/scanner/scan';
@@ -72,6 +73,11 @@ export type CoordinatedScanResult =
     status: 'completed';
     value: ScanResponse;
     settlement: 'settlement_pending' | 'settlement_complete';
+    /**
+     * The excerpts the model quoted, by candidate id, held in memory only and
+     * absent on a replay. The durable record never carries them.
+     */
+    evidence: ReadonlyMap<string, string>;
   }>;
 
 type CoordinatedScanInput = Readonly<{
@@ -82,6 +88,8 @@ type CoordinatedScanInput = Readonly<{
   signal: AbortSignal;
   candidateIdFactory: CandidateIdFactory;
   context?: ScanContext;
+  /** Cap on the quoted text kept per candidate; 0, the default, keeps none. */
+  evidenceMaxChars?: number;
 }>;
 
 type CoordinatedScanDependencies = Readonly<{
@@ -93,6 +101,7 @@ export async function runCoordinatedScanJob(
   input: CoordinatedScanInput,
   dependencies: CoordinatedScanDependencies = {},
 ): Promise<CoordinatedScanResult> {
+  let evidence: ReadonlyMap<string, string> = new Map();
   const operation: ProviderOperationInput = {
     requestId: input.requestId,
     variant: input.request.kind === 'text' ? 'scan-text' : 'scan-image',
@@ -103,6 +112,7 @@ export async function runCoordinatedScanJob(
         scanJobWithTransport(input.request, input.source, createEventEveryOpenRouterTransport({ invoke, context: input.context })),
         { candidateIdFactory: input.candidateIdFactory },
       );
+      evidence = evidenceByCandidate(result.candidates, input.evidenceMaxChars ?? 0);
       return toDurableScanReplay({ source: input.source, ...result });
     },
   };
@@ -125,5 +135,6 @@ export async function runCoordinatedScanJob(
     status: 'completed',
     value: materialized,
     settlement: outcome.settlement,
+    evidence,
   };
 }
