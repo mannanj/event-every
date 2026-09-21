@@ -87,8 +87,18 @@ export default function SiteHeader({ showHow = false }: { showHow?: boolean }) {
               busyLabel={account.syncing ? 'syncing' : null}
               hideSignIn={onSignIn}
               items={items}
-              // Disabled until the MCP Worker exists. See tasks/task-202.md.
-              mcp={{ enabled: false, tooltip: 'MCP coming soon' }}
+              // The mark opens the guide rather than a popover: connecting is a
+              // thing somebody does once, in a terminal or a client's settings,
+              // and the page can say what an assistant will be able to see. A
+              // popover cannot, and this is not a decision to make from a
+              // tooltip.
+              mcp={{
+                enabled: true,
+                tooltip: 'Connect your assistant',
+                onOpen: () => {
+                  window.location.href = '/mcp';
+                },
+              }}
               renderLink={(href, className, children) => (
                 <Link href={href} className={className} data-testid="sign-in-link">
                   {children}
