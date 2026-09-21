@@ -1,0 +1,16 @@
+-- Lifting the daily cap for one account, and nothing else.
+--
+-- Two ways to be uncapped, kept deliberately apart (src/server/accounts/admin.ts):
+--
+--   admin      the owner list, compiled in and extendable by env var. Carries
+--              every other administrative power with it.
+--   unlimited  THIS COLUMN. Lifts the daily cap and nothing else: no admin
+--              surface, no ability to grant it to anybody.
+--
+-- One bit for both would mean that the day somebody needs uncapped spend they
+-- also get everything else, which is how a spend exemption quietly becomes a
+-- privilege escalation.
+--
+-- Default 0, and a signed-out visitor is capped too. An exemption whose default
+-- is "exempt" is not a role, it is a hole.
+ALTER TABLE account ADD COLUMN unlimited INTEGER NOT NULL DEFAULT 0;
