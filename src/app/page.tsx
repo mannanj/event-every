@@ -928,7 +928,7 @@ function Home({ processingDisabled }: { processingDisabled: boolean }) {
             <OutlookCalendarMark />
             <span className="text-[0.6875rem]">+1 others</span>
           </div>
-          <p className="text-[0.6875rem]">We never collect your data</p>
+          <p className="text-[0.6875rem]">We never sell your data</p>
         </div>
 
         {/* Error notifications */}
