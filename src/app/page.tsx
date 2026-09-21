@@ -1109,14 +1109,14 @@ function Home({ processingDisabled }: { processingDisabled: boolean }) {
                           onKeyDown={(e) => {
                             if (e.key === 'Enter' || e.key === 'Escape') setEditingSavedTitleId(null);
                           }}
-                          className="font-bold text-base border border-black px-1 py-0 focus:outline-none focus:ring-1 focus:ring-black w-full"
+                          className="font-bold text-base border border-black px-1 py-0 focus:outline-none focus:ring-1 focus:ring-black w-2/3"
                           aria-label={`Title for ${event.title}`}
                           autoFocus
                         />
                       ) : (
                         <h3
                           data-testid="saved-event-title"
-                          className="font-bold text-base truncate cursor-pointer hover:bg-gray-100 px-1 -ml-1 rounded"
+                          className="font-bold text-base truncate cursor-pointer hover:bg-gray-100 px-1 -ml-1 rounded inline-block max-w-full align-top"
                           onClick={() => setEditingSavedTitleId(event.id)}
                         >
                           {event.title}
