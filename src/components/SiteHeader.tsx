@@ -4,7 +4,8 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
 import { useAccount } from '@/components/AccountProvider';
-import AccountBar from '@/components/account-bar/AccountBar';
+import AccountBar, { type AccountBarItem } from '@/components/account-bar/AccountBar';
+import { useAttachmentBackup } from '@/hooks/useAttachmentBackup';
 
 /**
  * The bar every screen wears.
@@ -14,10 +15,52 @@ import AccountBar from '@/components/account-bar/AccountBar';
  * own; the controls on the right are the portable AccountBar, which is handed
  * values and callbacks and knows nothing about this app.
  */
+/** Whole numbers below a megabyte: "1.4 MB" reads, "1434 KB" does not. */
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 export default function SiteHeader({ showHow = false }: { showHow?: boolean }) {
   const account = useAccount();
   // No point offering the way in from the page that is the way in.
   const onSignIn = usePathname() === '/signin';
+  const backup = useAttachmentBackup(account.signedIn);
+
+  // Only when there is a bucket to back up to. A deployment without one shows
+  // the menu it always showed rather than a switch that does nothing.
+  const items: AccountBarItem[] = backup.available
+    ? [
+        {
+          key: 'backup',
+          label: 'Backup attachments to my account',
+          checked: backup.enabled,
+          disabled: backup.busy,
+          note: backup.enabled
+            ? 'Originals are kept encrypted, so a new device can get them back.'
+            : 'Originals stay on this device only.',
+          onSelect: backup.toggle,
+          testId: 'attachment-backup-toggle',
+        },
+        {
+          key: 'delete-backups',
+          label: backup.confirming
+            ? 'Delete them. This cannot be undone.'
+            : 'Delete attachments from my account',
+          disabled: backup.busy || backup.count === 0,
+          note:
+            backup.count === 0
+              ? 'Nothing backed up yet.'
+              : `${backup.count} ${backup.count === 1 ? 'file' : 'files'}, ${formatBytes(backup.bytes)}. This device keeps its own copies.`,
+          // The first click only arms it, so the menu has to stay open for the
+          // second one to be possible.
+          keepOpen: !backup.confirming,
+          onSelect: backup.removeAll,
+          testId: 'attachment-backup-delete',
+        },
+      ]
+    : [];
 
   return (
     <nav className="sticky top-0 z-40 backdrop-blur-md bg-white/55 border-b border-black/10">
@@ -43,6 +86,7 @@ export default function SiteHeader({ showHow = false }: { showHow?: boolean }) {
               onSignOut={account.signOut}
               busyLabel={account.syncing ? 'syncing' : null}
               hideSignIn={onSignIn}
+              items={items}
               // Disabled until the MCP Worker exists. See tasks/task-202.md.
               mcp={{ enabled: false, tooltip: 'MCP coming soon' }}
               renderLink={(href, className, children) => (

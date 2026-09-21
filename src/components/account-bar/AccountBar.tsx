@@ -34,6 +34,31 @@ export interface AccountBarMcp {
   onOpen?: () => void;
 }
 
+/**
+ * One line in the account menu.
+ *
+ * `checked` makes it a switch rather than a command: it draws a tick and keeps
+ * the menu open, because somebody turning a setting on often wants to look at
+ * what else is there. A command closes the menu, the way Sign out always has.
+ */
+export interface AccountBarItem {
+  key: string;
+  label: string;
+  /** Present makes this a switch. Undefined makes it a command. */
+  checked?: boolean;
+  disabled?: boolean;
+  /** Small grey line under the label, for a consequence worth stating. */
+  note?: string | null;
+  /**
+   * Keep the menu open after this one is chosen. A switch does that anyway; a
+   * command needs it when choosing it only arms the real thing, such as a
+   * delete that asks before it means it.
+   */
+  keepOpen?: boolean;
+  onSelect: () => void | Promise<void>;
+  testId?: string;
+}
+
 export interface AccountBarProps {
   /** Undefined means "not asked yet" - render nothing rather than guess. */
   signedIn: boolean | undefined;
@@ -44,6 +69,8 @@ export interface AccountBarProps {
   /** Shown next to the account button while background work is running. */
   busyLabel?: string | null;
   mcp?: AccountBarMcp;
+  /** Extra lines above Sign out. Empty or omitted leaves the menu as it was. */
+  items?: readonly AccountBarItem[];
   /** Hide the way in on the page that is the way in. */
   hideSignIn?: boolean;
   renderLink?: (href: string, className: string, children: React.ReactNode) => React.ReactNode;
@@ -120,6 +147,7 @@ export default function AccountBar({
   signInLabel = 'Sign in',
   busyLabel = null,
   mcp,
+  items,
   hideSignIn = false,
   renderLink,
 }: AccountBarProps) {
@@ -181,8 +209,34 @@ export default function AccountBar({
 
           {open && (
             <div className={styles.menu} role="menu">
-              {/* The address is on the button, so it is not repeated here. One
-                  thing is left, and the menu should look like it. */}
+              {/* The address is on the button, so it is not repeated here. */}
+              {items?.map((item) => (
+                <button
+                  key={item.key}
+                  type="button"
+                  className={styles.item}
+                  role={item.checked === undefined ? 'menuitem' : 'menuitemcheckbox'}
+                  aria-checked={item.checked}
+                  disabled={item.disabled}
+                  onClick={() => {
+                    // A switch leaves the menu open so the tick can be seen to
+                    // move. A command closes it, the way Sign out always has,
+                    // unless it says otherwise.
+                    if (item.checked === undefined && !item.keepOpen) close();
+                    void item.onSelect();
+                  }}
+                  data-testid={item.testId}
+                >
+                  <span className={styles.itemLabel}>
+                    <span className={styles.tick} aria-hidden="true">
+                      {item.checked ? '✓' : ''}
+                    </span>
+                    {item.label}
+                  </span>
+                  {item.note && <span className={styles.itemSubnote}>{item.note}</span>}
+                </button>
+              ))}
+
               <button
                 type="button"
                 className={styles.item}

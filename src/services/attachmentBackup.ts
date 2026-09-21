@@ -1,0 +1,173 @@
+import type { StoredInputFile } from '@/types/input';
+
+/**
+ * Client half of attachment backup.
+ *
+ * THE LAYERING, WHICH IS THE POINT. IndexedDB is the store of record and is
+ * always read first. Nothing here runs when the browser already holds the file.
+ * These calls exist for two moments only:
+ *
+ *   uploading   after an input-history entry is saved, if the account asked
+ *               for backups
+ *   restoring   when a file is wanted and IndexedDB does not have it - a new
+ *               laptop, a cleared browser, an entry that aged out of the
+ *               200-entry cap on one device but not another
+ *
+ * Every function answers with a null or an empty result rather than throwing.
+ * Backup is an extra; a failure in it must never be able to break saving an
+ * event, which worked before any of this existed and still has to.
+ */
+
+export interface BackedUpFile {
+  id: string;
+  entryId: string;
+  name: string;
+  mimeType: string;
+  kind: 'image' | 'calendar';
+  size: number;
+  updatedAt: string;
+}
+
+export interface BackupStatus {
+  enabled: boolean;
+  attachments: BackedUpFile[];
+  bytes: number;
+}
+
+/** Null means "cannot know": signed out, or the deployment has no bucket. */
+export async function readBackupStatus(): Promise<BackupStatus | null> {
+  try {
+    const response = await fetch('/api/attachments', {
+      credentials: 'same-origin',
+      cache: 'no-store',
+    });
+    if (!response.ok) return null;
+    return (await response.json()) as BackupStatus;
+  } catch {
+    return null;
+  }
+}
+
+export async function setBackupEnabled(enabled: boolean): Promise<boolean | null> {
+  try {
+    const response = await fetch('/api/attachments/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ enabled }),
+    });
+    if (!response.ok) return null;
+    return ((await response.json()) as { enabled: boolean }).enabled;
+  } catch {
+    return null;
+  }
+}
+
+export async function removeAllBackups(): Promise<number | null> {
+  try {
+    const response = await fetch('/api/attachments/remove', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ all: true }),
+    });
+    if (!response.ok) return null;
+    return ((await response.json()) as { removed: number }).removed;
+  } catch {
+    return null;
+  }
+}
+
+async function toBase64(file: File): Promise<string> {
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  // Chunked, because `String.fromCharCode(...bytes)` on a multi-megabyte photo
+  // blows the argument limit and throws where a plain loop would not.
+  let binary = '';
+  for (let at = 0; at < bytes.length; at += 8192) {
+    binary += String.fromCharCode(...bytes.subarray(at, at + 8192));
+  }
+  return btoa(binary);
+}
+
+/**
+ * Send one entry's originals up.
+ *
+ * `override` is an explicit yes for this one call even though the account
+ * switch is off - the same override the MCP tools take. The server checks the
+ * account setting itself, so leaving it out is not a way to upload anyway.
+ */
+export async function backupEntryFiles(
+  entryId: string,
+  files: readonly StoredInputFile[],
+  options: { override?: boolean } = {},
+): Promise<string[]> {
+  if (files.length === 0) return [];
+  try {
+    const payload = await Promise.all(
+      files.map(async (stored) => ({
+        id: stored.id,
+        name: stored.name,
+        mimeType: stored.mimeType,
+        kind: stored.kind,
+        data: await toBase64(stored.file),
+      })),
+    );
+    const response = await fetch('/api/attachments/upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({
+        entryId,
+        files: payload,
+        ...(options.override ? { override: true } : {}),
+      }),
+    });
+    if (!response.ok) return [];
+    return ((await response.json()) as { stored: string[] }).stored ?? [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * The second layer. Called only when IndexedDB came up empty for this file.
+ */
+export async function restoreFile(file: BackedUpFile): Promise<StoredInputFile | null> {
+  try {
+    const response = await fetch(`/api/attachments/file?id=${encodeURIComponent(file.id)}`, {
+      credentials: 'same-origin',
+      cache: 'no-store',
+    });
+    if (!response.ok) return null;
+    const bytes = await response.arrayBuffer();
+    return {
+      id: file.id,
+      file: new File([bytes], file.name, { type: file.mimeType }),
+      kind: file.kind,
+      name: file.name,
+      mimeType: file.mimeType,
+      size: bytes.byteLength,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Everything backed up for one input-history entry, for a browser that has the
+ * entry but not its files.
+ */
+export async function restoreEntryFiles(entryId: string): Promise<StoredInputFile[]> {
+  try {
+    const response = await fetch(`/api/attachments?entry=${encodeURIComponent(entryId)}`, {
+      credentials: 'same-origin',
+      cache: 'no-store',
+    });
+    if (!response.ok) return [];
+    const { attachments } = (await response.json()) as BackupStatus;
+    const restored = await Promise.all(attachments.map((one) => restoreFile(one)));
+    return restored.filter((one): one is StoredInputFile => one !== null);
+  } catch {
+    return [];
+  }
+}

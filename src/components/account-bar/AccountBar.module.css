@@ -106,6 +106,39 @@
   background: var(--ab-ground, #f3f3f3);
 }
 
+/* A switch line: a fixed-width column for the tick so the labels of a checked
+   and an unchecked item start at the same x. Without it the text jumps sideways
+   every time the setting is toggled. */
+.itemLabel {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.tick {
+  display: inline-block;
+  width: 0.85em;
+  flex: none;
+  font-size: 0.85em;
+}
+
+.itemSubnote {
+  display: block;
+  padding-left: calc(0.85em + 6px);
+  font-size: 0.75rem;
+  line-height: 1.35;
+  color: var(--ab-muted, #6f6f6f);
+}
+
+.item:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.item:disabled:hover {
+  background: none;
+}
+
 .itemNote {
   padding: 6px 10px 8px;
   font-size: 0.75rem;
