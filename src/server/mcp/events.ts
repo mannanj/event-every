@@ -18,9 +18,27 @@ import { pullEvents, pushEvents } from '@/server/accounts/store';
  * because one bad blob must not break "list my events".
  */
 
-/** How many stored rows a single read will page through before it stops. */
+/**
+ * TWO CEILINGS, AND THEY ARE NOT THE SAME NUMBER.
+ *
+ * Nothing here can be filtered in SQL. `synced_event` stores each event as one
+ * opaque ciphertext blob and its only clear columns are the id, the account,
+ * the nonce and `updated_at` - there is deliberately no title or start-date
+ * column, because indexing on those would put the very fields worth protecting
+ * back in the clear and leak the shape of somebody's calendar to anyone who can
+ * read D1. So every filter runs in this Worker, after decryption.
+ *
+ * Which means RETURNED and DECRYPTED are different quantities. A caller asking
+ * for 50 events may cost a thousand decryptions to answer. `RETURN_CEILING`
+ * bounds what comes back; `SCAN_CEILING` bounds what the answer costs, and a
+ * read that hits it says so rather than quietly reporting a partial history as
+ * if it were the whole thing.
+ */
+const RETURN_CEILING = 50;
 const SCAN_CEILING = 1000;
 const PAGE = 200;
+
+export type EventSource = 'image' | 'text' | 'url';
 
 export interface McpEventView {
   id: string;
@@ -33,8 +51,45 @@ export interface McpEventView {
   location: string | null;
   description: string | null;
   url: string | null;
+  /** How the event got here: a photo, typed words, or a link. */
+  source: EventSource | null;
   updatedAt: string;
 }
+
+/**
+ * What a caller is asking for. At least one of these must be present: there is
+ * no bare "give me everything" read, because the cheapest thing for a client to
+ * do is take the lot and the cheapest thing is not the right default when the
+ * lot is somebody's calendar.
+ */
+export interface EventQuery {
+  from?: string | null;
+  to?: string | null;
+  /** Substring, case-insensitive, over title, location and description. */
+  query?: string | null;
+  source?: EventSource | null;
+  limit?: number;
+}
+
+export interface EventPage {
+  events: McpEventView[];
+  /** Which fields `query` was matched against, so the answer explains itself. */
+  searched: readonly string[];
+  /** Rows decrypted to answer this. */
+  scanned: number;
+  /**
+   * False when the scan ceiling was reached, meaning events older than the ones
+   * looked at exist and were not considered. Never reported as a complete
+   * answer.
+   */
+  complete: boolean;
+}
+
+export function hasFilter(query: EventQuery): boolean {
+  return Boolean(query.from || query.to || query.query || query.source);
+}
+
+const SEARCHED_FIELDS = ['title', 'location', 'description'] as const;
 
 export interface McpEventInput {
   title: string;
@@ -80,6 +135,10 @@ function view(row: { id: string; event: unknown; updatedAt: string }): McpEventV
     location: text(stored.location),
     description: text(stored.description),
     url: text(stored.url),
+    source:
+      stored.source === 'image' || stored.source === 'text' || stored.source === 'url'
+        ? stored.source
+        : null,
     updatedAt: row.updatedAt,
   };
 }
@@ -92,10 +151,15 @@ function view(row: { id: string; event: unknown; updatedAt: string }): McpEventV
  * is the cost of the rows being ciphertext. So a range filter is applied here,
  * after decryption, rather than in SQL.
  */
-async function scanAll(db: D1Like, dek: CryptoKey, accountId: string): Promise<McpEventView[]> {
+async function scanAll(
+  db: D1Like,
+  dek: CryptoKey,
+  accountId: string,
+): Promise<{ events: McpEventView[]; scanned: number; complete: boolean }> {
   const found: McpEventView[] = [];
   let cursor: string | null = null;
   let scanned = 0;
+  let complete = true;
 
   for (;;) {
     const page = await pullEvents(db, dek, accountId, cursor, PAGE);
@@ -109,31 +173,51 @@ async function scanAll(db: D1Like, dek: CryptoKey, accountId: string): Promise<M
     }
 
     cursor = page[page.length - 1]!.updatedAt;
-    if (page.length < PAGE || scanned >= SCAN_CEILING) break;
+    if (page.length < PAGE) break;
+    if (scanned >= SCAN_CEILING) {
+      complete = false;
+      break;
+    }
   }
 
-  return found;
+  return { events: found, scanned, complete };
+}
+
+function matches(event: McpEventView, needle: string): boolean {
+  return SEARCHED_FIELDS.some((field) => (event[field] ?? '').toLowerCase().includes(needle));
 }
 
 export async function readEvents(
   db: D1Like,
   dek: CryptoKey,
   accountId: string,
-  options: { from?: string | null; to?: string | null; limit?: number } = {},
-): Promise<McpEventView[]> {
-  const found = await scanAll(db, dek, accountId);
+  query: EventQuery,
+): Promise<EventPage> {
+  const scan = await scanAll(db, dek, accountId);
 
-  const from = options.from ? iso(options.from) : null;
-  const to = options.to ? iso(options.to) : null;
-  const filtered = found.filter((one) => {
+  const from = query.from ? iso(query.from) : null;
+  const to = query.to ? iso(query.to) : null;
+  const needle = query.query ? query.query.trim().toLowerCase() : null;
+
+  const filtered = scan.events.filter((one) => {
     if (from && one.end < from) return false;
     if (to && one.start > to) return false;
+    if (query.source && one.source !== query.source) return false;
+    if (needle && !matches(one, needle)) return false;
     return true;
   });
 
   filtered.sort((a, b) => a.start.localeCompare(b.start));
-  const limit = Math.min(Math.max(Math.trunc(options.limit ?? 50), 1), 200);
-  return filtered.slice(0, limit);
+  const limit = Math.min(Math.max(Math.trunc(query.limit ?? RETURN_CEILING), 1), RETURN_CEILING);
+
+  return {
+    events: filtered.slice(0, limit),
+    searched: needle ? SEARCHED_FIELDS : [],
+    scanned: scan.scanned,
+    // A page cut short by the limit is as incomplete as one cut short by the
+    // ceiling, and a caller deciding whether to narrow needs to know either way.
+    complete: scan.complete && filtered.length <= limit,
+  };
 }
 
 /**
@@ -148,7 +232,7 @@ export async function readEventsByIds(
   accountId: string,
   ids: ReadonlySet<string>,
 ): Promise<McpEventView[]> {
-  const all = await scanAll(db, dek, accountId);
+  const all = (await scanAll(db, dek, accountId)).events;
   return all.filter((one) => ids.has(one.id)).sort((a, b) => a.start.localeCompare(b.start));
 }
 
@@ -161,7 +245,7 @@ export async function readEvent(
   // No index to look one up by, so this is the whole scan with a filter. The
   // ceiling still applies, which is honest: an account past it cannot address
   // its oldest events by id, and the fix is a column this table will not have.
-  const all = await scanAll(db, dek, accountId);
+  const all = (await scanAll(db, dek, accountId)).events;
   return all.find((one) => one.id === id) ?? null;
 }
 

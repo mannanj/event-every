@@ -30,7 +30,10 @@ export const ROUTE_MANIFEST: Readonly<Record<string, RoutePolicy>> = {
   '/api/mcp/events': policy('GET', 0),
   '/api/mcp/events/save': policy('POST', 64 * 1024),
   '/api/mcp/events/remove': policy('POST', 1024),
-  '/api/mcp/scan': policy('POST', 64 * 1024),
+  // 16MiB because an image arrives here as base64, which costs a third on top
+  // of the scanner's own 8MiB ceiling. /api/scan admits 12MiB for the same
+  // reason; this is that plus the .ics and page-text cases.
+  '/api/mcp/scan': policy('POST', 16 * MiB),
   // Attachment backup. `file` returns bytes rather than JSON, which is why it
   // is a GET with no body: the admission policy pins the media type of what
   // comes IN, and nothing comes in here. `upload` carries base64 in JSON, so

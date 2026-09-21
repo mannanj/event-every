@@ -1,8 +1,10 @@
 import { z } from 'zod';
 
+import { attachmentsBucket } from '@/server/accounts/env';
 import { accountDek } from '@/server/accounts/store';
 import { mcpJson, requireActor } from '@/server/mcp/actor';
 import { buildStoredEvent, readEventsByIds, writeEvents } from '@/server/mcp/events';
+import { keepOriginal, resolveBackup } from '@/server/mcp/original';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,7 +29,13 @@ const CreateEvent = z.object({
   url: z.string().max(2000).nullish(),
 });
 
-const Body = z.object({ events: z.array(CreateEvent).min(1).max(25) });
+const Body = z.object({
+  events: z.array(CreateEvent).min(1).max(25),
+  /** The wording these events came from, kept only if backup resolves to yes. */
+  sourceText: z.string().max(20_000).optional(),
+  /** Absent follows the account setting; true and false override it for this call. */
+  backupOriginal: z.boolean().optional(),
+});
 
 export async function POST(request: Request) {
   const gate = await requireActor(request);
@@ -56,11 +64,29 @@ export async function POST(request: Request) {
     return mcpJson({ error: 'That start date could not be read.' }, 400);
   }
 
+  const entryId = crypto.randomUUID();
+  for (const event of stored) event.inputEntryIds = [entryId];
+
   try {
     const dek = await accountDek(db, env.ACCOUNT_DATA_KEK!, actor.sub);
     await writeEvents(db, dek, actor.sub, stored);
     const ids = new Set(stored.map((event) => String(event.id)));
-    return mcpJson({ events: await readEventsByIds(db, dek, actor.sub, ids) }, 201);
+    const saved = await readEventsByIds(db, dek, actor.sub, ids);
+
+    let backedUp = false;
+    if (
+      parsed.data.sourceText &&
+      (await resolveBackup(db, env, actor.sub, parsed.data.backupOriginal))
+    ) {
+      ({ backedUp } = await keepOriginal(db, attachmentsBucket(env), dek, actor.sub, {
+        entryId,
+        bytes: new TextEncoder().encode(parsed.data.sourceText),
+        name: 'original.txt',
+        mimeType: 'text/plain',
+      }));
+    }
+
+    return mcpJson({ events: saved, backedUp }, 201);
   } catch (error) {
     console.error('mcp save failed', error instanceof Error ? error.message : 'unknown');
     return mcpJson({ error: 'Could not save that.' }, 500);

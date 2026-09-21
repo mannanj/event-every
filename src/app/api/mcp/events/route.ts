@@ -1,6 +1,6 @@
 import { accountDek } from '@/server/accounts/store';
 import { mcpJson, requireActor } from '@/server/mcp/actor';
-import { readEvent, readEvents } from '@/server/mcp/events';
+import { hasFilter, readEvent, readEvents, type EventQuery } from '@/server/mcp/events';
 import { eventToIcs } from '@/server/mcp/ics';
 
 export const dynamic = 'force-dynamic';
@@ -38,12 +38,26 @@ export async function GET(request: Request) {
       return mcpJson({ events: [event], ...(ics ? { ics } : {}) });
     }
 
-    const events = await readEvents(db, dek, actor.sub, {
+    const source = url.searchParams.get('source');
+    const query: EventQuery = {
       from: url.searchParams.get('from'),
       to: url.searchParams.get('to'),
-      limit: Number.isFinite(limit) ? limit : 50,
-    });
-    return mcpJson({ events });
+      query: url.searchParams.get('query'),
+      source: source === 'image' || source === 'text' || source === 'url' ? source : null,
+      limit: Number.isFinite(limit) ? limit : undefined,
+    };
+
+    // No bare "give me everything". A caller has to say what it is looking for,
+    // which is cheap to enforce here and is the difference between answering a
+    // question and handing over a calendar.
+    if (!hasFilter(query)) {
+      return mcpJson(
+        { error: 'Say what you are looking for: a date range, some text, or a source.' },
+        400,
+      );
+    }
+
+    return mcpJson(await readEvents(db, dek, actor.sub, query));
   } catch (error) {
     console.error('mcp list failed', error instanceof Error ? error.message : 'unknown');
     return mcpJson({ error: 'Could not read your events.' }, 500);

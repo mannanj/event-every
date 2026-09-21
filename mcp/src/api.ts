@@ -23,6 +23,8 @@ export interface Caller {
   email: string;
 }
 
+export type EventSource = 'image' | 'text' | 'url';
+
 export interface McpEventView {
   id: string;
   title: string;
@@ -33,7 +35,15 @@ export interface McpEventView {
   location: string | null;
   description: string | null;
   url: string | null;
+  source: EventSource | null;
   updatedAt: string;
+}
+
+export interface EventPage {
+  events: McpEventView[];
+  searched: string[];
+  scanned: number;
+  complete: boolean;
 }
 
 export class ApiError extends Error {}
@@ -64,19 +74,21 @@ async function call<T>(
 export async function listEvents(
   env: ToolEnv,
   caller: Caller,
-  query: { from?: string; to?: string; limit?: number } = {},
-): Promise<McpEventView[]> {
+  query: {
+    from?: string;
+    to?: string;
+    query?: string;
+    source?: EventSource;
+    limit?: number;
+  } = {},
+): Promise<EventPage> {
   const path = new URL('/api/mcp/events', env.APP_ORIGIN);
   if (query.from) path.searchParams.set('from', query.from);
   if (query.to) path.searchParams.set('to', query.to);
+  if (query.query) path.searchParams.set('query', query.query);
+  if (query.source) path.searchParams.set('source', query.source);
   if (query.limit) path.searchParams.set('limit', String(query.limit));
-  const body = await call<{ events: McpEventView[] }>(
-    env,
-    `${path.pathname}${path.search}`,
-    { method: 'GET' },
-    caller,
-  );
-  return body.events;
+  return call<EventPage>(env, `${path.pathname}${path.search}`, { method: 'GET' }, caller);
 }
 
 export async function getEvent(
@@ -110,18 +122,36 @@ export interface NewEvent {
   url?: string;
 }
 
+export interface SaveResult {
+  events: McpEventView[];
+  /** Whether the original wording was kept. The app decides, not the caller. */
+  backedUp: boolean;
+}
+
 export async function saveEvents(
   env: ToolEnv,
   caller: Caller,
   events: readonly NewEvent[],
-): Promise<McpEventView[]> {
-  const body = await call<{ events: McpEventView[] }>(
+  options: { sourceText?: string; backupOriginal?: boolean } = {},
+): Promise<SaveResult> {
+  return call<SaveResult>(
     env,
     '/api/mcp/events/save',
-    { method: 'POST', body: JSON.stringify({ events }) },
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        events,
+        ...(options.sourceText ? { sourceText: options.sourceText } : {}),
+        // Sent only when the caller actually said something. Absent means
+        // "follow the account", and a literal false is a real instruction that
+        // must survive the trip rather than being folded into the default.
+        ...(options.backupOriginal === undefined
+          ? {}
+          : { backupOriginal: options.backupOriginal }),
+      }),
+    },
     caller,
   );
-  return body.events;
 }
 
 export async function removeEvent(
@@ -137,15 +167,45 @@ export async function removeEvent(
   );
 }
 
-export async function scanText(
+export interface ScanResult {
+  events: McpEventView[];
+  found: number;
+  backedUp: boolean;
+}
+
+/**
+ * Every way the app can be given something, as one call.
+ *
+ * `backupOriginal` is sent only when the caller actually said something.
+ * Absent means "follow the account setting", and a literal `false` is a real
+ * instruction that must survive the trip rather than being folded into the
+ * default by a falsy check.
+ */
+export type ScanInput =
+  | { kind: 'text'; text: string; timezone?: string; backupOriginal?: boolean }
+  | {
+      kind: 'image';
+      imageBase64?: string;
+      imageUrl?: string;
+      mimeType?: 'image/png' | 'image/jpeg' | 'image/webp';
+      filename?: string;
+      timezone?: string;
+      backupOriginal?: boolean;
+    }
+  | { kind: 'url'; url: string; timezone?: string; backupOriginal?: boolean }
+  | { kind: 'calendar'; ics: string; filename?: string; backupOriginal?: boolean };
+
+export async function scanInput(
   env: ToolEnv,
   caller: Caller,
-  input: { text: string; timezone?: string },
-): Promise<{ events: McpEventView[]; found: number }> {
-  return call<{ events: McpEventView[]; found: number }>(
+  input: ScanInput,
+): Promise<ScanResult> {
+  const body: Record<string, unknown> = { ...input };
+  if (input.backupOriginal === undefined) delete body.backupOriginal;
+  return call<ScanResult>(
     env,
     '/api/mcp/scan',
-    { method: 'POST', body: JSON.stringify(input) },
+    { method: 'POST', body: JSON.stringify(body) },
     caller,
   );
 }
