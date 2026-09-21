@@ -93,6 +93,21 @@
     "EMAIL_FROM": "Event Every <no-reply@mail.eventevery.com>",
     // Absolute, so the link in an email is never built from a request host that
     // happened to be a preview URL.
-    "APP_ORIGIN": "https://eventevery.com"
+    "APP_ORIGIN": "https://eventevery.com",
+    // Where the MCP Worker lives, for the /callback leg of the authorize
+    // bridge. The return URL is built from THIS, never from a query parameter:
+    // a bridge that redirects wherever it is told is how one of these leaks a
+    // credential.
+    //
+    // workers.dev rather than a custom domain, deliberately. The OAuth callback
+    // has to resolve for every client before anything works, and a custom
+    // domain needs the Workers Routes zone permission first. Prove a real
+    // client connects, then move it.
+    //
+    // Without this, mcpConfigured() is false and /api/mcp/authorize sends
+    // everybody to /?connect=unavailable - which is the correct behaviour for a
+    // deployment with no MCP Worker, and was silently the behaviour for this
+    // one until it was set.
+    "MCP_ORIGIN": "https://event-every-mcp.mannanteam.workers.dev"
   }
 }
