@@ -18,6 +18,19 @@ export const ROUTE_MANIFEST: Readonly<Record<string, RoutePolicy>> = {
   '/api/auth/config': policy('GET', 0),
   // Encrypted event sync. Split by method because a policy pins exactly one.
   '/api/sync/pull': policy('GET', 0), '/api/sync/push': policy('POST', 4 * MiB),
+  // The MCP bridge. `authorize` is a browser navigation carrying an opaque
+  // state; the rest are called by the MCP Worker with a signed actor token, so
+  // they arrive with no Origin header and no cookie.
+  //
+  // Split by verb in the PATH rather than by method, because a policy admits
+  // GET or POST and nothing else. `scan` is the only one that can spend money;
+  // its ceiling is the text limit its own schema enforces, not the 12MiB of
+  // /api/scan, because an assistant cannot hand over an image.
+  '/api/mcp/authorize': policy('GET', 0),
+  '/api/mcp/events': policy('GET', 0),
+  '/api/mcp/events/save': policy('POST', 64 * 1024),
+  '/api/mcp/events/remove': policy('POST', 1024),
+  '/api/mcp/scan': policy('POST', 64 * 1024),
 };
 
 /**

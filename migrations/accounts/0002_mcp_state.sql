@@ -1,0 +1,15 @@
+-- Remember that a sign-in began because an assistant asked to connect.
+--
+-- The MCP Worker sends somebody to /api/mcp/authorize carrying an opaque state.
+-- If they are signed out, that route sends them to /signin - and without this
+-- column the state dies there: they click the emailed link, land on the home
+-- page, and the client that started the whole thing is still waiting. The state
+-- has to survive the round trip through the mailbox, and the login token is the
+-- only thing that makes that trip.
+--
+-- Deliberately on login_token rather than session: it belongs to one sign-in
+-- attempt, not to being signed in. It is spent when the token is spent.
+--
+-- 0001 left this column out with a pointer to tasks/task-202.md rather than
+-- shipping a column nothing wrote. This is that task.
+ALTER TABLE login_token ADD COLUMN mcp_state TEXT;

@@ -48,7 +48,7 @@ export async function POST(request: Request) {
     return json({ error: 'Expected a JSON body.' }, 400);
   }
 
-  const fields = body as { email?: unknown; turnstileToken?: unknown };
+  const fields = body as { email?: unknown; turnstileToken?: unknown; mcpState?: unknown };
   const email = typeof fields.email === 'string' ? fields.email.trim() : '';
   if (!email || email.length > 200 || !EMAIL_PATTERN.test(email)) {
     return json({ error: 'Type an email address, like you@example.com.' }, 400);
@@ -107,7 +107,15 @@ export async function POST(request: Request) {
     );
   }
 
-  const token = await createLoginToken(db, email);
+  // Carried only if it looks like one of our states. It is echoed into a
+  // redirect when the link is spent, so anything shaped differently is refused
+  // rather than stored: a redirect target is not a field to be lenient about.
+  const mcpState =
+    typeof fields.mcpState === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(fields.mcpState)
+      ? fields.mcpState
+      : null;
+
+  const token = await createLoginToken(db, email, mcpState);
   const url = new URL('/api/auth/redeem', appOrigin(request, env));
   url.searchParams.set('token', token);
 

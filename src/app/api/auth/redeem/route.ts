@@ -30,10 +30,19 @@ export async function GET(request: Request) {
   }
 
   const session = await createSession(db, account.id);
+
+  // Somebody who started at an assistant's "connect" button goes back to the
+  // bridge, now carrying a session, rather than to the home page wondering what
+  // happened. The state came from our own table, and its shape was checked
+  // before it was stored, so this is not a caller-supplied redirect.
+  const destination = account.mcpState
+    ? `/api/mcp/authorize?state=${encodeURIComponent(account.mcpState)}`
+    : '/?signin=ok';
+
   return new Response(null, {
     status: 302,
     headers: {
-      Location: new URL('/?signin=ok', origin).toString(),
+      Location: new URL(destination, origin).toString(),
       // `secure` follows the scheme this request actually arrived on, so a
       // local http run still sets a usable cookie while production never does.
       'Set-Cookie': sessionCookie(session, new URL(request.url).protocol === 'https:'),

@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 
 import { useAccount } from '@/components/AccountProvider';
@@ -55,6 +54,15 @@ export default function SignInPage() {
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const turnstileBox = useRef<HTMLDivElement>(null);
   const turnstileWidget = useRef<string | null>(null);
+  // Set when an assistant sent someone here to connect. Read from the location
+  // rather than useSearchParams, which would make this whole page opt out of
+  // static rendering for a parameter almost nobody arrives with.
+  const [mcpState, setMcpState] = useState<string | null>(null);
+
+  useEffect(() => {
+    const state = new URLSearchParams(window.location.search).get('state');
+    setMcpState(state && /^[A-Za-z0-9_-]{1,128}$/.test(state) ? state : null);
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -114,7 +122,11 @@ export default function SignInPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'same-origin',
-        body: JSON.stringify({ email, ...(turnstileToken ? { turnstileToken } : {}) }),
+        body: JSON.stringify({
+          email,
+          ...(turnstileToken ? { turnstileToken } : {}),
+          ...(mcpState ? { mcpState } : {}),
+        }),
       });
       if (!response.ok) {
         const body = (await response.json().catch(() => null)) as { error?: string } | null;
@@ -141,7 +153,7 @@ export default function SignInPage() {
             <span className="inline-flex flex-none text-black">
               <SignInMark />
             </span>
-            {signedIn ? "You're signed in" : 'Event faster, plan better'}
+            {mcpState ? 'Connect your assistant' : signedIn ? "You're signed in" : 'Event faster, plan better'}
           </h1>
 
           {/* Three lines, each quieter than the one above it. The title follows
@@ -149,9 +161,11 @@ export default function SignInPage() {
               Time's "Meet faster, time better" - and verbs the product name the
               way the landing hero already does in "Event everything". */}
           <p className="text-sm text-black">
-            {signedIn
-              ? 'Your events are kept on this account, on any device you sign in on.'
-              : 'Save history across devices, manage events, and use the future MCP'}
+            {mcpState
+              ? 'Sign in and your assistant can read and add events on this account.'
+              : signedIn
+                ? 'Your events are kept on this account, on any device you sign in on.'
+                : 'Save history across devices, manage events, and connect your assistant'}
           </p>
           <p className="text-[0.6875rem] text-gray-500 -mt-3">
             Your data is encrypted, and we never sell it to third parties.
@@ -169,13 +183,16 @@ export default function SignInPage() {
             </div>
           ) : signedIn ? (
             <>
-              <Link
-                href="/"
+              {/* Already signed in with a connection waiting: a plain anchor,
+                  not a Link, because this leaves the app for the bridge and the
+                  router has no business prefetching an authorization. */}
+              <a
+                href={mcpState ? `/api/mcp/authorize?state=${encodeURIComponent(mcpState)}` : '/'}
                 className="block w-full border-2 border-black bg-black px-4 py-3 text-center font-semibold text-white transition-colors hover:bg-white hover:text-black"
                 data-testid="signin-continue"
               >
-                Go to your events
-              </Link>
+                {mcpState ? 'Finish connecting' : 'Go to your events'}
+              </a>
               <p className="mt-3 text-xs text-gray-500 leading-snug text-center">
                 Signed in on this device for 30 days, or until you sign out.
               </p>

@@ -9,9 +9,11 @@
  *   login_token  a single-use, time-limited link, stored hashed
  *   session      a cookie's worth of "still signed in"
  *
- * The MCP state field the skeleton carries on `login_token` is deliberately
- * absent: Event Every has no MCP Worker yet. See tasks/task-202.md, which adds
- * it back rather than leaving a column nothing writes.
+ * `login_token.mcp_state` is the one field that is not about signing in. It
+ * remembers that this sign-in began because an assistant asked to connect, so
+ * that clicking the emailed link returns to that flow rather than to the home
+ * page. It rides on the token because the mailbox round trip is the only thing
+ * the state has to survive, and the token is the only thing that makes it.
  */
 import type { D1Like } from './d1';
 import { newId, randomToken } from './tokens';
@@ -23,6 +25,15 @@ const SESSION_TTL_DAYS = 30;
 export interface Account {
   id: string;
   email: string;
+}
+
+/**
+ * What spending a sign-in link yields: the account, plus where the person was
+ * going before the link interrupted them.
+ */
+export interface SpentLoginToken extends Account {
+  /** The MCP authorization state this sign-in began from, or null. */
+  mcpState: string | null;
 }
 
 /**
@@ -42,21 +53,32 @@ export function normaliseEmail(email: string): string {
   return email.trim().toLowerCase();
 }
 
-/** Mint a single-use sign-in link token. */
-export async function createLoginToken(db: D1Like, email: string): Promise<string> {
+/**
+ * Mint a single-use sign-in link token.
+ *
+ * `mcpState` is the MCP Worker's opaque authorization state, present only when
+ * this sign-in began at /api/mcp/authorize. It is stored, never shown, and
+ * comes back out when the link is spent.
+ */
+export async function createLoginToken(
+  db: D1Like,
+  email: string,
+  mcpState: string | null = null,
+): Promise<string> {
   // Two draws rather than one long one: randomToken caps at a byte per
   // character, and 24 characters of this alphabet is ~120 bits.
   const token = `${randomToken(12)}${randomToken(12)}`;
   await db
     .prepare(
-      `INSERT INTO login_token (token_hash, email, created_at, expires_at)
-       VALUES (?, ?, ?, ?)`,
+      `INSERT INTO login_token (token_hash, email, created_at, expires_at, mcp_state)
+       VALUES (?, ?, ?, ?, ?)`,
     )
     .bind(
       await hashToken(token),
       normaliseEmail(email),
       iso(0),
       iso(LOGIN_TOKEN_TTL_MINUTES * 60_000),
+      mcpState,
     )
     .run();
   return token;
@@ -69,12 +91,17 @@ export async function createLoginToken(db: D1Like, email: string): Promise<strin
 export async function consumeLoginToken(
   db: D1Like,
   token: string,
-): Promise<Account | null> {
+): Promise<SpentLoginToken | null> {
   const hash = await hashToken(token);
   const row = await db
-    .prepare('SELECT email, expires_at, used_at FROM login_token WHERE token_hash = ?')
+    .prepare('SELECT email, expires_at, used_at, mcp_state FROM login_token WHERE token_hash = ?')
     .bind(hash)
-    .first<{ email: string; expires_at: string; used_at: string | null }>();
+    .first<{
+      email: string;
+      expires_at: string;
+      used_at: string | null;
+      mcp_state: string | null;
+    }>();
   if (!row || row.used_at || row.expires_at <= iso(0)) return null;
 
   // Burn it first: a replay must lose even if what follows is slow. The
@@ -86,7 +113,8 @@ export async function consumeLoginToken(
     .run();
   if (!burn.meta.changes) return null;
 
-  return upsertAccount(db, row.email);
+  const account = await upsertAccount(db, row.email);
+  return { ...account, mcpState: row.mcp_state ?? null };
 }
 
 export async function upsertAccount(db: D1Like, email: string): Promise<Account> {
