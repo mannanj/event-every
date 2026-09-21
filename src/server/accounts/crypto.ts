@@ -148,6 +148,70 @@ export async function sealEvent(
 }
 
 /**
+ * The same envelope, for a file's bytes.
+ *
+ * Attachments live in R2 rather than D1, and the split is only about size: a
+ * photo does not belong in a row. Everything else is identical - the same
+ * per-account DEK, the same AES-GCM, the same AAD binding the ciphertext to one
+ * account and one file id, so an object moved between accounts will not open.
+ *
+ * The ciphertext is returned as BYTES, not base64: it is written straight to an
+ * R2 object, and base64 would add a third to every stored photo for nothing.
+ * Only the nonce is base64, because that half lives in D1 beside the metadata.
+ */
+export interface SealedBytes {
+  nonce: string;
+  ciphertext: Uint8Array;
+  keyVersion: number;
+}
+
+function fileAad(accountId: string, fileId: string): Uint8Array {
+  return new TextEncoder().encode(`file:${accountId}:${fileId}`);
+}
+
+export async function sealFile(
+  dek: CryptoKey,
+  accountId: string,
+  fileId: string,
+  bytes: Uint8Array,
+): Promise<SealedBytes> {
+  const iv = nonce();
+  const sealed = await crypto.subtle.encrypt(
+    {
+      name: 'AES-GCM',
+      iv: iv as BufferSource,
+      additionalData: fileAad(accountId, fileId) as BufferSource,
+    },
+    dek,
+    bytes as BufferSource,
+  );
+  return { nonce: toBase64(iv), ciphertext: new Uint8Array(sealed), keyVersion: KEY_VERSION };
+}
+
+/** Null rather than a throw, for the same reason `openEvent` returns null. */
+export async function openFile(
+  dek: CryptoKey,
+  accountId: string,
+  fileId: string,
+  sealed: Readonly<{ nonce: string; ciphertext: Uint8Array }>,
+): Promise<Uint8Array | null> {
+  try {
+    const plaintext = await crypto.subtle.decrypt(
+      {
+        name: 'AES-GCM',
+        iv: fromBase64(sealed.nonce) as BufferSource,
+        additionalData: fileAad(accountId, fileId) as BufferSource,
+      },
+      dek,
+      sealed.ciphertext as BufferSource,
+    );
+    return new Uint8Array(plaintext);
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Returns null rather than throwing when a row will not open. A single corrupt
  * or wrong-key row must not fail the whole sync and lock someone out of every
  * other event they own.

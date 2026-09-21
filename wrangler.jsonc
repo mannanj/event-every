@@ -41,6 +41,15 @@
       "database_id": "2ca050c1-14ef-4168-905b-4d4b31c97e21"
     }
   ],
+  // Backed-up original files, for accounts that turned "back up attachments"
+  // on. Sealed with the same per-account data key the events use before they
+  // are written, so the bucket holds ciphertext and the filenames are inside
+  // the envelope rather than beside it. R2's own encryption is defence in
+  // depth, which is the position migrations/accounts/0001_init.sql already
+  // takes for D1.
+  "r2_buckets": [
+    { "binding": "ATTACHMENTS", "bucket_name": "event-every-attachments" }
+  ],
   // Cloudflare Email Sending, for magic links. The domain must be onboarded
   // (`wrangler email sending enable mail.eventevery.com`) or every send fails.
   // A subdomain, so the Resend/SES records on send.eventevery.com are untouched.

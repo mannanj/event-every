@@ -31,6 +31,16 @@ export const ROUTE_MANIFEST: Readonly<Record<string, RoutePolicy>> = {
   '/api/mcp/events/save': policy('POST', 64 * 1024),
   '/api/mcp/events/remove': policy('POST', 1024),
   '/api/mcp/scan': policy('POST', 64 * 1024),
+  // Attachment backup. `file` returns bytes rather than JSON, which is why it
+  // is a GET with no body: the admission policy pins the media type of what
+  // comes IN, and nothing comes in here. `upload` carries base64 in JSON, so
+  // its ceiling is the ten files it admits at six megabytes each, plus the
+  // third that base64 adds.
+  '/api/attachments': policy('GET', 0),
+  '/api/attachments/settings': policy('POST', 1024),
+  '/api/attachments/upload': policy('POST', 84 * MiB),
+  '/api/attachments/file': policy('GET', 0),
+  '/api/attachments/remove': policy('POST', 32 * 1024),
 };
 
 /**

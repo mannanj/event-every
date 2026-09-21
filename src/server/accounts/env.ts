@@ -1,6 +1,7 @@
 import type { D1Like } from './d1';
 import { getCloudflareContext } from '@opennextjs/cloudflare';
 
+import type { AttachmentBucket } from './attachments';
 import type { EmailSendBinding } from './email';
 
 /**
@@ -28,6 +29,13 @@ export interface AccountsEnv {
   /** Master key for envelope encryption. 32 bytes, base64. */
   ACCOUNT_DATA_KEK?: string;
 
+  /**
+   * Backed-up original files, sealed under the same per-account key the events
+   * use. Optional: an account without it simply cannot turn backup on, and
+   * everything else works exactly as before.
+   */
+  ATTACHMENTS?: AttachmentBucket;
+
   /** Keys the rate-limit bucket hashes, so the table is not a log of people. */
   RATE_LIMIT_HASH_SECRET?: string;
 
@@ -53,6 +61,20 @@ export function accountsDb(env: AccountsEnv = accountsEnv()): D1Like {
 
 export function accountsConfigured(env: AccountsEnv = accountsEnv()): boolean {
   return Boolean(env.ACCOUNTS_DB && env.ACCOUNT_DATA_KEK);
+}
+
+/**
+ * Attachment backup is available only when the bucket, the master key and the
+ * database are all present. Without any of them the account menu does not offer
+ * it, which is better than offering a switch that silently does nothing.
+ */
+export function attachmentsConfigured(env: AccountsEnv = accountsEnv()): boolean {
+  return Boolean(env.ATTACHMENTS && env.ACCOUNT_DATA_KEK && env.ACCOUNTS_DB);
+}
+
+export function attachmentsBucket(env: AccountsEnv = accountsEnv()): AttachmentBucket {
+  if (!env.ATTACHMENTS) throw new Error('attachments_unavailable');
+  return env.ATTACHMENTS;
 }
 
 /** Where the magic link points. Falls back to the request's own origin. */

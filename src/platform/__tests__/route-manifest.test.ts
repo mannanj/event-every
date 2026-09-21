@@ -73,6 +73,11 @@ describe('route manifest', () => {
       '/api/mcp/events/save': { method: 'POST', maxBodyBytes: 64 * 1024, allow: 'POST' },
       '/api/mcp/events/remove': { method: 'POST', maxBodyBytes: 1024, allow: 'POST' },
       '/api/mcp/scan': { method: 'POST', maxBodyBytes: 64 * 1024, allow: 'POST' },
+      '/api/attachments': { method: 'GET', maxBodyBytes: 0, allow: 'GET' },
+      '/api/attachments/settings': { method: 'POST', maxBodyBytes: 1024, allow: 'POST' },
+      '/api/attachments/upload': { method: 'POST', maxBodyBytes: 84 * 1024 * 1024, allow: 'POST' },
+      '/api/attachments/file': { method: 'GET', maxBodyBytes: 0, allow: 'GET' },
+      '/api/attachments/remove': { method: 'POST', maxBodyBytes: 32 * 1024, allow: 'POST' },
     });
   });
 
