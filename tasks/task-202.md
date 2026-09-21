@@ -29,18 +29,18 @@ The session cookie is deliberately host-only — no `Domain` attribute — so th
 
 #### Scope
 
-- [ ] Migration: add `mcp_state TEXT` to `login_token`, and thread it through `createLoginToken` / `consumeLoginToken` / the redeem redirect.
-- [ ] `/api/mcp/authorize` on the app Worker: find a session, sign a short-lived assertion bound to the request's opaque state, redirect back. Unauthenticated visitors go to sign-in carrying the state.
-- [ ] A second Worker with OAuth 2.1 + PKCE, dynamic client registration, and KV for parked authorization state. No D1 binding.
-- [ ] A signed actor token on every call back into this app's API, verified before any write.
-- [ ] Tools, minimally: `whoami`, `list_events`, `create_event_from_text`. Decide whether an assistant may spend owner budget at all — see Task 201; an MCP client calling `/api/scan` in a loop is exactly the traffic that freezes a day.
-- [ ] Decide what an assistant may read. Synced events are encrypted at rest but the app Worker can decrypt, so an MCP tool returning events hands plaintext to a third-party client. That is a product decision, not an implementation detail, and it needs an explicit answer before shipping.
-- [ ] Rate limit the MCP surface separately from the web one.
+- [x] Migration: add `mcp_state TEXT` to `login_token`, and thread it through `createLoginToken` / `consumeLoginToken` / the redeem redirect.
+- [x] `/api/mcp/authorize` on the app Worker: find a session, sign a short-lived assertion bound to the request's opaque state, redirect back. Unauthenticated visitors go to sign-in carrying the state.
+- [x] A second Worker with OAuth 2.1 + PKCE, dynamic client registration, and KV for parked authorization state. No D1 binding.
+- [x] A signed actor token on every call back into this app's API, verified before any write.
+- [x] Tools: `whoami`, `list_events`, `get_event`, `add_events`, `read_text_into_events`, `read_image_into_events`, `read_link_into_events`, `import_calendar`, `remove_event`. An assistant MAY spend owner budget, at the same caps as the web path — decided 2026-09-21. `import_calendar` spends nothing, and `add_events` spends nothing, and the tool descriptions say so.
+- [x] Decided 2026-09-21: full event detail. An assistant that can see a title and not a location cannot do what it was connected for. `list_events` requires at least one filter and caps at 50, so there is no bare "give me everything" read.
+- [x] Decided 2026-09-21: NO separate MCP rate limit. The MCP surface and the site run under the same limits, by explicit ruling. Kept here as a closed decision rather than deleted, so it is not reopened by someone reading the shape and assuming it was forgotten.
 
 #### Prove
 
 - [ ] A scripted end-to-end run of the whole flow with no human clicking anything, reading the magic link out of the Worker log the way `mcp/scripts/verify-oauth.mjs` does in the skeleton.
 - [ ] Refusal tests: a grant replayed after expiry, a grant bound to another state, an actor token from an unknown signer, a tool call with no token.
-- [ ] A test proving one account's MCP token cannot read another account's events.
+- [ ] A test proving one account's MCP token cannot read another account's events. (Attachments have this; events do not yet.)
 
 - Location: new `mcp/` Worker, `src/app/api/mcp/`, `src/server/accounts/auth.ts`, `migrations/accounts/`

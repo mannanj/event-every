@@ -68,20 +68,44 @@ export async function createLoginToken(
   // Two draws rather than one long one: randomToken caps at a byte per
   // character, and 24 characters of this alphabet is ~120 bits.
   const token = `${randomToken(12)}${randomToken(12)}`;
-  await db
-    .prepare(
-      `INSERT INTO login_token (token_hash, email, created_at, expires_at, mcp_state)
-       VALUES (?, ?, ?, ?, ?)`,
-    )
-    .bind(
-      await hashToken(token),
-      normaliseEmail(email),
-      iso(0),
-      iso(LOGIN_TOKEN_TTL_MINUTES * 60_000),
-      mcpState,
-    )
-    .run();
-  return token;
+  const hash = await hashToken(token);
+  const expires = iso(LOGIN_TOKEN_TTL_MINUTES * 60_000);
+
+  try {
+    await db
+      .prepare(
+        `INSERT INTO login_token (token_hash, email, created_at, expires_at, mcp_state)
+         VALUES (?, ?, ?, ?, ?)`,
+      )
+      .bind(hash, normaliseEmail(email), iso(0), expires, mcpState)
+      .run();
+    return token;
+  } catch (error) {
+    // THE COLUMN MIGHT NOT BE THERE YET, and if it is not, this is the only
+    // thing standing between a deploy and nobody being able to sign in at all.
+    //
+    // `mcp_state` arrives in migration 0002 of the accounts database. Code and
+    // schema deploy separately, so there is a window - however short, however
+    // carefully sequenced - where this Worker is new and the database is not.
+    // Without this fallback that window is a total sign-in outage for everyone,
+    // caused by a column that only matters to a feature most people never use.
+    //
+    // So: try the write that remembers, and if the database has never heard of
+    // the column, do the write that does not. The cost is that somebody who
+    // started at an assistant's "connect" button lands on the home page instead
+    // of back in the flow. That is a bad minute, not a bad day.
+    //
+    // Delete this once 0002 has been applied everywhere and stayed applied.
+    if (mcpState !== null) throw error;
+    await db
+      .prepare(
+        `INSERT INTO login_token (token_hash, email, created_at, expires_at)
+         VALUES (?, ?, ?, ?)`,
+      )
+      .bind(hash, normaliseEmail(email), iso(0), expires)
+      .run();
+    return token;
+  }
 }
 
 /**
@@ -93,15 +117,29 @@ export async function consumeLoginToken(
   token: string,
 ): Promise<SpentLoginToken | null> {
   const hash = await hashToken(token);
-  const row = await db
-    .prepare('SELECT email, expires_at, used_at, mcp_state FROM login_token WHERE token_hash = ?')
-    .bind(hash)
-    .first<{
-      email: string;
-      expires_at: string;
-      used_at: string | null;
-      mcp_state: string | null;
-    }>();
+
+  // Same reasoning as `createLoginToken`, and this half matters more: a link
+  // already in somebody's inbox has to keep working across the window where the
+  // Worker knows about `mcp_state` and the database does not. Failing here
+  // strands people who did everything right.
+  type Row = {
+    email: string;
+    expires_at: string;
+    used_at: string | null;
+    mcp_state?: string | null;
+  };
+  let row: Row | null;
+  try {
+    row = await db
+      .prepare('SELECT email, expires_at, used_at, mcp_state FROM login_token WHERE token_hash = ?')
+      .bind(hash)
+      .first<Row>();
+  } catch {
+    row = await db
+      .prepare('SELECT email, expires_at, used_at FROM login_token WHERE token_hash = ?')
+      .bind(hash)
+      .first<Row>();
+  }
   if (!row || row.used_at || row.expires_at <= iso(0)) return null;
 
   // Burn it first: a replay must lose even if what follows is slow. The
