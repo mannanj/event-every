@@ -3,7 +3,11 @@ import { defineConfig, devices } from '@playwright/test';
 const isOffline = process.env.E1_OFFLINE === '1';
 
 const isProd = !isOffline && process.env.E2E_TARGET === 'prod';
-const PROD_URL = process.env.E2E_PROD_URL || 'https://www.summonit.app';
+// eventevery.com, which is where wrangler.jsonc actually routes this Worker.
+// It pointed at www.summonit.app long after that stopped being the deployment,
+// so `E2E_TARGET=prod` was aiming at a domain nobody deploys to - on top of
+// matching no spec file at all. See e2e/prod.spec.ts.
+const PROD_URL = process.env.E2E_PROD_URL || 'https://eventevery.com';
 const localUrl = 'http://localhost:3777';
 const offlinePreload = process.env.E1_OFFLINE_PRELOAD;
 if (isOffline && !offlinePreload) throw new Error('E1_OFFLINE_PRELOAD is required for offline Playwright');
