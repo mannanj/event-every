@@ -195,6 +195,10 @@ export default function EditableField({
       );
     }
 
+    // Grace around the text: the padding grows the hit area, the negative margin
+    // gives that space back to the layout, so the target is easier to hit without
+    // anything moving. 4px is what the tightest neighbour gap (13px vertical,
+    // 20px horizontal) affords on both sides without two targets ever meeting.
     return (
       <>
         <span
@@ -210,7 +214,7 @@ export default function EditableField({
               handleClick();
             }
           }}
-          className={`${readOnly ? '' : 'cursor-pointer hover:bg-gray-200'} px-1 rounded`}
+          className={`${readOnly ? '' : 'cursor-pointer hover:bg-gray-200'} px-2 -mx-1 py-1 rounded`}
           aria-label={`${label}: ${formatDisplayValue(localValue)}. Click to edit.`}
           aria-invalid={!!error}
         >

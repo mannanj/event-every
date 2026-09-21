@@ -186,9 +186,12 @@ function EventCard({
                     onClick={(e) => e.stopPropagation()}
                   />
                 ) : (
+                  // Vertical grace only. This title's border box is a pinned
+                  // column - the undo row lines its text up against it - so
+                  // widening it sideways would pull that alignment off by 4px.
                   <h3
                     data-testid="event-card-title"
-                    className="font-bold text-base truncate cursor-pointer hover:bg-gray-200 px-1 rounded"
+                    className="font-bold text-base truncate cursor-pointer hover:bg-gray-200 px-1 py-1 -my-1 rounded"
                     onClick={(e) => {
                       e.stopPropagation();
                       setEditingField('title');

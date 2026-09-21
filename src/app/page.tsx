@@ -1116,7 +1116,7 @@ function Home({ processingDisabled }: { processingDisabled: boolean }) {
                       ) : (
                         <h3
                           data-testid="saved-event-title"
-                          className="font-bold text-base truncate cursor-pointer hover:bg-gray-100 px-1 -ml-1 rounded inline-block max-w-full align-top"
+                          className="font-bold text-base truncate cursor-pointer hover:bg-gray-100 px-2 -mx-2 py-1 -my-1 rounded inline-block max-w-full align-top"
                           onClick={() => setEditingSavedTitleId(event.id)}
                         >
                           {event.title}
