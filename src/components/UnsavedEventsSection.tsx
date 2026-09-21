@@ -3,6 +3,7 @@
 import { CalendarEvent } from '@/types/event';
 import { ImageProcessingStatus, URLProcessingStatus } from '@/types/processing';
 import { EventSelection } from '@/hooks/useEventSelection';
+import { StoredInputFile } from '@/types/input';
 import { PendingRemoval } from '@/hooks/useUndoableRemoval';
 import ProcessingShimmer from './ProcessingShimmer';
 import EventCardList from './event-card/EventCardList';
@@ -25,6 +26,7 @@ interface UnsavedEventsSectionProps {
   onTzSuggestionApply?: (eventId: string, timezone: string) => void;
   onTzSuggestionDismiss?: (eventId: string) => void;
   onTimezoneUserChange?: (eventId: string) => void;
+  attachments?: StoredInputFile[];
 }
 
 export default function UnsavedEventsSection({
@@ -45,6 +47,7 @@ export default function UnsavedEventsSection({
   onTzSuggestionApply,
   onTzSuggestionDismiss,
   onTimezoneUserChange,
+  attachments,
 }: UnsavedEventsSectionProps) {
   const activeProcessingItems = imageProcessingStatuses.filter(
     status => status.status === 'pending' || status.status === 'processing'
@@ -90,6 +93,7 @@ export default function UnsavedEventsSection({
             onTzSuggestionApply={onTzSuggestionApply}
             onTzSuggestionDismiss={onTzSuggestionDismiss}
             onTimezoneUserChange={onTimezoneUserChange}
+            attachments={attachments}
           />
         )}
       </div>

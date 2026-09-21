@@ -84,6 +84,10 @@ function Home({ processingDisabled }: { processingDisabled: boolean }) {
   const [urlProcessingStatus, setUrlProcessingStatus] = useState<URLProcessingStatus | null>(null);
   const [rateLimitInfo] = useState<{ remaining: number; total: number; resetTime: number } | undefined>();
   const [hasLoadedTempEvents, setHasLoadedTempEvents] = useState(false);
+  // Which input-history submissions produced the batch currently under review.
+  // Ids rather than files: the bytes already live in the IndexedDB input
+  // history, so this survives a reload without a second copy of every upload.
+  const [attachmentEntryIds, setAttachmentEntryIds] = useState<string[]>([]);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const { events, addEvent, deleteEvent, updateEvent, sortOption, setSortOption, setDateRange } = useHistory();
   const [totalEventsInStorage, setTotalEventsInStorage] = useState(0);
@@ -244,6 +248,13 @@ function Home({ processingDisabled }: { processingDisabled: boolean }) {
     if (result.success && result.data && result.data.length > 0) {
       unsavedEventsRef.current = result.data;
       setUnsavedEvents(result.data);
+
+      const storedAttachments = eventStorage.getTempAttachmentEntryIds();
+      if (storedAttachments.success && storedAttachments.data) {
+        setAttachmentEntryIds(storedAttachments.data);
+      }
+    } else {
+      eventStorage.clearTempAttachmentEntryIds();
     }
     setHasLoadedTempEvents(true);
 
@@ -274,10 +285,12 @@ function Home({ processingDisabled }: { processingDisabled: boolean }) {
     unsavedEventsRef.current = unsavedEvents;
     if (unsavedEvents.length > 0) {
       eventStorage.saveTempUnsavedEvents(unsavedEvents);
+      eventStorage.saveTempAttachmentEntryIds(attachmentEntryIds);
     } else {
       eventStorage.clearTempUnsavedEvents();
+      eventStorage.clearTempAttachmentEntryIds();
     }
-  }, [unsavedEvents, hasLoadedTempEvents]);
+  }, [unsavedEvents, attachmentEntryIds, hasLoadedTempEvents]);
 
   const runScan = useCallback(async (
     request: ScanRequest,
@@ -477,6 +490,16 @@ function Home({ processingDisabled }: { processingDisabled: boolean }) {
     });
   };
 
+  // The history rows hold hydrated File objects, so the panel reads its files
+  // from there rather than keeping a parallel copy in page state.
+  const attachmentFiles = useMemo(
+    () =>
+      attachmentEntryIds.flatMap(
+        (id) => inputHistory.find((entry) => entry.id === id)?.files ?? []
+      ),
+    [attachmentEntryIds, inputHistory]
+  );
+
   const inputSignature = (text: string, images: File[], calendarFiles: File[]): string =>
     `${text.trim()}|${[...images, ...calendarFiles].map(f => `${f.name}:${f.size}`).join(',')}`;
 
@@ -563,6 +586,14 @@ function Home({ processingDisabled }: { processingDisabled: boolean }) {
     // Transform always records to Recent — re-saving a loaded entry is fine.
     const entryId = await saveInputToHistory(text, images, calendarFiles);
     loadedSigRef.current = null;
+
+    // Re-running an identical input reuses its history row, so the same id can
+    // come back twice; the review panel must not then list the files twice.
+    if (entryId && (images.length > 0 || calendarFiles.length > 0)) {
+      setAttachmentEntryIds((previous) =>
+        previous.includes(entryId) ? previous : [...previous, entryId]
+      );
+    }
 
     // Exactly one handler "owns" the 2-3 word summary for this submit, so a mixed
     // input (e.g. images + a calendar file) never fires two competing summaries.
@@ -688,6 +719,7 @@ function Home({ processingDisabled }: { processingDisabled: boolean }) {
     abortRef.current?.abort();
     recoveryAbortRef.current?.abort();
     setUnsavedEvents([]);
+    setAttachmentEntryIds([]);
     setBatchProcessing(null);
     setImageProcessingStatuses([]);
     setUrlProcessingStatus(null);
@@ -958,12 +990,14 @@ function Home({ processingDisabled }: { processingDisabled: boolean }) {
           onExportComplete={(events) => {
             events.forEach(event => addEvent(event));
             setUnsavedEvents([]);
+            setAttachmentEntryIds([]);
             setTotalEventsInStorage(prev => prev + events.length);
           }}
           tzSuggestions={tzSuggestions}
           onTzSuggestionApply={handleTzSuggestionApply}
           onTzSuggestionDismiss={handleTzSuggestionDismiss}
           onTimezoneUserChange={handleTimezoneUserChange}
+          attachments={attachmentFiles}
         />
 
         {/* Marketing — recedes the moment you start */}

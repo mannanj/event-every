@@ -2,6 +2,10 @@ import { CalendarEvent } from '@/types/event';
 
 const STORAGE_KEY = 'event_every_history';
 const TEMP_UNSAVED_EVENTS_KEY = 'event_every_temp_unsaved';
+// Input-history ids, not the bytes: the files themselves already live in the
+// IndexedDB input history, so the review panel only needs to remember which
+// submissions produced the events it is still holding.
+const TEMP_ATTACHMENT_ENTRIES_KEY = 'event_every_temp_attachment_entries';
 
 export interface StorageResult<T> {
   success: boolean;
@@ -225,6 +229,48 @@ export const eventStorage = {
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Failed to clear temporary events',
+      };
+    }
+  },
+
+  saveTempAttachmentEntryIds: (ids: string[]): StorageResult<void> => {
+    try {
+      localStorage.setItem(TEMP_ATTACHMENT_ENTRIES_KEY, JSON.stringify(ids));
+      return { success: true };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to save attachment references',
+      };
+    }
+  },
+
+  getTempAttachmentEntryIds: (): StorageResult<string[]> => {
+    try {
+      const data = localStorage.getItem(TEMP_ATTACHMENT_ENTRIES_KEY);
+      if (!data) return { success: true, data: [] };
+
+      const parsed: unknown = JSON.parse(data);
+      if (!Array.isArray(parsed)) return { success: true, data: [] };
+
+      return { success: true, data: parsed.filter((id): id is string => typeof id === 'string') };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to load attachment references',
+        data: [],
+      };
+    }
+  },
+
+  clearTempAttachmentEntryIds: (): StorageResult<void> => {
+    try {
+      localStorage.removeItem(TEMP_ATTACHMENT_ENTRIES_KEY);
+      return { success: true };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to clear attachment references',
       };
     }
   },
