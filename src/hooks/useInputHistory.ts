@@ -3,7 +3,20 @@
 import { useState, useEffect, useCallback } from 'react';
 import { InputHistoryEntry } from '@/types/input';
 import { inputStorage } from '@/services/inputStorage';
+import { backupEntryFiles, restoreEntryFiles } from '@/services/attachmentBackup';
 
+/**
+ * Input history, with a second layer underneath it.
+ *
+ * INDEXEDDB IS THE STORE OF RECORD and is read first, always. The account
+ * backup is consulted in exactly two moments and no others:
+ *
+ *   on save     the originals go up, if the account asked for that
+ *   on a miss   a file is wanted and this browser does not have it
+ *
+ * A browser that already holds a file never makes a request, which is the whole
+ * point: the history stays instant, and the network is only ever the fallback.
+ */
 export function useInputHistory() {
   const [entries, setEntries] = useState<InputHistoryEntry[]>([]);
 
@@ -23,7 +36,47 @@ export function useInputHistory() {
     async (entry: InputHistoryEntry): Promise<string> => {
       const id = await inputStorage.addHistoryEntry(entry);
       await refresh();
+
+      // NOT AWAITED. Saving an input has already succeeded by the time this
+      // runs, and the person is waiting to see their events - making them wait
+      // on an upload would be charging them for a backup they may not even have
+      // turned on. The server checks the account setting and answers an empty
+      // list when it is off, so this is a no-op for most people.
+      //
+      // Errors cannot escape: backupEntryFiles catches everything and returns
+      // [], because a failed backup must never turn a successful save into an
+      // error the person sees.
+      if (entry.files.length > 0) {
+        void backupEntryFiles(id, entry.files);
+      }
+
       return id;
+    },
+    [refresh]
+  );
+
+  /**
+   * An entry with its files, fetching them only if this browser lacks them.
+   *
+   * The miss is real rather than theoretical: the history is capped at 200
+   * entries per device, so an entry can survive on a phone and be gone from a
+   * laptop, and a fresh sign-in starts with nothing at all.
+   *
+   * Restored files are written back into IndexedDB, so the second look is local
+   * again. Returns the entry unchanged when there is nothing to restore, which
+   * is also what a deployment without a bucket does.
+   */
+  const ensureFiles = useCallback(
+    async (entry: InputHistoryEntry): Promise<InputHistoryEntry> => {
+      if (entry.files.length > 0) return entry;
+
+      const files = await restoreEntryFiles(entry.id);
+      if (files.length === 0) return entry;
+
+      const hydrated = { ...entry, files };
+      await inputStorage.updateHistoryEntry(entry.id, { files });
+      await refresh();
+      return hydrated;
     },
     [refresh]
   );
@@ -36,5 +89,5 @@ export function useInputHistory() {
     [refresh]
   );
 
-  return { entries, addEntry, setSummary, refresh };
+  return { entries, addEntry, ensureFiles, setSummary, refresh };
 }

@@ -95,7 +95,12 @@ function Home({ processingDisabled }: { processingDisabled: boolean }) {
   const { addToQueue, updateProgress } = useProcessingQueue();
   const smartInputRef = useRef<SmartInputHandle>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
-  const { entries: inputHistory, addEntry: addInputHistory, refresh: refreshInputHistory } = useInputHistory();
+  const {
+    entries: inputHistory,
+    addEntry: addInputHistory,
+    ensureFiles: ensureInputFiles,
+    refresh: refreshInputHistory,
+  } = useInputHistory();
   const [pendingSummaryIds, setPendingSummaryIds] = useState<Set<string>>(new Set());
   const [providerOperationsReady, setProviderOperationsReady] = useState(false);
   const [restoringProviderOperations, setRestoringProviderOperations] = useState<ProviderOperationRecord[]>([]);
@@ -528,7 +533,13 @@ function Home({ processingDisabled }: { processingDisabled: boolean }) {
     });
   };
 
-  const handleApplyInput = async (entry: InputHistoryEntry) => {
+  const handleApplyInput = async (historyEntry: InputHistoryEntry) => {
+    // Loading an entry is the moment its files are actually wanted, so it is
+    // the only honest place to reach for the account backup. This browser's
+    // own copy is preferred and no request is made when it has one; the miss
+    // is a real case, because the history is capped per device and a fresh
+    // sign-in starts empty.
+    const entry = await ensureInputFiles(historyEntry);
     const current = smartInputRef.current?.getDraft();
     if (
       current &&

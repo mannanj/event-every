@@ -29,8 +29,8 @@ Off by default. Uploading somebody's photographs because they signed in is not a
 - [x] `src/services/attachmentBackup.ts`, every failure answering null or empty rather than throwing
 - [x] `useAttachmentBackup`, optimistic and corrected by the server
 - [x] The two account-menu items, with a second click before deleting
-- [ ] Upload on save: call it when an input-history entry is written
-- [ ] Restore on miss: call it when a file is wanted and IndexedDB does not have it
+- [x] Upload on save: called from `useInputHistory.addEntry`, not awaited
+- [x] Restore on miss: `ensureFiles`, called when an entry is loaded from history
 - [ ] The R2 bucket itself, and the migration applied
 
 #### Decisions, stated
