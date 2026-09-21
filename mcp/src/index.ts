@@ -35,7 +35,11 @@ const apiHandler = {
   },
 };
 
-export default new OAuthProvider({
+/**
+ * Named rather than exported anonymously, so a stack trace and the lint rule
+ * both have something to point at.
+ */
+const provider = new OAuthProvider({
   apiRoute: '/mcp',
   apiHandler,
   defaultHandler: authHandler,
@@ -44,3 +48,5 @@ export default new OAuthProvider({
   clientRegistrationEndpoint: '/register',
   scopesSupported: ['account'],
 });
+
+export default provider;

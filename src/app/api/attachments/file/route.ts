@@ -4,6 +4,26 @@ import { attachmentJson, requireAttachmentSession } from '@/server/accounts/atta
 export const dynamic = 'force-dynamic';
 
 /**
+ * The only media types this endpoint will name.
+ *
+ * An allowlist rather than a denylist: the set of types a browser will execute
+ * grows, and a list of the ones it will not is a list that goes out of date
+ * silently. These are the types the app itself produces - the image kinds the
+ * scanner accepts, plus the calendar and text originals.
+ */
+const SERVABLE = new Set([
+  'image/png',
+  'image/jpeg',
+  'image/webp',
+  'text/calendar',
+  'text/plain',
+]);
+
+function servableType(stored: string): string {
+  return SERVABLE.has(stored) ? stored : 'application/octet-stream';
+}
+
+/**
  * One backed-up file's bytes.
  *
  * THE SECOND LAYER. Nothing calls this when IndexedDB already holds the file.
@@ -31,8 +51,21 @@ export async function GET(request: Request) {
 
     return new Response(file.bytes as unknown as BodyInit, {
       headers: {
-        'Content-Type': file.mimeType,
+        // The stored type, but only from a list this app is willing to serve.
+        // The upload route takes the media type from the client, so echoing it
+        // back means an uploader chooses what the browser executes on this
+        // origin - and text/html here is a stored cross-site scripting hole
+        // against eventevery.com itself, session cookie and all. Anything
+        // unrecognised is served as bytes to download rather than content to
+        // render.
+        'Content-Type': servableType(file.mimeType),
         'Content-Length': String(file.bytes.byteLength),
+        // Belt as well as braces: never let a sniffer overrule the line above.
+        'X-Content-Type-Options': 'nosniff',
+        // An attachment even when the type is renderable, so nothing from this
+        // endpoint is ever treated as a document in this origin. The restore
+        // path reads the bytes; it does not navigate to them.
+        'Content-Disposition': 'attachment',
         // Private, not public: this is one person's file and a shared cache
         // must never hold it.
         'Cache-Control': 'private, no-store',

@@ -23,9 +23,7 @@ export const ROUTE_MANIFEST: Readonly<Record<string, RoutePolicy>> = {
   // they arrive with no Origin header and no cookie.
   //
   // Split by verb in the PATH rather than by method, because a policy admits
-  // GET or POST and nothing else. `scan` is the only one that can spend money;
-  // its ceiling is the text limit its own schema enforces, not the 12MiB of
-  // /api/scan, because an assistant cannot hand over an image.
+  // GET or POST and nothing else.
   '/api/mcp/authorize': policy('GET', 0),
   '/api/mcp/events': policy('GET', 0),
   '/api/mcp/events/save': policy('POST', 64 * 1024),
