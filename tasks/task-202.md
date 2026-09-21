@@ -41,6 +41,6 @@ The session cookie is deliberately host-only — no `Domain` attribute — so th
 
 - [ ] A scripted end-to-end run of the whole flow with no human clicking anything, reading the magic link out of the Worker log the way `mcp/scripts/verify-oauth.mjs` does in the skeleton.
 - [ ] Refusal tests: a grant replayed after expiry, a grant bound to another state, an actor token from an unknown signer, a tool call with no token.
-- [ ] A test proving one account's MCP token cannot read another account's events. (Attachments have this; events do not yet.)
+- [x] A test proving one account's MCP token cannot read another account's events. Four ways: a list read, a known id, a removal by id, and the ciphertext copied across so the envelope is what refuses rather than the WHERE clause.
 
 - Location: new `mcp/` Worker, `src/app/api/mcp/`, `src/server/accounts/auth.ts`, `migrations/accounts/`
