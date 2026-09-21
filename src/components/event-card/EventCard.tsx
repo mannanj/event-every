@@ -166,7 +166,7 @@ function EventCard({
     >
       {/* Card header - always visible */}
       <div
-        className={`p-3 transition-colors duration-200 ${!isNew ? 'hover:bg-gray-100' : ''} cursor-pointer`}
+        className={`px-3 pt-3 ${isExpanded ? 'pb-1' : 'pb-3'} transition-colors duration-200 ${!isNew ? 'hover:bg-gray-100' : ''} cursor-pointer`}
         onClick={toggleExpand}
       >
         <div className="flex justify-between items-start gap-3">
@@ -429,9 +429,11 @@ function EventCard({
         </div>
       </div>
 
-      {/* Expanded details with inline editing */}
+      {/* Expanded details with inline editing. No rule under the header: the
+          change of surface already separates the body, and the hard line read
+          as a seam between two cards. */}
       {isExpanded && (
-        <div className="border-t-2 border-black p-4 bg-gray-50">
+        <div className={`pt-2 pb-4 pr-4 bg-gray-50 ${selectable ? 'pl-12' : 'pl-4'}`}>
           <EventFields
             mode="inline"
             event={event}

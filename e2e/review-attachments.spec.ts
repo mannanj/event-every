@@ -294,4 +294,65 @@ test.describe('Review panel attachments', () => {
       .evaluate((node) => node.parentElement === document.body);
     expect(parentIsBody).toBe(true);
   });
+
+  test('the header sits the same distance from the fields as the files do', async ({ page }) => {
+    await mockScanAPI(page, await oneCandidate());
+    await setupLocal(page);
+    await scanAnImage(page, 'meeting-invite.png');
+    await waitForCards(page, 1);
+
+    const card = page.getByTestId('event-card').first();
+    await expect(card.getByTestId('unsaved-attachments')).toBeVisible();
+
+    const measured = await card.evaluate((root) => {
+      const ink = (el: Element) => {
+        const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+        let top = Infinity;
+        let bottom = -Infinity;
+        let n: Node | null;
+        while ((n = walker.nextNode())) {
+          if (!n.textContent?.trim()) continue;
+          const r = document.createRange();
+          r.selectNodeContents(n);
+          const b = r.getBoundingClientRect();
+          if (b.height === 0) continue;
+          top = Math.min(top, b.top);
+          bottom = Math.max(bottom, b.bottom);
+        }
+        return { top, bottom };
+      };
+
+      const title = root.querySelector('[data-testid="event-card-title"]')!;
+      const files = root.querySelector('[data-testid="unsaved-attachments"]')!;
+      const wrap = files.parentElement!;
+      const rows = (Array.from(wrap.children) as HTMLElement[]).filter(
+        (r) => r !== files && isFinite(ink(r).top),
+      );
+      const lastRow = rows[rows.length - 1];
+
+      return {
+        headerGap: ink(rows[0]).top - ink(title).bottom,
+        filesGap: files.getBoundingClientRect().top - ink(lastRow).bottom,
+        titleLeft: title.getBoundingClientRect().left + parseFloat(getComputedStyle(title).paddingLeft),
+        rowLeft: rows[0].getBoundingClientRect().left,
+      };
+    });
+
+    // The header is spaced off the fields exactly as the files are: one step
+    // bigger than the row rhythm, so both read as the same kind of break.
+    expect(Math.abs(measured.headerGap - measured.filesGap)).toBeLessThanOrEqual(1);
+    // And the body lines up under the title, which the checkbox offsets.
+    expect(Math.abs(measured.titleLeft - measured.rowLeft)).toBeLessThanOrEqual(1);
+  });
+
+  test('no rule under the header once the card is open', async ({ page }) => {
+    await mockScanAPI(page, await oneCandidate());
+    await setupLocal(page);
+    await scanAnImage(page, 'meeting-invite.png');
+    await waitForCards(page, 1);
+
+    const body = page.getByTestId('event-card').first().locator('div.bg-gray-50');
+    await expect(body).toBeVisible();
+    expect(await body.evaluate((n) => getComputedStyle(n).borderTopWidth)).toBe('0px');
+  });
 });
