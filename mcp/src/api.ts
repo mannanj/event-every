@@ -25,7 +25,7 @@ export interface Caller {
 
 export type EventSource = 'image' | 'text' | 'url';
 
-export interface McpEventView {
+export type McpEventView = {
   id: string;
   title: string;
   start: string;
@@ -39,7 +39,7 @@ export interface McpEventView {
   updatedAt: string;
 }
 
-export interface EventPage {
+export type EventPage = {
   events: McpEventView[];
   searched: string[];
   scanned: number;
@@ -122,7 +122,7 @@ export interface NewEvent {
   url?: string;
 }
 
-export interface SaveResult {
+export type SaveResult = {
   events: McpEventView[];
   /** Whether the original wording was kept. The app decides, not the caller. */
   backedUp: boolean;
@@ -167,7 +167,7 @@ export async function removeEvent(
   );
 }
 
-export interface ScanResult {
+export type ScanResult = {
   events: McpEventView[];
   found: number;
   backedUp: boolean;

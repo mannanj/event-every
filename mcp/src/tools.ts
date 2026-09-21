@@ -1,4 +1,4 @@
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { McpServer } from '@modelcontextprotocol/server';
 import { getMcpAuthContext } from 'agents/mcp';
 import { z } from 'zod';
 

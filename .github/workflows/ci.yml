@@ -25,6 +25,14 @@ jobs:
       # suite passes ~35 test files, because the concurrent GC races with per-file global
       # teardown inside one VM. That is an upstream bun bug, not a test-order problem.
       - run: bun run test
+      # The MCP Worker is its own package with its own dependencies, and the
+      # root tsconfig excludes it. Without these two lines nothing anywhere
+      # compiles it: it shipped once already having never been through tsc, and
+      # an audit found three real errors the moment it finally was.
+      - run: bun install --frozen-lockfile
+        working-directory: mcp
+      - run: bun run type-check
+        working-directory: mcp
       # Deliberately excluded from CI:
       # - Playwright e2e (test:e2e): needs a running dev server + a browser download,
       #   so it stays a local / pre-release step rather than a per-push gate.
