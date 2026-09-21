@@ -42,7 +42,7 @@ async function openCard(page: Page) {
   await setupLocal(page);
   await submitText(page, 'Civic Signal Sept 22 7pm');
   await waitForCards(page, 1);
-  await page.getByRole('button', { name: 'Expand' }).first().click();
+  // Review cards arrive open.
   await expect(page.getByText('All-day event')).toBeVisible();
 }
 

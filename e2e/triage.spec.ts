@@ -82,7 +82,7 @@ test('a split verdict scans each chunk and shows every card', async ({ page }) =
   await submitText(page, 'Dentist Tue Apr 7 2pm\n\nDinner with Sam Fri Apr 10 7pm');
   await waitForCards(page, 2);
   expect(seen.sort()).toEqual(['Dentist Tue Apr 7 2pm', 'Dinner with Sam Fri Apr 10 7pm']);
-  await expect(page.getByTestId('event-card-title')).toContainText(['Dentist', 'Dinner with Sam']);
+  await expect(page.getByTestId('event-card').getByTestId('event-card-title')).toContainText(['Dentist', 'Dinner with Sam']);
 });
 
 test('an unavailable triage runs exactly one scan as before', async ({ page }) => {

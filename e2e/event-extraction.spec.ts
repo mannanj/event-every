@@ -1,15 +1,7 @@
 import { expect, test } from '@playwright/test';
 import type { ScanResponse } from '../src/types/scannerHttp';
 import { ScanRequestSchema } from '../src/types/scanRequest';
-import {
-  eventCards,
-  mockRawScanAPI,
-  mockScanAPI,
-  scanButton,
-  setupLocal,
-  submitText,
-  waitForCards,
-} from './helpers';
+import { collapseCards, eventCards, mockRawScanAPI, mockScanAPI, scanButton, setupLocal, submitText, waitForCards } from './helpers';
 
 type ScannerModule = typeof import('@event-every/scanner');
 
@@ -132,6 +124,8 @@ test.describe('Event Extraction Scenarios', () => {
     await submitText(page, MULTIPLE_CANDIDATES_EXCERPT);
 
     await waitForCards(page, 3);
+    // The one-line "when" summary belongs to the shut card.
+    await collapseCards(page);
     const cards = eventCards(page);
     const expectedCandidates = [
       { title: 'Standup', location: 'Daily room', when: 'Mar 9 at 9:00 AM' },
@@ -247,7 +241,7 @@ test.describe('UI Interaction Tests', () => {
     await textarea.press('Meta+Enter');
 
     await waitForCards(page, 1);
-    await expect(page.getByTestId('event-card-title')).toHaveText('Quick Event');
+    await expect(page.getByTestId('event-card').getByTestId('event-card-title')).toHaveText('Quick Event');
     expect(await page.evaluate(() => localStorage.getItem('event-every:last-scan-source'))).toBeNull();
   });
 });

@@ -201,7 +201,7 @@ export default function EventFields({
   })();
 
   return (
-    <div className="space-y-2 text-sm">
+    <div className="space-y-1.5 text-sm leading-5">
       {!hideTitle && (
         <div>
           <EditableField
@@ -216,7 +216,7 @@ export default function EventFields({
         </div>
       )}
 
-      <div className="text-gray-700 leading-relaxed relative">
+      <div className="text-gray-700 relative">
         <span className="font-semibold">Start:</span>{' '}
         <span onFocusCapture={() => setEditingField('startDate')}>
           <EditableField
@@ -306,7 +306,7 @@ export default function EventFields({
         )}
       </div>
 
-      <div className="text-gray-700 leading-relaxed">
+      <div className="text-gray-700">
         <span className="font-semibold">End:</span>{' '}
         <span onFocusCapture={() => setEditingField('endDate')}>
           <EditableField
@@ -357,7 +357,7 @@ export default function EventFields({
       </div>
 
       {(event.location || editingField === 'location') && (
-        <div className="text-gray-700 leading-relaxed">
+        <div className="text-gray-700">
           <span className="font-semibold">Location:</span>{' '}
           <span onFocusCapture={() => setEditingField('location')}>
             <EditableField
@@ -391,7 +391,7 @@ export default function EventFields({
       )}
 
       {event.url && (
-        <div className="text-gray-700 leading-relaxed">
+        <div className="text-gray-700">
           <span className="font-semibold">URL:</span>{' '}
           <URLPill url={event.url} large />
         </div>
@@ -401,10 +401,11 @@ export default function EventFields({
         <AttachmentList attachments={event.attachments} />
       )}
 
-      {/* The source files sit twice the field gap below the last field: far
-          enough to read as a separate group rather than one more field, and
-          left-aligned with the field labels above them. `!mt-*` because the
-          parent's space-y rule would otherwise win on specificity. */}
+      {/* Twice the gap the rows sit at - measured between glyphs, not margins,
+          since that is what the eye spaces by: ~10px between rows, ~20px here.
+          Far enough to read as a separate group rather than one more field, and
+          left-aligned with the field labels above. `!mt-*` because the parent's
+          space-y rule would otherwise win on specificity. */}
       {inputFiles && inputFiles.length > 0 && (
         <InputAttachments files={inputFiles} size="sm" className="!mt-4" />
       )}

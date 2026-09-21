@@ -99,7 +99,7 @@ test.describe('URL paste → scrape → parse', () => {
 
     await submitText(page, SOURCE_TEXT);
 
-    await expect(page.getByTestId('event-card-title')).toHaveText('Launch Party scanner candidate');
+    await expect(page.getByTestId('event-card').getByTestId('event-card-title')).toHaveText('Launch Party scanner candidate');
     expect(requests).toHaveLength(1);
   });
 });

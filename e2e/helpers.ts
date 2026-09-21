@@ -189,10 +189,20 @@ export function scanButton(page: Page): Locator {
 export function eventCards(page: Page): Locator {
   return page.getByTestId('event-card');
 }
+// Review cards arrive open. The one-line "Mar 9 at 9:00 AM" summary and its
+// inline editors belong to the shut state, so tests about them shut the card first.
+export async function collapseCards(page: Page): Promise<void> {
+  const collapse = page.getByRole('button', { name: 'Collapse' });
+  for (let i = await collapse.count(); i > 0; i = await collapse.count()) {
+    await collapse.first().click();
+  }
+}
+
 export async function waitForCards(page: Page, count: number, timeout = 20000): Promise<void> {
   await expect(eventCards(page)).toHaveCount(count, { timeout });
 }
 export function cardTitled(page: Page, title: string): Locator {
+  // Already scoped by eventCards(); the inner lookup must stay card-relative.
   return eventCards(page).filter({ has: page.getByTestId('event-card-title').filter({ hasText: title }) });
 }
 

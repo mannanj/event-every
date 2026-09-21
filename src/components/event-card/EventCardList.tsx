@@ -99,6 +99,7 @@ export default function EventCardList({
               onRemove={onRemove}
               tzSuggestion={tzSuggestions?.[event.id]}
               inputFiles={attachments}
+              defaultExpanded
               onTzSuggestionApply={onTzSuggestionApply}
               onTzSuggestionDismiss={onTzSuggestionDismiss}
               onTimezoneUserChange={onTimezoneUserChange}

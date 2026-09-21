@@ -145,10 +145,10 @@ test.describe('CalendarEvent regressions', () => {
     })]);
 
     const card = page.getByTestId('event-card').filter({ hasText: 'Team Sync' });
-    await expect(card.getByTestId('tz-chip')).toHaveText('UTC');
+    await expect(card.getByTestId('tz-chip').first()).toHaveText('UTC');
   });
 
-  test('legacy CalendarEvent reveals description only after expansion', async ({ page }) => {
+  test('legacy CalendarEvent shows its description until the card is collapsed', async ({ page }) => {
     await openSeededPage(page, [event({
       id: 'ce03-description',
       title: 'Test Event',
@@ -160,9 +160,9 @@ test.describe('CalendarEvent regressions', () => {
 
     const card = page.getByTestId('event-card').filter({ hasText: 'Test Event' });
     const description = page.getByText('A test event with details', { exact: true });
-    await expect(description).toBeHidden();
-    await card.getByRole('button', { name: 'Expand' }).click();
     await expect(description).toBeVisible();
+    await card.getByRole('button', { name: 'Collapse' }).click();
+    await expect(description).toBeHidden();
   });
 
   test('legacy CalendarEvent single export writes one timed UTC VEVENT', async ({ page }) => {
@@ -173,7 +173,7 @@ test.describe('CalendarEvent regressions', () => {
       start: '20260313T190000Z',
       end: '20260313T200000Z',
     }]), 'single-event.ics');
-    await expect(page.getByTestId('event-card-title')).toHaveCount(1);
+    await expect(page.getByTestId('event-card').getByTestId('event-card-title')).toHaveCount(1);
 
     const download = await downloadSelectedEvents(page);
     const calendarText = await fs.readFile((await download.path())!, 'utf8');
@@ -190,7 +190,7 @@ test.describe('CalendarEvent regressions', () => {
       { uid: 'ce05-design@example.test', title: 'Design Review', start: '20260310T140000Z', end: '20260310T150000Z' },
       { uid: 'ce05-retro@example.test', title: 'Retro', start: '20260311T110000Z', end: '20260311T120000Z' },
     ]), 'three-events.ics');
-    await expect(page.getByTestId('event-card-title')).toHaveCount(3);
+    await expect(page.getByTestId('event-card').getByTestId('event-card-title')).toHaveCount(3);
 
     const download = await downloadSelectedEvents(page);
     const calendarText = await fs.readFile((await download.path())!, 'utf8');
@@ -206,7 +206,7 @@ test.describe('CalendarEvent regressions', () => {
       { uid: 'ce06-design@example.test', title: 'Design Review', start: '20260310T140000Z', end: '20260310T150000Z' },
       { uid: 'ce06-retro@example.test', title: 'Retro', start: '20260311T110000Z', end: '20260311T120000Z' },
     ]), 'selected-subset.ics');
-    await expect(page.getByTestId('event-card-title')).toHaveCount(3);
+    await expect(page.getByTestId('event-card').getByTestId('event-card-title')).toHaveCount(3);
     await page.locator('input[aria-label="Select Design Review"]').uncheck();
 
     const download = await downloadSelectedEvents(page);
@@ -229,6 +229,9 @@ test.describe('CalendarEvent regressions', () => {
     })]);
     const card = page.getByTestId('event-card').filter({ hasText: 'Planning' });
 
+    // The summary line carries its own inline editors and shows only while the
+    // card is shut, so collapse before reaching for them.
+    await card.getByRole('button', { name: 'Collapse' }).click();
     // Under a fully parallel run the card can still be settling; clicking before
     // it is visible left the time editor closed and the fill waiting (flake).
     await expect(card.getByText('12:00 PM')).toBeVisible();
@@ -254,6 +257,9 @@ test.describe('CalendarEvent regressions', () => {
     })]);
     const card = page.getByTestId('event-card').filter({ hasText: 'Planning' });
 
+    // The summary line carries its own inline editors and shows only while the
+    // card is shut, so collapse before reaching for them.
+    await card.getByRole('button', { name: 'Collapse' }).click();
     // Under a fully parallel run the card can still be settling; clicking before
     // it is visible left the time editor closed and the fill waiting (flake).
     await expect(card.getByText('12:00 PM')).toBeVisible();
@@ -261,6 +267,7 @@ test.describe('CalendarEvent regressions', () => {
     await card.getByTestId('event-card-time-input').fill('17:00');
     await card.getByTestId('event-card-time-input').press('Enter');
     await expect(card).toContainText('5:00 PM');
+    // The end lives in the body, so open the card back up to read it.
     await card.getByRole('button', { name: 'Expand' }).click();
     await expect(card).toContainText('6:00 PM');
     await expect(card).not.toContainText('1:00 PM');

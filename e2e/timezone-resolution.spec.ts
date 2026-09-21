@@ -1,7 +1,7 @@
 import { expect, test, type Locator, type Page, type Route } from '@playwright/test';
 import { ScanRequestSchema } from '../src/types/scanRequest';
 import type { ScanResponse } from '../src/types/scannerHttp';
-import { downloadedCalendar, readTempUnsaved, setupLocal, submitText, waitForCards } from './helpers';
+import { collapseCards, downloadedCalendar, readTempUnsaved, setupLocal, submitText, waitForCards } from './helpers';
 
 type ScannerModule = typeof import('@event-every/scanner');
 
@@ -112,6 +112,7 @@ async function mockTimezoneScan(page: Page, response: ScanResponse) {
 }
 
 function cardBy(page: Page, title: string): Locator {
+  // Inside a filter({ has }), the inner lookup is already card-relative.
   return page.getByTestId('event-card').filter({ has: page.getByTestId('event-card-title').filter({ hasText: title }) });
 }
 
@@ -145,6 +146,7 @@ test.describe('Scanner temporal authority (viewer in America/Los_Angeles)', () =
     const card = cardBy(page, 'Zoned provider interview');
     // 10:30 in New York is 07:30 for the Los Angeles reader. The chip names the
     // zone the time is shown in; the picker behind it still holds the source zone.
+    await collapseCards(page);
     await expect(card).toContainText('Jun 15 at 7:30 AM');
     await expect(card.getByTestId('tz-chip')).toHaveText('PT');
     await expect(card.locator('select[aria-label="Timezone"]')).toHaveValue('America/New_York');
@@ -173,6 +175,7 @@ test.describe('Scanner temporal authority (viewer in America/Los_Angeles)', () =
     const floatingCard = cardBy(page, 'Floating provider interview');
     const zonedControlCard = cardBy(page, 'Zoned provider control');
     // No zone on the source: 10:30 is the reader's own 10:30, Pacific.
+    await collapseCards(page);
     await expect(floatingCard).toContainText('Jun 15 at 10:30 AM');
     await expect(floatingCard.locator('select[aria-label="Timezone"]')).toHaveValue('America/Los_Angeles');
     await expect(zonedControlCard).toContainText('Jun 15 at 7:30 AM');

@@ -1,25 +1,7 @@
 import { expect, test, type Route } from '@playwright/test';
 import { ScanRequestSchema } from '../src/types/scanRequest';
 import type { ScanResponse } from '../src/types/scannerHttp';
-import {
-  cardTitled,
-  downloadedCalendar,
-  eventCards,
-  mockAuth,
-  mockRawScanAPI,
-  mockScanAPI,
-  mockSummarize,
-  mockURLDetection,
-  readTempUnsaved,
-  scanButton,
-  setCardDate,
-  setCardTime,
-  setupLocal,
-  submitText,
-  TINY_PNG_BASE64,
-  waitForCards,
-  mockTriage,
-} from './helpers';
+import { TINY_PNG_BASE64, cardTitled, collapseCards, downloadedCalendar, eventCards, mockAuth, mockRawScanAPI, mockScanAPI, mockSummarize, mockTriage, mockURLDetection, readTempUnsaved, scanButton, setCardDate, setCardTime, setupLocal, submitText, waitForCards } from './helpers';
 
 /**
  * Scan results are the ordinary event cards (task 206). Floating times are read
@@ -362,6 +344,7 @@ test('editing the start time on a card is what gets exported', async ({ page }) 
 
   await waitForCards(page, 1);
   const card = cardTitled(page, 'Buffered start-time review');
+  await collapseCards(page);
   await expect(card).toContainText('Mar 13 at 7:00 PM');
   await expect.poll(async () => (await readTempUnsaved(page))[0]?.startDate).toBe('2026-03-13T19:00:00.000Z');
 
@@ -398,7 +381,7 @@ test('image scan sends a strict data URL, shows the vision candidate, exports it
   expect(scanRequest.postDataJSON()).toEqual({ kind: 'image', dataUrl });
 
   await waitForCards(page, 1);
-  await expect(page.getByTestId('event-card-title')).toHaveText('Vision flyer lunch');
+  await expect(page.getByTestId('event-card').getByTestId('event-card-title')).toHaveText('Vision flyer lunch');
   await expect(page.getByTestId('save-events-button')).toBeEnabled();
 
   // Privacy: what persists is the card, never the image or a scan request.
@@ -467,7 +450,7 @@ test('two named images scan strictly in order and produce both cards in that ord
   expect(secondStartedBeforeFirstResponseReleased).toBe(false);
 
   await waitForCards(page, 2);
-  await expect(page.getByTestId('event-card-title')).toHaveText(['First sequential flyer', 'Second sequential flyer']);
+  await expect(page.getByTestId('event-card').getByTestId('event-card-title')).toHaveText(['First sequential flyer', 'Second sequential flyer']);
   await expect.poll(async () => (await readTempUnsaved(page)).map((event) => event.title)).toEqual([
     'First sequential flyer',
     'Second sequential flyer',
@@ -607,7 +590,7 @@ test('a card with no source start survives a reload, and an unselected card does
   await submitText(page, 'Export the first strict Scanner draft and retain the second draft.');
 
   await waitForCards(page, 2);
-  await expect(page.getByTestId('event-card-title')).toHaveText(['Exported partial candidate', 'Retained partial candidate']);
+  await expect(page.getByTestId('event-card').getByTestId('event-card-title')).toHaveText(['Exported partial candidate', 'Retained partial candidate']);
   await expect(cardTitled(page, 'Exported partial candidate')).toContainText('Export pier');
   await expect(cardTitled(page, 'Retained partial candidate')).toContainText('Keep room');
 
@@ -615,7 +598,7 @@ test('a card with no source start survives a reload, and an unselected card does
   await page.reload();
   await page.waitForLoadState('networkidle');
   await waitForCards(page, 2);
-  await expect(page.getByTestId('event-card-title')).toHaveText(['Exported partial candidate', 'Retained partial candidate']);
+  await expect(page.getByTestId('event-card').getByTestId('event-card-title')).toHaveText(['Exported partial candidate', 'Retained partial candidate']);
   await expect(cardTitled(page, 'Retained partial candidate')).toContainText('Keep room');
 
   const retainedSelection = page.getByRole('checkbox', { name: 'Select Retained partial candidate' });
@@ -642,7 +625,7 @@ test('a candidate with no title is shown and exported as Untitled Event', async 
   await submitText(page, 'Planning lunch at noon');
 
   await waitForCards(page, 1);
-  await expect(page.getByTestId('event-card-title')).toHaveText('Untitled Event');
+  await expect(page.getByTestId('event-card').getByTestId('event-card-title')).toHaveText('Untitled Event');
   await expect(page.getByTestId('save-events-button')).toBeEnabled();
 
   const calendarText = await downloadedCalendar(page);
@@ -657,6 +640,7 @@ test('a candidate with no start can be given one on the card and exports it', as
   await submitText(page, 'Planning meeting with no start time');
 
   await waitForCards(page, 1);
+  await collapseCards(page);
   const card = cardTitled(page, 'Planning meeting');
   await expect(card).toContainText('Room 4');
   // No source start: the card is placed at the moment it was created so it can be edited.
@@ -671,6 +655,7 @@ test('a candidate with no start can be given one on the card and exports it', as
   const timeInput = card.getByTestId('event-card-time-input');
   await timeInput.fill('09:15');
   await timeInput.press('Enter');
+  await collapseCards(page);
   await expect(card).toContainText('Aug 6 at 9:15 AM');
   await expect.poll(async () => (await readTempUnsaved(page))[0]?.startDate).toBe('2026-08-06T09:15:00.000Z');
 
@@ -689,6 +674,7 @@ test('narrow viewport keeps every card control keyboard reachable with stable ac
   await submitText(page, 'Show every card control at a narrow viewport.');
 
   await waitForCards(page, 1);
+  await collapseCards(page);
   const card = cardTitled(page, 'Narrow accessibility candidate');
   const selection = card.getByRole('checkbox', { name: 'Select Narrow accessibility candidate' });
   const timezone = card.getByRole('combobox', { name: 'Timezone' });
@@ -734,7 +720,7 @@ test('reload restores the unsaved cards without storing the raw submission', asy
   await submitText(page, rawSubmission);
 
   await waitForCards(page, 1);
-  await expect(page.getByTestId('event-card-title')).toHaveText('Planning meeting');
+  await expect(page.getByTestId('event-card').getByTestId('event-card-title')).toHaveText('Planning meeting');
 
   const readStored = () => page.evaluate(() => localStorage.getItem('event_every_temp_unsaved'));
   await expect.poll(readStored).not.toBeNull();
@@ -746,7 +732,7 @@ test('reload restores the unsaved cards without storing the raw submission', asy
   await page.waitForLoadState('networkidle');
 
   await waitForCards(page, 1);
-  await expect(page.getByTestId('event-card-title')).toHaveText('Planning meeting');
+  await expect(page.getByTestId('event-card').getByTestId('event-card-title')).toHaveText('Planning meeting');
   expect(await readStored()).toBe(storedBeforeReload);
   expect(await page.evaluate(() => localStorage.getItem('event_every_history'))).toBe(legacyStorage);
 });
@@ -763,6 +749,7 @@ test('edited title, time and location are what get exported, not the scanned val
   // becomes an input while it is.
   const card = eventCards(page).first();
   await expect(card.getByTestId('event-card-title')).toHaveText('Team lunch');
+  await collapseCards(page);
   await expect(card).toContainText('Aug 4 at 12:00 PM');
   await expect(card).toContainText('Cafe Example');
 
@@ -840,14 +827,14 @@ test('canceling a delayed first scan leaves the succeeding second scan as the on
   await submitText(page, 'This second result must survive.');
   await secondRequest;
   await waitForCards(page, 1);
-  await expect(page.getByTestId('event-card-title')).toHaveText('Successful second scan');
+  await expect(page.getByTestId('event-card').getByTestId('event-card-title')).toHaveText('Successful second scan');
   releaseFirstResponse();
   await firstResponseSettled;
   await page.waitForLoadState('networkidle');
 
   // The stale-result guard: the canceled request may not append a card after
   // the successful replacement submission.
-  await expect(page.getByTestId('event-card-title')).toHaveCount(1);
+  await expect(page.getByTestId('event-card').getByTestId('event-card-title')).toHaveCount(1);
   await expect.poll(async () => (await readTempUnsaved(page)).map((event) => event.title)).toEqual(['Successful second scan']);
 });
 
@@ -901,10 +888,16 @@ async function proveAllDayCardEdit(page: import('@playwright/test').Page) {
   await submitText(page, ALL_DAY_TEXT);
 
   await waitForCards(page, 1);
+  // This case drives the summary line's own date editor, which is the shut state.
+  await collapseCards(page);
   const card = cardTitled(page, 'Company offsite');
   await expect(card).toContainText('Napa Valley');
   await expect(card).toContainText('Mar 20');
-  await expect(card).not.toContainText(' at ');
+  // An all-day event states no time. Asserted on the settled string rather
+  // than through toContainText, whose whitespace normalisation reads across the
+  // row boundaries this card renders without spaces.
+  await expect(card).toContainText('Napa Valley');
+  expect(((await card.textContent()) ?? '').replace(/\s+/g, ' ')).not.toContain(' at ');
   await expect(card.getByTestId('tz-chip')).toHaveCount(0);
   expect(requestCount).toBe(1);
   await expect.poll(async () => {

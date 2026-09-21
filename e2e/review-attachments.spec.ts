@@ -58,10 +58,6 @@ async function setupSurvivingReload(page: import('@playwright/test').Page) {
   await waitForSmartInputReady(page);
 }
 
-async function expandFirstCard(page: import('@playwright/test').Page) {
-  await page.getByRole('button', { name: 'Expand' }).first().click();
-}
-
 async function scanAnImage(page: import('@playwright/test').Page, name: string) {
   await page.locator('input[type="file"]').setInputFiles({
     name,
@@ -80,9 +76,8 @@ test.describe('Review panel attachments', () => {
 
     await waitForCards(page, 1);
 
-    // The row lives in the expanded card body, under the fields.
-    await expect(page.getByTestId('unsaved-attachments')).toHaveCount(0);
-    await expandFirstCard(page);
+    // The row lives in the card body, under the fields, and review cards open
+    // by default so it is there straight away.
 
     const attachments = page.getByTestId('unsaved-attachments');
     await expect(attachments).toBeVisible();
@@ -95,8 +90,7 @@ test.describe('Review panel attachments', () => {
     await page.reload();
     await page.waitForLoadState('networkidle');
     await waitForCards(page, 1);
-    await expandFirstCard(page);
-    await expect(page.getByTestId('unsaved-attachments').locator('img[alt="Attachment 1"]')).toBeVisible();
+    await expect(page.getByTestId('unsaved-attachments').first().locator('img[alt="Attachment 1"]')).toBeVisible();
   });
 
   test('sits twice the field gap below the last field, left-aligned with the labels', async ({ page }) => {
@@ -104,23 +98,54 @@ test.describe('Review panel attachments', () => {
     await setupLocal(page);
     await scanAnImage(page, 'meeting-invite.png');
     await waitForCards(page, 1);
-    await expandFirstCard(page);
 
     const attachments = page.getByTestId('unsaved-attachments');
     await expect(attachments).toBeVisible();
 
-    // Every field row is a sibling under the same space-y rule, so the gap the
-    // user sees is that rule's margin-top. The attachments row must carry twice it.
+    // Measured between glyphs, not margins: the rows carry their own leading,
+    // so equal margins would not read as equal space.
     const gaps = await attachments.evaluate((node) => {
       const row = node as HTMLElement;
-      const siblings = Array.from(row.parentElement!.children);
-      const fieldRow = siblings[siblings.indexOf(row) - 1];
-      const px = (el: Element) => parseFloat(getComputedStyle(el).marginTop);
-      return { field: px(fieldRow), attachments: px(row) };
+      const parent = row.parentElement!;
+      const kids = Array.from(parent.children) as HTMLElement[];
+
+      const ink = (el: Element) => {
+        const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+        let top = Infinity;
+        let bottom = -Infinity;
+        let n: Node | null;
+        while ((n = walker.nextNode())) {
+          if (!n.textContent?.trim()) continue;
+          const r = document.createRange();
+          r.selectNodeContents(n);
+          const b = r.getBoundingClientRect();
+          if (b.height === 0) continue;
+          top = Math.min(top, b.top);
+          bottom = Math.max(bottom, b.bottom);
+        }
+        return { top, bottom };
+      };
+
+      const textRows = kids.filter((k) => k !== row && isFinite(ink(k).top));
+      const between: number[] = [];
+      for (let i = 1; i < textRows.length; i++) {
+        between.push(ink(textRows[i]).top - ink(textRows[i - 1]).bottom);
+      }
+      const last = textRows[textRows.length - 1];
+
+      return {
+        rowGaps: between,
+        attachments: row.getBoundingClientRect().top - ink(last).bottom,
+      };
     });
 
-    expect(gaps.field).toBeGreaterThan(0);
-    expect(gaps.attachments).toBe(gaps.field * 2);
+    // Sub-pixel font metrics put the row gaps within ~1px of each other, so the
+    // rhythm is the mean rather than any single pair.
+    const meanRowGap = gaps.rowGaps.reduce((a, b) => a + b, 0) / gaps.rowGaps.length;
+    expect(meanRowGap).toBeGreaterThan(0);
+    expect(Math.max(...gaps.rowGaps) - Math.min(...gaps.rowGaps)).toBeLessThanOrEqual(1.5);
+    expect(gaps.attachments / meanRowGap).toBeGreaterThan(1.75);
+    expect(gaps.attachments / meanRowGap).toBeLessThan(2.25);
 
     // First tile starts at the same left edge as the "URL:" label.
     const [urlBox, rowBox] = await Promise.all([
@@ -136,9 +161,8 @@ test.describe('Review panel attachments', () => {
     await setupLocal(page);
     await scanAnImage(page, 'meeting-invite.png');
     await waitForCards(page, 1);
-    await expandFirstCard(page);
 
-    const tile = page.getByTestId('unsaved-attachments').locator('img[alt="Attachment 1"]');
+    const tile = page.getByTestId('unsaved-attachments').first().locator('img[alt="Attachment 1"]');
     const box = await tile.boundingBox();
     if (!box) throw new Error('missing tile box');
     expect(Math.round(box.width)).toBe(60);
@@ -150,9 +174,8 @@ test.describe('Review panel attachments', () => {
     await setupLocal(page);
     await scanAnImage(page, 'meeting-invite.png');
     await waitForCards(page, 1);
-    await expandFirstCard(page);
 
-    await page.getByTestId('unsaved-attachments').getByRole('button', { name: /View attachment 1/ }).click();
+    await page.getByTestId('unsaved-attachments').first().getByRole('button', { name: /View attachment 1/ }).click();
     await expect(page.getByText('meeting-invite.png')).toBeVisible();
   });
 
@@ -162,8 +185,7 @@ test.describe('Review panel attachments', () => {
 
     await scanAnImage(page, 'first.png');
     await waitForCards(page, 1);
-    await expandFirstCard(page);
-    await expect(page.getByTestId('unsaved-attachments').locator('img[alt="Attachment 1"]')).toBeVisible();
+    await expect(page.getByTestId('unsaved-attachments').first().locator('img[alt="Attachment 1"]')).toBeVisible();
 
     await page.locator('input[type="file"]').setInputFiles({
       name: 'second.png',
@@ -172,7 +194,7 @@ test.describe('Review panel attachments', () => {
     });
     await scanButton(page).click();
 
-    await expect(page.getByTestId('unsaved-attachments').locator('img[alt="Attachment 2"]')).toBeVisible();
+    await expect(page.getByTestId('unsaved-attachments').first().locator('img[alt="Attachment 2"]')).toBeVisible();
   });
 
   test('discarding the batch takes the attachments with it', async ({ page }) => {
@@ -180,7 +202,6 @@ test.describe('Review panel attachments', () => {
     await setupLocal(page);
     await scanAnImage(page, 'meeting-invite.png');
     await waitForCards(page, 1);
-    await expandFirstCard(page);
     await expect(page.getByTestId('unsaved-attachments')).toBeVisible();
 
     await page.getByRole('button', { name: 'Unselect all' }).click();
@@ -199,19 +220,17 @@ test.describe('Review panel attachments', () => {
     await page.getByTestId('save-events-button').click();
     await download;
 
-    // Saved cards start collapsed: no fields, no files, just the toggle.
-    const toggle = page.getByTestId('saved-event-toggle').first();
-    await expect(toggle).toBeVisible();
-    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    // Saved cards are the same card, arriving shut: no fields, no files.
+    const saved = page.getByTestId('saved-event-card').first();
+    await expect(saved).toBeVisible();
     await expect(page.getByTestId('unsaved-attachments')).toHaveCount(0);
 
-    await toggle.click();
-    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
-    const attachments = page.getByTestId('unsaved-attachments');
+    await saved.getByRole('button', { name: 'Expand' }).click();
+    const attachments = saved.getByTestId('unsaved-attachments');
     await expect(attachments).toBeVisible();
     await expect(attachments.locator('img[alt="Attachment 1"]')).toBeVisible();
 
-    await toggle.click();
+    await saved.getByRole('button', { name: 'Collapse' }).click();
     await expect(page.getByTestId('unsaved-attachments')).toHaveCount(0);
   });
 
@@ -225,9 +244,10 @@ test.describe('Review panel attachments', () => {
     await page.getByTestId('save-events-button').click();
     await download;
 
+    const saved = page.getByTestId('saved-event-card').first();
     const [bin, chevron] = await Promise.all([
-      page.getByRole('button', { name: 'Delete Civic Signal' }).boundingBox(),
-      page.getByTestId('saved-event-toggle').first().boundingBox(),
+      saved.getByTestId('event-card-remove').boundingBox(),
+      saved.getByRole('button', { name: 'Expand' }).boundingBox(),
     ]);
     if (!bin || !chevron) throw new Error('missing control box');
     expect(bin.x).toBeLessThan(chevron.x);
@@ -254,8 +274,7 @@ test.describe('Review panel attachments', () => {
     // From a card, which must land in exactly the same place.
     await scanButton(page).click();
     await waitForCards(page, 1);
-    await expandFirstCard(page);
-    await page.getByTestId('unsaved-attachments').getByRole('button', { name: /View attachment 1/ }).click();
+    await page.getByTestId('unsaved-attachments').first().getByRole('button', { name: /View attachment 1/ }).click();
     const fromCard = await page.locator('.fixed.inset-0.z-50').boundingBox();
     expect(fromCard).toEqual(fromInput);
   });

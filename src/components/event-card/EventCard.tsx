@@ -1,6 +1,6 @@
 'use client';
 
-import { memo, useState, useRef } from 'react';
+import { memo, useState, useRef, type ReactNode } from 'react';
 import { CalendarEvent } from '@/types/event';
 import { convertRawToDate, formatDateForInput, formatTimeForInput, parseAllDayDate, resyncRawFields, shiftEndPreservingDuration } from '@/utils/timeConversion';
 import { getBrowserTimezone } from '@/utils/timezone';
@@ -16,6 +16,14 @@ const DATE_FMT = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeri
 const DATE_FMT_ALLDAY = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
 const TIME_FMT = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit' });
 
+// Intl throws RangeError on an invalid date, which would take the whole list
+// down. Saved events reach this card straight from storage, where a legacy or
+// hand-edited row can carry no usable start at all.
+const safeFormat = (fmt: Intl.DateTimeFormat, date: Date): string => {
+  const time = date instanceof Date ? date.getTime() : NaN;
+  return Number.isNaN(time) ? '--' : fmt.format(date);
+};
+
 interface EventCardProps {
   event: CalendarEvent;
   selected: boolean;
@@ -28,6 +36,13 @@ interface EventCardProps {
   onTzSuggestionDismiss?: (eventId: string) => void;
   onTimezoneUserChange?: (eventId: string) => void;
   inputFiles?: StoredInputFile[];
+  /** Saved cards arrive shut; a batch under review arrives open. */
+  defaultExpanded?: boolean;
+  /** Only a batch under review is selectable, so only it shows a checkbox. */
+  selectable?: boolean;
+  /** Saved cards hang Created + Export under the fields. */
+  footer?: ReactNode;
+  testId?: string;
 }
 
 function buildTzInfoLines(event: CalendarEvent): string[] {
@@ -59,11 +74,15 @@ function EventCard({
   onRemove,
   tzSuggestion,
   inputFiles,
+  defaultExpanded = false,
+  selectable = true,
+  footer,
+  testId = 'event-card',
   onTzSuggestionApply,
   onTzSuggestionDismiss,
   onTimezoneUserChange,
 }: EventCardProps) {
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(defaultExpanded);
   const [editingField, setEditingField] = useState<string | null>(null);
   const [showTzInfo, setShowTzInfo] = useState(false);
   const [tzInfoHover, setTzInfoHover] = useState(false);
@@ -140,7 +159,7 @@ function EventCard({
 
   return (
     <div
-      data-testid="event-card"
+      data-testid={testId}
       className={`transition-all duration-500 border-t-2 border-black ${
         isNew ? 'bg-green-50' : 'bg-white'
       }`}
@@ -152,18 +171,20 @@ function EventCard({
       >
         <div className="flex justify-between items-start gap-3">
           <div className="flex items-center gap-3 flex-1 min-w-0">
-            {/* Checkbox */}
-            <input
-              type="checkbox"
-              checked={selected}
-              onClick={(e) => e.stopPropagation()}
-              onChange={(e) => {
-                e.stopPropagation();
-                onToggleSelect(event.id);
-              }}
-              className="w-5 h-5 border-2 border-black cursor-pointer focus:ring-2 focus:ring-black flex-shrink-0"
-              aria-label={`Select ${event.title}`}
-            />
+            {/* Checkbox - the one thing a saved card does not have */}
+            {selectable && (
+              <input
+                type="checkbox"
+                checked={selected}
+                onClick={(e) => e.stopPropagation()}
+                onChange={(e) => {
+                  e.stopPropagation();
+                  onToggleSelect(event.id);
+                }}
+                className="w-5 h-5 border-2 border-black cursor-pointer focus:ring-2 focus:ring-black flex-shrink-0"
+                aria-label={`Select ${event.title}`}
+              />
+            )}
 
             {/* Event info */}
             <div className="flex-1 min-w-0">
@@ -181,7 +202,7 @@ function EventCard({
                         setEditingField(null);
                       }
                     }}
-                    className="font-bold text-base border border-black px-1 py-0 focus:outline-none focus:ring-1 focus:ring-black flex-1"
+                    className="font-bold text-base border border-black px-1 py-0 focus:outline-none focus:ring-1 focus:ring-black w-2/3"
                     autoFocus
                     onClick={(e) => e.stopPropagation()}
                   />
@@ -207,7 +228,10 @@ function EventCard({
                 )}
               </div>
 
-              {/* Date, Time, Location - always visible on one line, editable */}
+              {/* Date, Time, Location on one line, editable. Rendered only
+                  while shut - open, the Start and End rows say it in full, and
+                  a hidden copy would still answer queries for the chip. */}
+              {!isExpanded && (
               <p className="text-sm text-gray-600 px-1 overflow-visible">
                 {editingField === 'startDate' ? (
                   <input
@@ -239,7 +263,7 @@ function EventCard({
                   >
                     {event.startMissing
                       ? 'Add a date'
-                      : (event.allDay ? DATE_FMT_ALLDAY : DATE_FMT).format(event.startDate)}
+                      : safeFormat(event.allDay ? DATE_FMT_ALLDAY : DATE_FMT, event.startDate)}
                   </span>
                 )}
                 {event.assumedYear && !event.startMissing && (
@@ -273,7 +297,7 @@ function EventCard({
                           setEditingField('startTime');
                         }}
                       >
-                        {TIME_FMT.format(event.startDate)}
+                        {safeFormat(TIME_FMT, event.startDate)}
                       </span>
                     )}
                     <span onClick={(e) => e.stopPropagation()} className="inline-block align-middle">
@@ -350,6 +374,7 @@ function EventCard({
                   </>
                 )}
               </p>
+              )}
             </div>
           </div>
 
@@ -422,6 +447,7 @@ function EventCard({
             onTzSuggestionDismiss={onTzSuggestionDismiss ? () => onTzSuggestionDismiss(event.id) : undefined}
             onTimezoneUserChange={onTimezoneUserChange ? () => onTimezoneUserChange(event.id) : undefined}
           />
+          {footer}
         </div>
       )}
     </div>
