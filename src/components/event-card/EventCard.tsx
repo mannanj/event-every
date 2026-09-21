@@ -166,11 +166,11 @@ function EventCard({
     >
       {/* Card header - always visible */}
       <div
-        className={`px-3 pt-3 ${isExpanded ? 'pb-1' : 'pb-3'} transition-colors duration-200 ${!isNew ? 'hover:bg-gray-100' : ''} cursor-pointer`}
+        className={`px-2 pt-3 ${isExpanded ? 'pb-0' : 'pb-3'} transition-colors duration-200 ${!isNew ? 'hover:bg-gray-100' : ''} cursor-pointer`}
         onClick={toggleExpand}
       >
         <div className="flex justify-between items-start gap-3">
-          <div className="flex items-center gap-3 flex-1 min-w-0">
+          <div className="flex items-start gap-2 flex-1 min-w-0">
             {/* Checkbox - the one thing a saved card does not have */}
             {selectable && (
               <input
@@ -181,7 +181,7 @@ function EventCard({
                   e.stopPropagation();
                   onToggleSelect(event.id);
                 }}
-                className="w-5 h-5 border-2 border-black cursor-pointer focus:ring-2 focus:ring-black flex-shrink-0"
+                className="w-5 h-5 mt-1 border-2 border-black cursor-pointer focus:ring-2 focus:ring-black flex-shrink-0"
                 aria-label={`Select ${event.title}`}
               />
             )}
@@ -202,7 +202,7 @@ function EventCard({
                         setEditingField(null);
                       }
                     }}
-                    className="font-bold text-base border border-black px-1 py-0 focus:outline-none focus:ring-1 focus:ring-black w-2/3"
+                    className="font-bold text-lg border border-black px-1 py-0 focus:outline-none focus:ring-1 focus:ring-black w-2/3"
                     autoFocus
                     onClick={(e) => e.stopPropagation()}
                   />
@@ -212,7 +212,7 @@ function EventCard({
                   // widening it sideways would pull that alignment off by 4px.
                   <h3
                     data-testid="event-card-title"
-                    className="font-bold text-base truncate cursor-pointer hover:bg-gray-200 px-1 py-1 -my-1 rounded"
+                    className="font-bold text-lg truncate cursor-pointer hover:bg-gray-200 px-1 py-1 -my-1 rounded"
                     onClick={(e) => {
                       e.stopPropagation();
                       setEditingField('title');
@@ -433,7 +433,7 @@ function EventCard({
           change of surface already separates the body, and the hard line read
           as a seam between two cards. */}
       {isExpanded && (
-        <div className={`pt-2 pb-4 pr-4 bg-gray-50 ${selectable ? 'pl-12' : 'pl-4'}`}>
+        <div className={`pt-[1px] pb-4 pr-4 bg-gray-50 ${selectable ? 'pl-10' : 'pl-3'}`}>
           <EventFields
             mode="inline"
             event={event}

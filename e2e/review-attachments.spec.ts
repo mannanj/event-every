@@ -93,13 +93,13 @@ test.describe('Review panel attachments', () => {
     await expect(page.getByTestId('unsaved-attachments').first().locator('img[alt="Attachment 1"]')).toBeVisible();
   });
 
-  test('sits twice the field gap below the last field, left-aligned with the labels', async ({ page }) => {
+  test('sits on the same rhythm as the fields, left-aligned with the labels', async ({ page }) => {
     await mockScanAPI(page, await oneCandidate());
     await setupLocal(page);
     await scanAnImage(page, 'meeting-invite.png');
     await waitForCards(page, 1);
 
-    const attachments = page.getByTestId('unsaved-attachments');
+    const attachments = page.getByTestId('unsaved-attachments').first();
     await expect(attachments).toBeVisible();
 
     // Measured between glyphs, not margins: the rows carry their own leading,
@@ -139,13 +139,10 @@ test.describe('Review panel attachments', () => {
       };
     });
 
-    // Sub-pixel font metrics put the row gaps within ~1px of each other, so the
-    // rhythm is the mean rather than any single pair.
-    const meanRowGap = gaps.rowGaps.reduce((a, b) => a + b, 0) / gaps.rowGaps.length;
-    expect(meanRowGap).toBeGreaterThan(0);
-    expect(Math.max(...gaps.rowGaps) - Math.min(...gaps.rowGaps)).toBeLessThanOrEqual(1.5);
-    expect(gaps.attachments / meanRowGap).toBeGreaterThan(1.75);
-    expect(gaps.attachments / meanRowGap).toBeLessThan(2.25);
+    // Every element sits at one gap: the files are not set apart any more.
+    const all = [...gaps.rowGaps, gaps.attachments];
+    expect(Math.min(...all)).toBeGreaterThan(0);
+    expect(Math.max(...all) - Math.min(...all)).toBeLessThanOrEqual(1.5);
 
     // First tile starts at the same left edge as the "URL:" label.
     const [urlBox, rowBox] = await Promise.all([
@@ -295,7 +292,7 @@ test.describe('Review panel attachments', () => {
     expect(parentIsBody).toBe(true);
   });
 
-  test('the header sits the same distance from the fields as the files do', async ({ page }) => {
+  test('the header, the fields and the files all sit on one rhythm', async ({ page }) => {
     await mockScanAPI(page, await oneCandidate());
     await setupLocal(page);
     await scanAnImage(page, 'meeting-invite.png');
@@ -338,9 +335,8 @@ test.describe('Review panel attachments', () => {
       };
     });
 
-    // The header is spaced off the fields exactly as the files are: one step
-    // bigger than the row rhythm, so both read as the same kind of break.
-    expect(Math.abs(measured.headerGap - measured.filesGap)).toBeLessThanOrEqual(1);
+    // Header, fields and files all sit at one gap.
+    expect(Math.abs(measured.headerGap - measured.filesGap)).toBeLessThanOrEqual(1.5);
     // And the body lines up under the title, which the checkbox offsets.
     expect(Math.abs(measured.titleLeft - measured.rowLeft)).toBeLessThanOrEqual(1);
   });

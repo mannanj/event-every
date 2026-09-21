@@ -401,13 +401,13 @@ export default function EventFields({
         <AttachmentList attachments={event.attachments} />
       )}
 
-      {/* Twice the gap the rows sit at - measured between glyphs, not margins,
-          since that is what the eye spaces by: ~10px between rows, ~20px here.
-          Far enough to read as a separate group rather than one more field, and
-          left-aligned with the field labels above. `!mt-*` because the parent's
-          space-y rule would otherwise win on specificity. */}
+      {/* One rhythm: the files sit the same distance below the last field as the
+          fields sit from each other, measured between glyphs rather than
+          margins. `!mt-*` because the parent's space-y rule would otherwise win
+          on specificity, and the row needs a slightly larger margin than the
+          text rows to land on the same visual gap. */}
       {inputFiles && inputFiles.length > 0 && (
-        <InputAttachments files={inputFiles} size="sm" className="!mt-4" />
+        <InputAttachments files={inputFiles} size="sm" className="!mt-1.5" />
       )}
     </div>
   );

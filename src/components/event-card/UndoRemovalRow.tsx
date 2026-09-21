@@ -19,7 +19,7 @@ export default function UndoRemovalRow({ title, onUndo }: UndoRemovalRowProps) {
   return (
     <div
       data-testid="undo-removal-row"
-      className="border-t-2 border-black bg-gray-50 pl-11 pr-12 py-2 flex items-center justify-between gap-3"
+      className="border-t-2 border-black bg-gray-50 pl-9 pr-11 py-2 flex items-center justify-between gap-3"
     >
       <p className="text-sm italic text-gray-600 truncate" title={title}>
         Removed {title}
