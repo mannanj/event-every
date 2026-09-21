@@ -33,6 +33,12 @@ export interface CalendarEvent {
   source: 'image' | 'text' | 'url';
   originalInput?: string;
   attachments?: EventAttachment[];
+  /**
+   * Input-history rows this event was scanned from, stamped when the batch is
+   * saved. The files themselves stay in the IndexedDB input history, which is
+   * capped, so a long-lived event may outlive its source and show no files.
+   */
+  inputEntryIds?: string[];
 }
 
 export interface OCRResult {

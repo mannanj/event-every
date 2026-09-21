@@ -88,6 +88,7 @@ function Home({ processingDisabled }: { processingDisabled: boolean }) {
   // Ids rather than files: the bytes already live in the IndexedDB input
   // history, so this survives a reload without a second copy of every upload.
   const [attachmentEntryIds, setAttachmentEntryIds] = useState<string[]>([]);
+  const [expandedSavedIds, setExpandedSavedIds] = useState<Set<string>>(new Set());
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const { events, addEvent, deleteEvent, updateEvent, sortOption, setSortOption, setDateRange } = useHistory();
   const [totalEventsInStorage, setTotalEventsInStorage] = useState(0);
@@ -492,12 +493,22 @@ function Home({ processingDisabled }: { processingDisabled: boolean }) {
 
   // The history rows hold hydrated File objects, so the panel reads its files
   // from there rather than keeping a parallel copy in page state.
+  const filesForEntryIds = useCallback(
+    (ids: string[] | undefined) =>
+      (ids ?? []).flatMap((id) => inputHistory.find((entry) => entry.id === id)?.files ?? []),
+    [inputHistory]
+  );
+
+  const toggleSavedExpanded = (id: string) =>
+    setExpandedSavedIds((previous) => {
+      const next = new Set(previous);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+
   const attachmentFiles = useMemo(
-    () =>
-      attachmentEntryIds.flatMap(
-        (id) => inputHistory.find((entry) => entry.id === id)?.files ?? []
-      ),
-    [attachmentEntryIds, inputHistory]
+    () => filesForEntryIds(attachmentEntryIds),
+    [filesForEntryIds, attachmentEntryIds]
   );
 
   const inputSignature = (text: string, images: File[], calendarFiles: File[]): string =>
@@ -988,7 +999,11 @@ function Home({ processingDisabled }: { processingDisabled: boolean }) {
           onExport={handleBatchEventExport}
           onCancelAll={handleCancelBatch}
           onExportComplete={(events) => {
-            events.forEach(event => addEvent(event));
+            // Stamped at save: the batch's entry ids are cleared a line later,
+            // so a saved event has to carry its own way back to its files.
+            events.forEach(event => addEvent(
+              attachmentEntryIds.length > 0 ? { ...event, inputEntryIds: attachmentEntryIds } : event
+            ));
             setUnsavedEvents([]);
             setAttachmentEntryIds([]);
             setTotalEventsInStorage(prev => prev + events.length);
@@ -1071,48 +1086,88 @@ function Home({ processingDisabled }: { processingDisabled: boolean }) {
             {events.length > 0 ? (
             <div className="max-h-[99vh] overflow-y-auto">
               <div className="border-2 border-black">
-              {events.map((event, index) => (
+              {events.map((event, index) => {
+                const isSavedExpanded = expandedSavedIds.has(event.id);
+                const savedFiles = isSavedExpanded ? filesForEntryIds(event.inputEntryIds) : undefined;
+                return (
                 <div
                   key={event.id}
                   className={`p-4 bg-white ${index > 0 ? 'border-t-2 border-black' : ''}`}
                 >
-                  <div className="flex justify-between items-start mb-3">
-                    <div className="flex-1">
-                      <EventFields
-                        mode="inline"
-                        event={event}
-                        onChange={(updatedEvent) => updateEvent(updatedEvent)}
-                        showAttachments={true}
-                      />
+                  <div className="flex justify-between items-start gap-2">
+                    <div className="flex-1 min-w-0">
+                      {isSavedExpanded ? (
+                        <EventFields
+                          mode="inline"
+                          event={event}
+                          onChange={(updatedEvent) => updateEvent(updatedEvent)}
+                          showAttachments={true}
+                          inputFiles={savedFiles}
+                        />
+                      ) : (
+                        <button
+                          onClick={() => toggleSavedExpanded(event.id)}
+                          className="text-left w-full focus:outline-none"
+                          aria-label={`Expand ${event.title}`}
+                        >
+                          <p className="font-semibold text-sm truncate">{event.title}</p>
+                          <p className="text-gray-500 text-xs">{formatDate(event.startDate)}</p>
+                        </button>
+                      )}
                     </div>
-                    <button
-                      onClick={() => handleDeleteEvent(event.id)}
-                      className="ml-2 text-gray-400 hover:text-black focus:outline-none flex-shrink-0"
-                      aria-label={`Delete ${event.title}`}
-                    >
-                      {/* A bin, not a cross: this removes the event rather than
-                          closing the card, and an X reads as dismiss. */}
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
-                    </button>
+                    {/* Bin then chevron, matching the unsaved cards: the
+                        destructive control keeps the same seat in both lists. */}
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      <button
+                        onClick={() => handleDeleteEvent(event.id)}
+                        className="text-gray-400 hover:text-black focus:outline-none"
+                        aria-label={`Delete ${event.title}`}
+                      >
+                        {/* A bin, not a cross: this removes the event rather than
+                            closing the card, and an X reads as dismiss. */}
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                      <button
+                        onClick={() => toggleSavedExpanded(event.id)}
+                        className="p-1 hover:bg-gray-100 rounded transition-colors focus:outline-none"
+                        aria-label={isSavedExpanded ? `Collapse ${event.title}` : `Expand ${event.title}`}
+                        aria-expanded={isSavedExpanded}
+                        data-testid="saved-event-toggle"
+                      >
+                        <svg
+                          className={`w-5 h-5 transition-transform ${isSavedExpanded ? 'rotate-180' : ''}`}
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </button>
+                    </div>
                   </div>
 
-                  <p className="text-gray-500 text-xs mb-3">
-                    Created: {formatDate(event.created)}
-                  </p>
+                  {isSavedExpanded && (
+                    <>
+                      <p className="text-gray-500 text-xs mt-3 mb-3">
+                        Created: {formatDate(event.created)}
+                      </p>
 
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => handleExportFromHistory(event)}
-                      className="flex-1 px-4 py-2 bg-black text-white border-2 border-black hover:bg-white hover:text-black transition-colors focus:outline-none focus:ring-2 focus:ring-black"
-                      aria-label={`Export ${event.title}`}
-                    >
-                      Export
-                    </button>
-                  </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleExportFromHistory(event)}
+                          className="flex-1 px-4 py-2 bg-black text-white border-2 border-black hover:bg-white hover:text-black transition-colors focus:outline-none focus:ring-2 focus:ring-black"
+                          aria-label={`Export ${event.title}`}
+                        >
+                          Export
+                        </button>
+                      </div>
+                    </>
+                  )}
                 </div>
-              ))}
+                );
+              })}
             </div>
           </div>
             ) : (

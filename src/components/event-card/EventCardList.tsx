@@ -6,7 +6,6 @@ import { exportMultipleToICS } from '@/services/exporter';
 import { EventSelection } from '@/hooks/useEventSelection';
 import { PendingRemoval, removalsAtPosition } from '@/hooks/useUndoableRemoval';
 import { StoredInputFile } from '@/types/input';
-import InputAttachments from '../InputAttachments';
 import EventCard from './EventCard';
 import UndoRemovalRow from './UndoRemovalRow';
 
@@ -99,6 +98,7 @@ export default function EventCardList({
               onEdit={onEdit}
               onRemove={onRemove}
               tzSuggestion={tzSuggestions?.[event.id]}
+              inputFiles={attachments}
               onTzSuggestionApply={onTzSuggestionApply}
               onTzSuggestionDismiss={onTzSuggestionDismiss}
               onTimezoneUserChange={onTimezoneUserChange}
@@ -107,12 +107,6 @@ export default function EventCardList({
         ))}
         {undoRows(events.length, true)}
       </div>
-
-      {/* The files this batch came from, so the review panel can be checked
-          against its own source without reopening Recent. */}
-      {events.length > 0 && !isProcessing && attachments && attachments.length > 0 && (
-        <InputAttachments files={attachments} />
-      )}
 
       {/* Save/Delete button */}
       {events.length > 0 && !isProcessing && (

@@ -6,6 +6,7 @@ import { convertRawToDate, formatDateForInput, formatTimeForInput, parseAllDayDa
 import { getBrowserTimezone } from '@/utils/timezone';
 import EventFields from '@/components/EventFields';
 import TimezonePicker, { friendlyTimezoneLabel } from '@/components/TimezonePicker';
+import { StoredInputFile } from '@/types/input';
 
 // Hoisted to module scope: building these per-render (once per card) was ~190 Intl
 // allocations every few seconds while the message-rotation timer churned the list.
@@ -26,6 +27,7 @@ interface EventCardProps {
   onTzSuggestionApply?: (eventId: string, timezone: string) => void;
   onTzSuggestionDismiss?: (eventId: string) => void;
   onTimezoneUserChange?: (eventId: string) => void;
+  inputFiles?: StoredInputFile[];
 }
 
 function buildTzInfoLines(event: CalendarEvent): string[] {
@@ -56,6 +58,7 @@ function EventCard({
   onEdit,
   onRemove,
   tzSuggestion,
+  inputFiles,
   onTzSuggestionApply,
   onTzSuggestionDismiss,
   onTimezoneUserChange,
@@ -408,6 +411,7 @@ function EventCard({
               onEdit(updatedEvent);
             }}
             showAttachments={true}
+            inputFiles={inputFiles}
             hideTitle={true}
             hideTimezoneInfo={true}
             tzSuggestion={tzSuggestion}

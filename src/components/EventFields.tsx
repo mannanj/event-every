@@ -9,12 +9,16 @@ import { validateEvent, EventFormValues } from '@/utils/validation';
 import EditableField from './EditableField';
 import TimezonePicker, { friendlyTimezoneLabel } from './TimezonePicker';
 import AttachmentList from './AttachmentList';
+import InputAttachments from './InputAttachments';
+import { StoredInputFile } from '@/types/input';
 import URLPill from './URLPill';
 
 interface EventFieldsProps {
   event: CalendarEvent;
   onChange: (updatedEvent: CalendarEvent) => void;
   showAttachments?: boolean;
+  /** Files the event was scanned from, shown as a tile row under the fields. */
+  inputFiles?: StoredInputFile[];
   hideTitle?: boolean;
   tzSuggestion?: { timezone: string; confidence: number };
   onTzSuggestionApply?: (timezone: string) => void;
@@ -54,6 +58,7 @@ export default function EventFields({
   event,
   onChange,
   showAttachments = true,
+  inputFiles,
   hideTitle = false,
   tzSuggestion,
   onTzSuggestionApply,
@@ -394,6 +399,14 @@ export default function EventFields({
 
       {showAttachments && event.attachments && event.attachments.length > 0 && (
         <AttachmentList attachments={event.attachments} />
+      )}
+
+      {/* The source files sit twice the field gap below the last field: far
+          enough to read as a separate group rather than one more field, and
+          left-aligned with the field labels above them. `!mt-*` because the
+          parent's space-y rule would otherwise win on specificity. */}
+      {inputFiles && inputFiles.length > 0 && (
+        <InputAttachments files={inputFiles} size="sm" className="!mt-4" />
       )}
     </div>
   );
