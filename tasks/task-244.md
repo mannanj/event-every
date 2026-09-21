@@ -52,16 +52,43 @@ that ends the day early for everybody, and the refusal moves from this app's
 clean "budget exhausted" to an OpenRouter 402 - which is precisely the failure
 the comment above exists to prevent.
 
-**The mechanism is built and tested and does nothing yet, deliberately.** It
-cannot be wired until one of these is true:
+**The mechanism is built and tested and does nothing yet, deliberately.**
+Wiring it against the single shared ledger would not grant a privilege. It would
+move where the app breaks.
 
-- the OpenRouter key's own daily limit is raised, and
-  `OWNER_DAILY_LIMIT_NANODOLLARS` with it, so there is headroom to hand out; or
-- a per-user daily cap is introduced beneath the platform ceiling, at which
-  point `shouldEnforceDailyCaps` is exactly the thing that gates it.
+#### The answer: a second key, not a bigger one
 
-Wiring it before either would not grant a privilege. It would move where the
-app breaks.
+Decided 2026-09-21. `OPENROUTER_ADMIN_KEY` is a separate OpenRouter key with its
+own $1/day ceiling, and the admin and unlimited tiers spend from it.
+
+Two keys rather than one raised limit, because the point is **isolation, not
+headroom**:
+
+- an admin looping a tool cannot exhaust what ordinary visitors spend from
+- a busy day for visitors cannot lock the owner out of his own app
+- each key's ceiling still matches what that key will actually honour, which is
+  the rule `OWNER_DAILY_LIMIT_NANODOLLARS` exists to keep
+
+The key is set as a Worker secret (`wrangler secret put OPENROUTER_ADMIN_KEY`)
+and held locally in `.dev.vars`, which is gitignored. It is declared in
+`ProviderBindingEnv` and read by nothing yet.
+
+#### What is still in the way
+
+The ledger name has to differ per tier, and `ownerBudgetLedgerName` carries this
+warning:
+
+> Both the reserve and the settle paths must derive the name here. If they ever
+> disagree, a request settles against a ledger it never reserved from.
+
+Reserve knows the tier: it has the request. Settle does not - it works from the
+stored row (`provider-request-authority.ts`, the `row.authorityDay` call). So
+the tier has to be **persisted on the provider-request row** for the two to
+agree.
+
+That is a storage change inside the budget authority, which task-201 owns and
+which has failing tests today. Doing it from this branch would mean editing the
+money-handling code while it is already red, so it waits.
 
 #### The backstop Green Light has and this does not
 
