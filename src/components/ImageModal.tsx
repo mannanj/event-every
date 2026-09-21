@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 
 interface ImagePreview {
   file: File;
@@ -21,6 +22,9 @@ const ImageModal = ({ images, initialIndex, onClose }: ImageModalProps) => {
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const imageRef = useRef<HTMLImageElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => setMounted(true), []);
 
   const currentImage = images[currentIndex];
 
@@ -104,7 +108,13 @@ const ImageModal = ({ images, initialIndex, onClose }: ImageModalProps) => {
     }
   };
 
-  return (
+  if (!mounted) return null;
+
+  // Portalled to <body> because `fixed` is not viewport-relative inside an
+  // ancestor that establishes a containing block, and the smart input wraps its
+  // files row in one ([container-type:size]) - which pinned this modal inside
+  // the input box instead of filling the screen as it does everywhere else.
+  return createPortal(
     <div
       ref={containerRef}
       className="fixed inset-0 z-50 bg-black bg-opacity-90 flex items-center justify-center"
@@ -214,7 +224,8 @@ const ImageModal = ({ images, initialIndex, onClose }: ImageModalProps) => {
       <div className="absolute bottom-20 left-1/2 transform -translate-x-1/2 bg-white rounded px-4 py-2 text-sm max-w-md truncate z-10">
         {currentImage.file.name}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 

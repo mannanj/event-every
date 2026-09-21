@@ -232,4 +232,47 @@ test.describe('Review panel attachments', () => {
     if (!bin || !chevron) throw new Error('missing control box');
     expect(bin.x).toBeLessThan(chevron.x);
   });
+
+  test('the lightbox fills the viewport from the input and from a card alike', async ({ page }) => {
+    await page.setViewportSize({ width: 900, height: 800 });
+    await mockScanAPI(page, await oneCandidate());
+    await setupLocal(page);
+
+    await page.locator('input[type="file"]').setInputFiles({
+      name: 'meeting-invite.png',
+      mimeType: 'image/png',
+      buffer: Buffer.from(TINY_PNG_BASE64, 'base64'),
+    });
+
+    // From the smart input. Its files row sets [container-type:size], which
+    // would otherwise make the modal's `fixed` resolve against the input box.
+    await page.locator('img[alt="Uploaded 1"]').click();
+    const fromInput = await page.locator('.fixed.inset-0.z-50').boundingBox();
+    expect(fromInput).toEqual({ x: 0, y: 0, width: 900, height: 800 });
+    await page.keyboard.press('Escape');
+
+    // From a card, which must land in exactly the same place.
+    await scanButton(page).click();
+    await waitForCards(page, 1);
+    await expandFirstCard(page);
+    await page.getByTestId('unsaved-attachments').getByRole('button', { name: /View attachment 1/ }).click();
+    const fromCard = await page.locator('.fixed.inset-0.z-50').boundingBox();
+    expect(fromCard).toEqual(fromInput);
+  });
+
+  test('the lightbox is portalled out of the input so nothing can clip it', async ({ page }) => {
+    await mockScanAPI(page, await oneCandidate());
+    await setupLocal(page);
+    await page.locator('input[type="file"]').setInputFiles({
+      name: 'meeting-invite.png',
+      mimeType: 'image/png',
+      buffer: Buffer.from(TINY_PNG_BASE64, 'base64'),
+    });
+    await page.locator('img[alt="Uploaded 1"]').click();
+
+    const parentIsBody = await page
+      .locator('.fixed.inset-0.z-50')
+      .evaluate((node) => node.parentElement === document.body);
+    expect(parentIsBody).toBe(true);
+  });
 });

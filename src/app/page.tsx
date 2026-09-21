@@ -89,6 +89,7 @@ function Home({ processingDisabled }: { processingDisabled: boolean }) {
   // history, so this survives a reload without a second copy of every upload.
   const [attachmentEntryIds, setAttachmentEntryIds] = useState<string[]>([]);
   const [expandedSavedIds, setExpandedSavedIds] = useState<Set<string>>(new Set());
+  const [editingSavedTitleId, setEditingSavedTitleId] = useState<string | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const { events, addEvent, deleteEvent, updateEvent, sortOption, setSortOption, setDateRange } = useHistory();
   const [totalEventsInStorage, setTotalEventsInStorage] = useState(0);
@@ -1094,26 +1095,34 @@ function Home({ processingDisabled }: { processingDisabled: boolean }) {
                   key={event.id}
                   className={`p-4 bg-white ${index > 0 ? 'border-t-2 border-black' : ''}`}
                 >
+                  {/* The header is identical open or shut - same title, same
+                      weight, same seat - so expanding adds a body rather than
+                      moving the heading. Matches the unsaved cards. */}
                   <div className="flex justify-between items-start gap-2">
                     <div className="flex-1 min-w-0">
-                      {isSavedExpanded ? (
-                        <EventFields
-                          mode="inline"
-                          event={event}
-                          onChange={(updatedEvent) => updateEvent(updatedEvent)}
-                          showAttachments={true}
-                          inputFiles={savedFiles}
+                      {editingSavedTitleId === event.id ? (
+                        <input
+                          type="text"
+                          value={event.title}
+                          onChange={(e) => updateEvent({ ...event, title: e.target.value })}
+                          onBlur={() => setEditingSavedTitleId(null)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === 'Escape') setEditingSavedTitleId(null);
+                          }}
+                          className="font-bold text-base border border-black px-1 py-0 focus:outline-none focus:ring-1 focus:ring-black w-full"
+                          aria-label={`Title for ${event.title}`}
+                          autoFocus
                         />
                       ) : (
-                        <button
-                          onClick={() => toggleSavedExpanded(event.id)}
-                          className="text-left w-full focus:outline-none"
-                          aria-label={`Expand ${event.title}`}
+                        <h3
+                          data-testid="saved-event-title"
+                          className="font-bold text-base truncate cursor-pointer hover:bg-gray-100 px-1 -ml-1 rounded"
+                          onClick={() => setEditingSavedTitleId(event.id)}
                         >
-                          <p className="font-semibold text-sm truncate">{event.title}</p>
-                          <p className="text-gray-500 text-xs">{formatDate(event.startDate)}</p>
-                        </button>
+                          {event.title}
+                        </h3>
                       )}
+                      <p className="text-gray-500 text-xs">{formatDate(event.startDate)}</p>
                     </div>
                     {/* Bin then chevron, matching the unsaved cards: the
                         destructive control keeps the same seat in both lists. */}
@@ -1150,6 +1159,17 @@ function Home({ processingDisabled }: { processingDisabled: boolean }) {
 
                   {isSavedExpanded && (
                     <>
+                      <div className="mt-3">
+                        <EventFields
+                          mode="inline"
+                          event={event}
+                          onChange={(updatedEvent) => updateEvent(updatedEvent)}
+                          showAttachments={true}
+                          hideTitle={true}
+                          inputFiles={savedFiles}
+                        />
+                      </div>
+
                       <p className="text-gray-500 text-xs mt-3 mb-3">
                         Created: {formatDate(event.created)}
                       </p>
