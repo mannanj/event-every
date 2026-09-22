@@ -30,6 +30,10 @@ export const ROUTE_MANIFEST: Readonly<Record<string, RoutePolicy>> = {
   // meant a link could connect a stranger's assistant to your account.
   '/api/mcp/authorize': policy('GET', 0),
   '/api/mcp/authorize/confirm': policy('POST', 0),
+  // Ending every connection on the account. A POST from a signed-in session
+  // and nothing else: disconnecting is not something a link should be able to
+  // do to somebody, which is the lesson the authorize bridge taught.
+  '/api/mcp/disconnect': policy('POST', 0),
   '/api/mcp/events': policy('GET', 0),
   '/api/mcp/events/save': policy('POST', 64 * 1024),
   '/api/mcp/events/remove': policy('POST', 1024),
@@ -44,11 +48,11 @@ export const ROUTE_MANIFEST: Readonly<Record<string, RoutePolicy>> = {
   // Attachment backup. `file` returns bytes rather than JSON, which is why it
   // is a GET with no body: the admission policy pins the media type of what
   // comes IN, and nothing comes in here. `upload` carries base64 in JSON, so
-  // its ceiling is the ten files it admits at six megabytes each, plus the
-  // third that base64 adds.
+  // its ceiling is the three files it admits at fifteen megabytes each, plus
+  // the third that base64 adds.
   '/api/attachments': policy('GET', 0),
   '/api/attachments/settings': policy('POST', 1024),
-  '/api/attachments/upload': policy('POST', 84 * MiB),
+  '/api/attachments/upload': policy('POST', 61 * MiB),
   '/api/attachments/file': policy('GET', 0),
   '/api/attachments/remove': policy('POST', 32 * 1024),
 };

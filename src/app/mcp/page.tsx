@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 
 import SiteFooter from '@/components/SiteFooter';
 import SiteHeader from '@/components/SiteHeader';
+import McpDisconnect from '@/components/McpDisconnect';
 import { McpConnector } from '@/vendor/mcp-connector/connector';
 import '@/vendor/mcp-connector/styles.css';
 import {
@@ -44,6 +45,8 @@ export default function McpGuidePage() {
           search your saved events and add new ones for you. You sign in the same way you
           always do, in your own browser, and you can disconnect whenever you like.
         </p>
+
+        <McpDisconnect />
 
         {/* The panel shared by Green Light, Sun Signal, mannan.is and Meet
             Time. Vendored rather than imported, because bun satisfies a `file:`

@@ -1,6 +1,6 @@
 import type { AuthRequest, OAuthHelpers } from '@cloudflare/workers-oauth-provider';
 
-import { verifyMcpGrant } from '../../src/server/mcp/grant';
+import { REVOKE_PURPOSE, verifyActor, verifyMcpGrant } from '../../src/server/mcp/grant';
 
 /**
  * Everything that is not the MCP API itself: the OAuth authorize and callback.
@@ -104,6 +104,9 @@ export const authHandler = {
 
     if (url.pathname === '/authorize') return handleAuthorize(request, env);
     if (url.pathname === '/callback') return handleCallback(request, env);
+    if (url.pathname === '/revoke' && request.method === 'POST') {
+      return handleRevoke(request, env);
+    }
 
     if (url.pathname === '/' || url.pathname === '/health') {
       return Response.json({
@@ -206,4 +209,41 @@ async function handleCallback(request: Request, env: Env): Promise<Response> {
   });
 
   return Response.redirect(redirectTo, 302);
+}
+
+/**
+ * End every connection this account has.
+ *
+ * WHY IT LIVES HERE. The tokens are in this Worker's KV and the session is on
+ * the app's origin, so neither side can do this alone. The app asserts who is
+ * asking, signed and short-lived, and this acts on it - the same bridge as
+ * starting a connection, pointed the other way.
+ *
+ * ALL of them, not one. Somebody disconnecting has decided they do not want an
+ * assistant on their calendar, and asking which of several they meant is the
+ * wrong question at the wrong moment. The /mcp page promised this could be done
+ * and nothing implemented it, which is worse than not offering it.
+ */
+async function handleRevoke(request: Request, env: Env): Promise<Response> {
+  const token = (await request.text()).trim();
+  if (!token) return fail(400, 'Nothing to revoke.');
+
+  const who = await verifyActor(token, env.MCP_GRANT_SECRET, { purpose: REVOKE_PURPOSE });
+  if (!who) return fail(403, 'That request could not be verified.');
+
+  let revoked = 0;
+  let cursor: string | undefined;
+  do {
+    const page = await env.OAUTH_PROVIDER.listUserGrants(who.sub, cursor ? { cursor } : {});
+    for (const grant of page.items) {
+      await env.OAUTH_PROVIDER.revokeGrant(grant.id, who.sub);
+      revoked += 1;
+    }
+    cursor = page.cursor;
+  } while (cursor);
+
+  return Response.json(
+    { revoked },
+    { headers: { 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' } },
+  );
 }

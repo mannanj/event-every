@@ -2,6 +2,7 @@ import {
   RESOLVER_BODY_LIMIT,
   assertAllowedResolverUrl,
   fetchWithResolverPolicy,
+  readCappedBody,
 } from '@/platform/resolver/url-policy';
 import { MAX_SCANNER_IMAGE_BYTES } from '@/server/scanner/image';
 
@@ -87,13 +88,19 @@ export async function fetchImageAsDataUrl(url: string, signal: AbortSignal): Pro
         throw new IntakeError('That link is not a PNG, JPEG or WebP image.');
       }
 
-      const buffer = await response.arrayBuffer();
-      if (buffer.byteLength === 0) throw new IntakeError('That image was empty.');
-      if (buffer.byteLength > MAX_SCANNER_IMAGE_BYTES) {
-        throw new IntakeError('That image is too large to read.');
-      }
+      // STREAMED WITH A CEILING, not buffered and then measured. `arrayBuffer()`
+      // reads whatever the far end sends before anything checks the size, so a
+      // server that answers with a gigabyte fills this Worker's memory and the
+      // limit below never runs. The Content-Length header is no help either -
+      // it is a claim by the same server.
+      //
+      // `readCappedBody` in the resolver policy does exactly this but is pinned
+      // to its own 512KB limit, which is right for a page and far too small for
+      // a photograph. Same shape, the scanner's ceiling.
+      const bytes = await readCapped(response, MAX_SCANNER_IMAGE_BYTES, 'That image is too large to read.');
+      if (bytes.byteLength === 0) throw new IntakeError('That image was empty.');
 
-      return `data:${mediaType};base64,${base64(new Uint8Array(buffer))}`;
+      return `data:${mediaType};base64,${base64(bytes)}`;
     },
     'That image could not be fetched.',
   );
@@ -105,12 +112,56 @@ export async function fetchPageText(url: string, signal: AbortSignal): Promise<s
     url,
     signal,
     async (response) => {
-      const text = (await response.text()).slice(0, RESOLVER_BODY_LIMIT);
+      // The resolver's own reader, which stops at the limit instead of reading
+      // everything and slicing afterwards. The comment on this function claimed
+      // "bounded by the resolver policy" while `.text()` did no such thing.
+      let bytes: Uint8Array;
+      try {
+        bytes = await readCappedBody(response.body, RESOLVER_BODY_LIMIT, signal);
+      } catch {
+        throw new IntakeError('That page could not be read.');
+      }
+      const text = new TextDecoder().decode(bytes);
       if (!text.trim()) throw new IntakeError('That page had nothing to read.');
       return text;
     },
     'That page could not be fetched.',
   );
+}
+
+/**
+ * Read a response body, stopping the moment it exceeds what we will accept.
+ *
+ * The point is the STOPPING. Reading it all and checking afterwards means a
+ * hostile or broken server decides how much memory this Worker uses, and the
+ * check runs too late to matter.
+ */
+async function readCapped(response: Response, limit: number, tooLarge: string): Promise<Uint8Array> {
+  if (!response.body) throw new IntakeError('That link returned nothing.');
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  try {
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > limit) {
+        await reader.cancel().catch(() => undefined);
+        throw new IntakeError(tooLarge);
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  const out = new Uint8Array(total);
+  let at = 0;
+  for (const chunk of chunks) {
+    out.set(chunk, at);
+    at += chunk.byteLength;
+  }
+  return out;
 }
 
 export function decodeBase64(value: string): Uint8Array | null {

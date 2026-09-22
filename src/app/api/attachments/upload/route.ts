@@ -19,8 +19,17 @@ export const dynamic = 'force-dynamic';
  * the browser.
  */
 
-const MAX_FILES = 10;
-const MAX_FILE_BYTES = 6 * 1024 * 1024;
+/**
+ * Fifteen megabytes a file, three a request.
+ *
+ * The per-file figure is the one that matters to a person: a modern phone
+ * photograph is comfortably under it. The per-request count came DOWN from ten
+ * when the size went up, because base64 adds a third and ten fifteen-megabyte
+ * files would be roughly two hundred megabytes on the wire - past what a Worker
+ * will accept, so the whole batch would fail rather than the eleventh file.
+ */
+const MAX_FILES = 3;
+const MAX_FILE_BYTES = 15 * 1024 * 1024;
 
 const Incoming = z.object({
   id: z.string().min(1).max(200),
@@ -91,6 +100,12 @@ export async function POST(request: Request) {
       stored.push(file.id);
     }
   } catch (error) {
+    if (error instanceof Error && error.message === 'attachment_quota_exceeded') {
+      return attachmentJson(
+        { error: 'This account is out of backup space. Remove some files first.', stored },
+        507,
+      );
+    }
     console.error('attachment upload failed', error instanceof Error ? error.message : 'unknown');
     // Partial success is reported honestly rather than rolled back: the files
     // already stored are genuinely stored, and a client that retries the whole

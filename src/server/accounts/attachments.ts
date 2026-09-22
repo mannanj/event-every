@@ -47,6 +47,28 @@ export function objectKey(accountId: string, id: string): string {
   return `att/${accountId}/${id}`;
 }
 
+/**
+ * How much one account may keep.
+ *
+ * There was no ceiling at all: six megabytes a file, ten a request, forever.
+ * R2 is billed by what is stored, so "forever" is somebody else's decision
+ * about the owner's money.
+ *
+ * Two gigabytes is roughly 130 photographs at the per-file limit - far more
+ * than a calendar's worth of posters and tickets, and small enough that a
+ * runaway client shows up on a bill rather than in it.
+ */
+export const ACCOUNT_STORAGE_LIMIT_BYTES = 2 * 1024 * 1024 * 1024;
+
+/** What this account is currently using. Tombstones are already zeroed. */
+export async function storedBytes(db: D1Like, accountId: string): Promise<number> {
+  const row = await db
+    .prepare('SELECT COALESCE(SUM(byte_size), 0) AS used FROM attachment WHERE account_id = ? AND deleted = 0')
+    .bind(accountId)
+    .first<{ used: number }>();
+  return Number(row?.used ?? 0);
+}
+
 function iso(): string {
   return new Date().toISOString();
 }
@@ -85,6 +107,22 @@ export async function putAttachment(
   accountId: string,
   input: { id: string; entryId: string; bytes: Uint8Array } & AttachmentMeta,
 ): Promise<void> {
+  // Checked BEFORE the object is written. Writing first and refusing after
+  // would leave the bytes in the bucket - paid for, unreferenced, and invisible
+  // to every listing.
+  //
+  // Re-uploading an existing id replaces it, so its current size does not count
+  // against the ceiling twice.
+  const [used, existing] = await Promise.all([
+    storedBytes(db, accountId),
+    db
+      .prepare('SELECT byte_size FROM attachment WHERE account_id = ? AND id = ? AND deleted = 0')
+      .bind(accountId, input.id)
+      .first<{ byte_size: number }>(),
+  ]);
+  const after = used - Number(existing?.byte_size ?? 0) + input.bytes.byteLength;
+  if (after > ACCOUNT_STORAGE_LIMIT_BYTES) throw new Error('attachment_quota_exceeded');
+
   const sealed = await sealFile(dek, accountId, input.id, input.bytes);
   await bucket.put(objectKey(accountId, input.id), sealed.ciphertext);
 
@@ -95,7 +133,8 @@ export async function putAttachment(
   } satisfies AttachmentMeta);
 
   const now = iso();
-  await db
+  try {
+    await db
     .prepare(
       `INSERT INTO attachment
          (id, account_id, entry_id, nonce, meta_nonce, meta, byte_size, key_version, created_at, updated_at, deleted)
@@ -124,6 +163,13 @@ export async function putAttachment(
       now,
     )
     .run();
+  } catch (error) {
+    // The object is already in the bucket and nothing now references it. Take
+    // it back out rather than leaving storage nobody can see or delete: the
+    // listing reads the table, so an orphan is invisible AND billed.
+    await bucket.delete(objectKey(accountId, input.id)).catch(() => undefined);
+    throw error;
+  }
 }
 
 async function describe(

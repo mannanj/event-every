@@ -28,6 +28,9 @@ export interface BackedUpFile {
   updatedAt: string;
 }
 
+/** Matches MAX_FILES on /api/attachments/upload. */
+const UPLOAD_BATCH = 3;
+
 export interface BackupStatus {
   enabled: boolean;
   attachments: BackedUpFile[];
@@ -102,6 +105,16 @@ export async function backupEntryFiles(
   options: { override?: boolean } = {},
 ): Promise<string[]> {
   if (files.length === 0) return [];
+  // Batched to the route's own limit. Sending eleven files to a route that
+  // takes three fails the whole request, including the three it would have
+  // accepted.
+  if (files.length > UPLOAD_BATCH) {
+    const done: string[] = [];
+    for (let at = 0; at < files.length; at += UPLOAD_BATCH) {
+      done.push(...(await backupEntryFiles(entryId, files.slice(at, at + UPLOAD_BATCH), options)));
+    }
+    return done;
+  }
   try {
     const payload = await Promise.all(
       files.map(async (stored) => ({

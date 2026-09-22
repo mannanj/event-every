@@ -43,6 +43,20 @@ export const ACTOR_TTL_SECONDS = 60;
 const GRANT_PURPOSE = 'ee.mcp.grant.v1';
 const ACTOR_PURPOSE = 'ee.mcp.actor.v1';
 
+/**
+ * Disconnecting.
+ *
+ * The app owns the session; the Worker owns the tokens. So ending a connection
+ * needs the same bridge as starting one, pointed the other way: the app says
+ * who is asking, the Worker acts on it.
+ *
+ * Purpose-separated like the others, so a revoke assertion cannot be presented
+ * as an actor token, a grant, or an upload link. Sixty seconds, because it is
+ * one form submission and not a session.
+ */
+export const REVOKE_PURPOSE = 'ee.mcp.revoke.v1';
+export const REVOKE_TTL_SECONDS = 60;
+
 export interface McpGrantPayload {
   /** Account id. */
   sub: string;
