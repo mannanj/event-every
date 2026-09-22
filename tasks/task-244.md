@@ -31,7 +31,7 @@ Collapsing them into one flag is the mistake this shape exists to avoid. "May by
 
 `/api/scan` is anonymous today. It takes a request id and no session, which is why an exemption has to be read somewhere the session is available. Reading the cookie there is the small change; the question it raises is what happens for a signed-out visitor, and the answer has to stay "capped", or the exemption is a hole rather than a role.
 
-#### BLOCKED: there is nothing here to exempt anyone from
+#### RESOLVED. What was in the way, and how (kept because the reasoning is the point)
 
 Found while wiring it, in `src/platform/provider/policy.ts`:
 
@@ -52,9 +52,9 @@ that ends the day early for everybody, and the refusal moves from this app's
 clean "budget exhausted" to an OpenRouter 402 - which is precisely the failure
 the comment above exists to prevent.
 
-**The mechanism is built and tested and does nothing yet, deliberately.**
-Wiring it against the single shared ledger would not grant a privilege. It would
-move where the app breaks.
+**This was true for most of a day, and the answer was a second key rather than a
+bigger one.** Wiring the exemption against the single shared ledger would not
+have granted a privilege; it would have moved where the app breaks.
 
 #### The answer: a second key, not a bigger one
 
@@ -73,10 +73,10 @@ The key is set as a Worker secret (`wrangler secret put OPENROUTER_ADMIN_KEY`)
 and held locally in `.dev.vars`, which is gitignored. It is declared in
 `ProviderBindingEnv` and read by nothing yet.
 
-#### What is still in the way
+#### What was in the way, and what it turned out to be
 
-The ledger name has to differ per tier, and `ownerBudgetLedgerName` carries this
-warning:
+Resolved in task-245, and not the way this section first proposed. The ledger
+name has to differ per tier, and `ownerBudgetLedgerName` carries this warning:
 
 > Both the reserve and the settle paths must derive the name here. If they ever
 > disagree, a request settles against a ledger it never reserved from.
@@ -86,9 +86,13 @@ stored row (`provider-request-authority.ts`, the `row.authorityDay` call). So
 the tier has to be **persisted on the provider-request row** for the two to
 agree.
 
-That is a storage change inside the budget authority, which task-201 owns and
-which has failing tests today. Doing it from this branch would mean editing the
-money-handling code while it is already red, so it waits.
+It does - and it ALREADY DID. `policy_version` is a column on that row, written
+at begin and read back at settle, and this function is documented as naming the
+ledger after "the policy it was opened under". A second key with its own ceiling
+is a second policy. The proposed new column would have been a schema change to a
+Durable Object that asserts its schema rather than migrating it, on a population
+that never goes away - see task-245, which an independent assessment corrected
+before any of it was built.
 
 #### The backstop question, answered
 
@@ -116,8 +120,13 @@ will actually allow, per key. If a key's limit is raised, raise it here too; if
 it is lowered, lower it here FIRST, or OpenRouter's 402 becomes the control and
 this app stops being the thing that says no.
 
-#### The difference from Green Light, stated
+#### The difference from Green Light, closed
 
-In Green Light both tiers still sit under a monthly budget governor - a platform ceiling rather than a per-user fairness rule. Event Every has only the daily authority, so an uncapped account here is uncapped full stop. That is a real difference from the design being copied and it is stated rather than papered over. See task-201, which owns the budget authority.
+Green Light puts both tiers under a monthly governor because many users share one
+key there, so a per-user daily cap does not bound the total. Event Every gives
+each TIER its own key, so the total is bounded by construction - and since
+2026-09-21 it also has the per-user cap underneath (`SCAN_LIMITS.perIdentity`,
+twenty a day), which is the other half Green Light has. The shapes now match for
+the same reasons rather than by imitation.
 
 - Location: `src/server/accounts/admin.ts`, `migrations/accounts/0004_unlimited.sql`, `src/app/api/scan/`
