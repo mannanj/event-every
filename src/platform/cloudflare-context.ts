@@ -36,6 +36,8 @@ export type ProviderOperationContext = Readonly<{
   requestAuthority: DurableNamespaceLike<ProviderRequestAuthorityStub>;
   ownerBudgetAuthority: DurableNamespaceLike<OwnerBudgetAuthorityStub>;
   ownerKey: string;
+  /** Absent when the secret is unset. Callers degrade to the owner policy. */
+  adminKey?: string;
 }>;
 
 type ProviderBindingEnv = Readonly<{
@@ -82,6 +84,7 @@ export function getProviderOperationContext(): ProviderOperationContext {
     requestAuthority: env.PROVIDER_REQUEST_AUTHORITY,
     ownerBudgetAuthority: env.OWNER_BUDGET_AUTHORITY,
     ownerKey: env.OPENROUTER_OWNER_KEY,
+    ...(nonempty(env.OPENROUTER_ADMIN_KEY) ? { adminKey: env.OPENROUTER_ADMIN_KEY } : {}),
   };
 }
 

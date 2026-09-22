@@ -43,7 +43,10 @@ test.each([
   expect(response.status).toBe(200);
   expect(response.headers.get('cache-control')).toBe('no-store');
   expect(await response.json()).toEqual(current);
-  expect(ownerBudgetStatus).toHaveBeenCalledWith(new Date().toISOString().slice(0, 10));
+  // The day AND the ledger the caller spends from. This request carries no
+  // session, so it must be the owner policy - a signed-out visitor can never
+  // be told about the admin budget, nor gated on it.
+  expect(ownerBudgetStatus).toHaveBeenCalledWith(new Date().toISOString().slice(0, 10), 'owner-v1');
   expect(JSON.stringify(await (await GET(new NextRequest('http://localhost/api/usage'))).json())).not.toMatch(/requestId|identity|model|route|source|candidate/i);
 });
 

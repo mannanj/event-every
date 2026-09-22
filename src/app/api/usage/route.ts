@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { resolveSpendPolicy } from '@/server/accounts/spend-tier';
 import { z } from 'zod';
 import { getPlatformRuntime } from '@/platform/runtime';
 
@@ -21,9 +22,13 @@ const UsageResponseSchema = z.object({
   if (value.exhausted !== (value.frozen || remaining < 500_000)) context.addIssue({ code: 'custom', message: 'invalid exhaustion state' });
 });
 
-export async function GET(_request: NextRequest): Promise<Response> {
+export async function GET(request: NextRequest): Promise<Response> {
   const authorityDay = new Date().toISOString().slice(0, 10);
-  const result = await getPlatformRuntime().ownerBudgetStatus(authorityDay);
+  // The caller's own ledger. An admin asking how much is left must be told
+  // about the budget they actually spend from, or the app takes itself away
+  // from them on a day that never touched it.
+  const policyVersion = await resolveSpendPolicy(request);
+  const result = await getPlatformRuntime().ownerBudgetStatus(authorityDay, policyVersion);
   const parsed = UsageResponseSchema.safeParse(result);
   if (!parsed.success || parsed.data.authorityDay !== authorityDay) {
     return NextResponse.json(

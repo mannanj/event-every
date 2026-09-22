@@ -10,6 +10,7 @@ import { resolveScanTimeZone } from '@/server/scanner/scanContext';
 import { OWNER_MODEL_CHAINS } from '@/platform/provider/policy';
 import { MAX_EXCERPT_CHARS, verifyCandidates } from '@/server/typesafe/verify';
 import { typeSafeAvailable } from '@/server/typesafe/client';
+import { resolveSpendPolicy } from '@/server/accounts/spend-tier';
 
 type E1SourceHandle = Extract<SourceHandle, { kind: 'text' | 'image' }>;
 
@@ -59,6 +60,11 @@ export async function POST(request: NextRequest): Promise<Response> {
       route: 'scan', variant, canonicalJson: JSON.stringify(scanRequest), ...runtime.shapeKeys(),
     });
     const source: E1SourceHandle = { sourceId: randomUUID(), kind: scanRequest.kind, contentHandle: randomUUID() };
+    // Which budget this spends from. An admin or unlimited account reserves
+    // from its own ledger and its own key; everybody else, including every
+    // signed-out visitor, is on the shared capped one.
+    const policyVersion = await resolveSpendPolicy(request);
+
     const result = await runCoordinatedScanJob({
       requestId,
       request: scanRequest,
@@ -79,7 +85,7 @@ export async function POST(request: NextRequest): Promise<Response> {
             ?? (request as unknown as { cf?: { timezone?: string } }).cf?.timezone,
         ),
       },
-    }, { runOperation: runtime.runProviderOperation });
+    }, { runOperation: runtime.runProviderOperation, policyVersion });
     if (result.status !== 'completed') {
       log({ models: OWNER_MODEL_CHAINS[variant], status: result.status, code: 'code' in result ? result.code : null });
       return fixed(result);

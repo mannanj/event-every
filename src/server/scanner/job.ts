@@ -5,6 +5,7 @@ import {
   type OpenRouterTransport,
 } from '@event-every/scanner/openrouter';
 import type { CandidateIdFactory, SourceHandle } from '@event-every/scanner';
+import type { SpendPolicyVersion } from '@/platform/provider/policy';
 import type { ProviderBindingCandidate } from '@/platform/contracts';
 import {
   runProviderOperation,
@@ -94,6 +95,8 @@ type CoordinatedScanInput = Readonly<{
 
 type CoordinatedScanDependencies = Readonly<{
   runOperation?: typeof runProviderOperation;
+  /** Which spending policy this scan runs under. Defaults to the owner's. */
+  policyVersion?: SpendPolicyVersion;
   operationDependencies?: Partial<ProviderOperationDependencies>;
 }>;
 
@@ -107,6 +110,10 @@ export async function runCoordinatedScanJob(
     variant: input.request.kind === 'text' ? 'scan-text' : 'scan-image',
     bindingCandidates: input.bindingCandidates,
     signal: input.signal,
+    // Omitted rather than defaulted here: `runProviderOperation` owns the
+    // fallback, so there is one place that decides what "no policy given"
+    // means.
+    ...(dependencies.policyVersion ? { policyVersion: dependencies.policyVersion } : {}),
     execute: async (invoke) => {
       const result = await scanSource(
         scanJobWithTransport(input.request, input.source, createEventEveryOpenRouterTransport({ invoke, context: input.context })),

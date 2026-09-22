@@ -22,8 +22,67 @@ export const OWNER_PROVIDER_URL = 'https://openrouter.ai/api/v1/chat/completions
  * Both the reserve and the settle paths must derive the name here. If they ever
  * disagree, a request settles against a ledger it never reserved from.
  */
-export function ownerBudgetLedgerName(authorityDay: string): string {
-  return `${OWNER_POLICY_VERSION}:${OWNER_DAILY_LIMIT_NANODOLLARS}:${authorityDay}`;
+export function ownerBudgetLedgerName(
+  authorityDay: string,
+  policyVersion: SpendPolicyVersion = OWNER_POLICY_VERSION,
+): string {
+  return `${policyVersion}:${SPEND_POLICIES[policyVersion].limitNanodollars}:${authorityDay}`;
+}
+
+/**
+ * Two policies, because there are two keys.
+ *
+ * THE TIER IS NOT STORED ANYWHERE NEW. `policy_version` is already a column on
+ * `provider_request`, already written when a request begins and already read
+ * back when it settles - and this function is already documented as naming the
+ * ledger after "the policy it was opened under". A second OpenRouter key with
+ * its own ceiling IS a second policy, so the carrier was there all along.
+ *
+ * That matters more than it sounds. The alternative was a new column on a
+ * Durable Object that ASSERTS its schema rather than migrating it, where every
+ * instance that has ever existed still holds the old table - tombstones are
+ * written and never deleted - so there would have been no date at which
+ * requiring the column was safe.
+ *
+ * THE OWNER NAME MUST NOT MOVE. A request that reserved before this change
+ * settles after it by recomputing the name from its stored row. If the default
+ * produced anything but `owner-v1:1000000000:<day>`, that settlement would
+ * address a ledger which never held the reservation, `settle` would answer
+ * conflict, and the old ledger's lease sweep would eventually bill the full
+ * reservation for a call that succeeded. There is a literal-string test.
+ */
+export const ADMIN_POLICY_VERSION = 'admin-v1' as const;
+export type SpendPolicyVersion = typeof OWNER_POLICY_VERSION | typeof ADMIN_POLICY_VERSION;
+
+export type SpendPolicy = Readonly<{
+  limitNanodollars: number;
+  /** Which Worker secret holds the key this policy spends against. */
+  keyBinding: 'OPENROUTER_OWNER_KEY' | 'OPENROUTER_ADMIN_KEY';
+}>;
+
+/**
+ * Each policy's ceiling matches what ITS OWN key will honour. That invariant is
+ * the reason the limit is in the ledger name at all: raise a key's limit and
+ * you raise it here, or the app stops being the thing that says no and
+ * OpenRouter's 402 becomes the control.
+ */
+export const SPEND_POLICIES: Readonly<Record<SpendPolicyVersion, SpendPolicy>> = Object.freeze({
+  [OWNER_POLICY_VERSION]: Object.freeze({
+    limitNanodollars: OWNER_DAILY_LIMIT_NANODOLLARS,
+    keyBinding: 'OPENROUTER_OWNER_KEY' as const,
+  }),
+  [ADMIN_POLICY_VERSION]: Object.freeze({
+    limitNanodollars: OWNER_DAILY_LIMIT_NANODOLLARS,
+    keyBinding: 'OPENROUTER_ADMIN_KEY' as const,
+  }),
+});
+
+export function isSpendPolicyVersion(value: unknown): value is SpendPolicyVersion {
+  return value === OWNER_POLICY_VERSION || value === ADMIN_POLICY_VERSION;
+}
+
+export function spendLimitFor(policyVersion: SpendPolicyVersion): number {
+  return SPEND_POLICIES[policyVersion].limitNanodollars;
 }
 export const PRE_PERMIT_LEASE_MS = 2 * 60_000;
 export const TRANSPORT_LEASE_MS = 14 * 60_000;

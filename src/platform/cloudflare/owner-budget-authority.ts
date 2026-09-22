@@ -16,6 +16,9 @@ import {
   ACCOUNTING_RETENTION_MS,
   COMMITTED_LEASE_MS,
   OWNER_DAILY_LIMIT_NANODOLLARS,
+  isSpendPolicyVersion,
+  spendLimitFor,
+  type SpendPolicyVersion,
   OWNER_POLICY_VERSION,
   OWNER_VARIANT_POLICY,
   PRE_PERMIT_LEASE_MS,
@@ -110,6 +113,10 @@ export class OwnerBudgetAuthority extends DurableObject<Record<string, never>> {
     if (policy && policy.authorityDay !== input.authorityDay) return { status: 'day-mismatch' };
     if (!validBinding(input)) return { status: 'conflict' };
 
+    // `validBinding` has already refused anything that is not a known policy,
+    // so this narrowing is a statement about that check rather than a hope.
+    const policyVersion = input.policyVersion as SpendPolicyVersion;
+
     const existing = this.readOperation(input.executionId);
     if (existing) return this.replayReserve(existing, policy, input);
     if (policy?.frozenCode) return exhausted(input.authorityDay);
@@ -139,16 +146,19 @@ export class OwnerBudgetAuthority extends DurableObject<Record<string, never>> {
           'INSERT INTO owner_budget_policy (authority_day, policy_version, limit_nanodollars, frozen_code, created_at_ms) VALUES (?, ?, ?, NULL, ?)',
           input.authorityDay,
           input.policyVersion,
-          OWNER_DAILY_LIMIT_NANODOLLARS,
+          spendLimitFor(policyVersion),
           nowMs,
         );
-      } else if (concurrentPolicy.policyVersion !== input.policyVersion || concurrentPolicy.limitNanodollars !== OWNER_DAILY_LIMIT_NANODOLLARS) {
+      } else if (
+        concurrentPolicy.policyVersion !== input.policyVersion
+        || concurrentPolicy.limitNanodollars !== spendLimitFor(policyVersion)
+      ) {
         return { status: 'conflict' as const };
       }
 
       const totals = this.readTotals();
       const admittedTotal = safeAdd(safeAdd(totals.spent, totals.reserved), input.reservationNanodollars);
-      if (admittedTotal > OWNER_DAILY_LIMIT_NANODOLLARS) return exhausted(input.authorityDay);
+      if (admittedTotal > spendLimitFor(policyVersion)) return exhausted(input.authorityDay);
       this.ctx.storage.sql.exec(
         `INSERT INTO owner_budget_operation (
           execution_id, request_authority_name, route, variant, reservation_nanodollars,
@@ -631,7 +641,7 @@ function validBindingFieldTypes(input: Record<string, unknown>): boolean {
 
 function validBinding(input: OwnerBudgetBinding): boolean {
   if (!UUID.test(input.executionId) || !AUTHORITY_NAME.test(input.requestAuthorityName)) return false;
-  if (input.policyVersion !== OWNER_POLICY_VERSION || !Number.isSafeInteger(input.reservationNanodollars) || input.reservationNanodollars < 0) return false;
+  if (!isSpendPolicyVersion(input.policyVersion) || !Number.isSafeInteger(input.reservationNanodollars) || input.reservationNanodollars < 0) return false;
   const policy = OWNER_VARIANT_POLICY[input.variant];
   return policy !== undefined && policy.route === input.route && policy.reservationNanodollars === input.reservationNanodollars;
 }

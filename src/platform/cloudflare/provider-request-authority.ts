@@ -29,6 +29,7 @@ import {
   PRE_PERMIT_LEASE_MS,
   REPLAY_RETENTION_MS,
   ownerBudgetLedgerName,
+  isSpendPolicyVersion,
 } from '../provider/policy';
 import {
   DurableScanReplaySchema,
@@ -557,8 +558,18 @@ export class ProviderRequestAuthority extends DurableObject<RequestAuthorityEnv>
     if (!outbox || outbox.nextAttemptMs > nowMs) return;
     const row = this.readRequest();
     if (!row || row.executionId !== outbox.executionId) throw schemaError();
+    // FROM THE ROW, not from the constant. The row records which policy it
+    // reserved under, and settle has to reach the same ledger reserve did -
+    // `ownerBudgetLedgerName` says so on itself. Taking the default here would
+    // send an admin request's settlement to the owner's ledger, which never
+    // held its reservation.
     const budget = this.requestEnv.OWNER_BUDGET_AUTHORITY.get(
-      this.requestEnv.OWNER_BUDGET_AUTHORITY.idFromName(ownerBudgetLedgerName(row.authorityDay)),
+      this.requestEnv.OWNER_BUDGET_AUTHORITY.idFromName(
+        ownerBudgetLedgerName(
+          row.authorityDay,
+          isSpendPolicyVersion(row.policyVersion) ? row.policyVersion : OWNER_POLICY_VERSION,
+        ),
+      ),
     );
     const binding: OwnerBudgetBinding = {
       executionId: row.executionId,

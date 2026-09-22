@@ -13,7 +13,13 @@ import {
   type ProviderRequestAuthorityStub,
 } from '@/platform/cloudflare-context';
 import type { ProviderVariant } from '@/platform/provider/contracts';
-import { OWNER_POLICY_VERSION, ownerPolicyForVariant } from '@/platform/provider/policy';
+import {
+  OWNER_POLICY_VERSION,
+  ownerBudgetLedgerName as ledgerName,
+  ownerPolicyForVariant,
+  SPEND_POLICIES,
+  type SpendPolicyVersion,
+} from '@/platform/provider/policy';
 import { providerRequestName } from '@/platform/provider/request-binding';
 import {
   callOpenRouter,
@@ -42,16 +48,46 @@ export type ProviderOperationInput = Readonly<{
   bindingCandidates: readonly ProviderBindingCandidate[];
   signal: AbortSignal;
   execute(invoke: ProviderInvocation): Promise<unknown>;
+  /**
+   * Which spending policy this request runs under, and therefore which ledger
+   * it reserves from and which key it spends against.
+   *
+   * Defaults to the owner policy, so every existing caller is unchanged and a
+   * signed-out visitor can never be anything else. Only /api/scan sets it, from
+   * a session it has already read.
+   */
+  policyVersion?: SpendPolicyVersion;
 }>;
 
 export type ProviderOperationDependencies = Readonly<{
   requestAuthority: DurableNamespaceLike<ProviderRequestAuthorityStub>;
   ownerBudgetAuthority: DurableNamespaceLike<OwnerBudgetAuthorityStub>;
   ownerKey: string;
+  adminKey?: string;
   callProvider(input: ProviderTransportInput): Promise<ProviderTransportResult>;
   now(): number;
   deadlineSignal(delayMs: number): AbortSignal;
 }>;
+
+/**
+ * The key this policy spends against.
+ *
+ * A MISSING ADMIN KEY FALLS BACK TO THE OWNER KEY, and the caller that chose
+ * the policy must fall back with it - see `resolvePolicy`. An admin LEDGER paired
+ * with the owner KEY is the one combination that breaks the invariant the whole
+ * design rests on: the ledger would permit a second $1 against a key that has
+ * already spent its own, and OpenRouter's 402 becomes the thing that says no
+ * instead of this app.
+ */
+function keyFor(
+  resolved: ProviderOperationDependencies,
+  policyVersion: SpendPolicyVersion,
+): string {
+  if (SPEND_POLICIES[policyVersion].keyBinding === 'OPENROUTER_ADMIN_KEY') {
+    return resolved.adminKey ?? resolved.ownerKey;
+  }
+  return resolved.ownerKey;
+}
 
 function dependencies(overrides?: Partial<ProviderOperationDependencies>): ProviderOperationDependencies {
   const context = overrides?.requestAuthority && overrides.ownerBudgetAuthority && overrides.ownerKey
@@ -61,6 +97,9 @@ function dependencies(overrides?: Partial<ProviderOperationDependencies>): Provi
     requestAuthority: overrides?.requestAuthority ?? context!.requestAuthority,
     ownerBudgetAuthority: overrides?.ownerBudgetAuthority ?? context!.ownerBudgetAuthority,
     ownerKey: overrides?.ownerKey ?? context!.ownerKey,
+    ...(overrides?.adminKey ?? context?.adminKey
+      ? { adminKey: overrides?.adminKey ?? context!.adminKey }
+      : {}),
     callProvider: overrides?.callProvider ?? ((input) => callOpenRouter(input)),
     now: overrides?.now ?? Date.now,
     deadlineSignal: overrides?.deadlineSignal ?? ((delayMs) => AbortSignal.timeout(delayMs)),
@@ -110,6 +149,10 @@ export async function runProviderOperation(
     resolved.requestAuthority.idFromName(requestAuthorityName),
   );
 
+  // One decision, used for the request row, the ledger and the key. Splitting
+  // it is how a request reserves from one budget and spends another's key.
+  const policyVersion: SpendPolicyVersion = input.policyVersion ?? OWNER_POLICY_VERSION;
+
   let observed;
   try {
     observed = await requestAuthority.begin({
@@ -118,7 +161,7 @@ export async function runProviderOperation(
       variant: input.variant,
       bindingCandidates: input.bindingCandidates,
       proposedAuthorityDay,
-      policyVersion: OWNER_POLICY_VERSION,
+      policyVersion,
       reservationNanodollars: policy.reservationNanodollars,
     });
   } catch {
@@ -130,7 +173,7 @@ export async function runProviderOperation(
   if (input.signal.aborted) return { status: 'unavailable' };
 
   const budgetAuthority = resolved.ownerBudgetAuthority.get(
-    resolved.ownerBudgetAuthority.idFromName(ownerBudgetLedgerName(observed.authorityDay)),
+    resolved.ownerBudgetAuthority.idFromName(ledgerName(observed.authorityDay, policyVersion)),
   );
   const budgetBinding: OwnerBudgetBinding = {
     executionId: observed.executionId,
@@ -138,7 +181,7 @@ export async function runProviderOperation(
     authorityDay: observed.authorityDay,
     route: policy.route,
     variant: input.variant,
-    policyVersion: OWNER_POLICY_VERSION,
+    policyVersion,
     reservationNanodollars: policy.reservationNanodollars,
   };
 
@@ -230,7 +273,7 @@ export async function runProviderOperation(
     try {
       transport = await resolved.callProvider({
         consumerKind: CONSUMER_BY_VARIANT[input.variant],
-        apiKey: resolved.ownerKey,
+        apiKey: keyFor(resolved, policyVersion),
         providerBody,
         signal: combinedSignal,
       });

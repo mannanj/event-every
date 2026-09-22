@@ -10,7 +10,11 @@ import {
 } from '@/platform/cloudflare/provider-operation';
 import { getProviderRequestShapeKeys } from '@/platform/cloudflare-context';
 import { providerRequestName, type ShapeKey } from '@/platform/provider/request-binding';
-import { ownerBudgetLedgerName } from '@/platform/provider/policy';
+import {
+  OWNER_POLICY_VERSION,
+  ownerBudgetLedgerName,
+  type SpendPolicyVersion,
+} from '@/platform/provider/policy';
 
 type StatusNamespace<Stub> = Readonly<{
   idFromName(name: string): unknown;
@@ -33,7 +37,7 @@ type RuntimeEnv = Readonly<{
 export type PlatformRuntime = Readonly<{
   runProviderOperation(input: ProviderOperationInput): Promise<ProviderOperationResult>;
   providerRequestStatus(requestId: string): Promise<ProviderRequestStatusResult>;
-  ownerBudgetStatus(authorityDay: string): Promise<OwnerBudgetStatusResult>;
+  ownerBudgetStatus(authorityDay: string, policyVersion?: SpendPolicyVersion): Promise<OwnerBudgetStatusResult>;
   shapeKeys(): Readonly<{ current: ShapeKey; previous?: ShapeKey }>;
 }>;
 
@@ -63,11 +67,25 @@ async function providerRequestStatus(requestId: string): Promise<ProviderRequest
   }
 }
 
-async function ownerBudgetStatus(authorityDay: string): Promise<OwnerBudgetStatusResult> {
+/**
+ * A day's budget, on the ledger the CALLER spends from.
+ *
+ * The policy argument is not decoration. This feeds /api/usage, which feeds
+ * OwnerBudgetBoundary - the full-page takeover that removes the input box when
+ * the day is exhausted. Reading the owner ledger for everybody would mean a
+ * busy visitor day blanks the app for an admin whose own budget is untouched,
+ * which is the isolation this whole feature exists to provide, inverted.
+ */
+async function ownerBudgetStatus(
+  authorityDay: string,
+  policyVersion: SpendPolicyVersion = OWNER_POLICY_VERSION,
+): Promise<OwnerBudgetStatusResult> {
   try {
     const namespace = env().OWNER_BUDGET_AUTHORITY;
     if (!namespace) return { status: 'day-mismatch' };
-    return await namespace.get(namespace.idFromName(ownerBudgetLedgerName(authorityDay))).status({ authorityDay });
+    return await namespace
+      .get(namespace.idFromName(ownerBudgetLedgerName(authorityDay, policyVersion)))
+      .status({ authorityDay });
   } catch {
     return { status: 'day-mismatch' };
   }

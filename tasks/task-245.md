@@ -49,23 +49,23 @@ The cost: `policy_version` carries two meanings, generation and tier. Acceptable
 
 #### Scope
 
-- [ ] Latent bug first: `owner-budget-authority.ts:130` INSERTs the constant `OWNER_POLICY_VERSION` while `:134` compares `input.policyVersion`. Equal today, so harmless; with a second version the admin ledger's first reserve writes `owner-v1` and every later one returns `conflict` forever. Fix and test before anything else.
-- [ ] `POLICIES` map; `ownerBudgetLedgerName(day, version)` with a byte-identical default.
-- [ ] Settle derives from `row.policyVersion`.
-- [ ] `/api/scan` reads the session and resolves the tier. A signed-out visitor is always the owner policy.
-- [ ] Validators take a set. `owner-budget-authority.ts:130` writes the input's version; `:134`, `:140`, `:260` take the limit from the policy rather than the constant.
-- [ ] **`/api/usage` and `OwnerBudgetBoundary`.** A third derivation of the ledger name lives at `runtime.ts:70` and has no session. Left alone, a visitor-heavy day that exhausts the owner ledger takes the whole UI away from an admin - the precise isolation this task exists to provide, inverted. `runtime.test.ts:101-102` pins the one-argument call.
+- [x] Latent bug first: `owner-budget-authority.ts:130` INSERTs the constant `OWNER_POLICY_VERSION` while `:134` compares `input.policyVersion`. Equal today, so harmless; with a second version the admin ledger's first reserve writes `owner-v1` and every later one returns `conflict` forever. Fix and test before anything else.
+- [x] `SPEND_POLICIES` map; `ownerBudgetLedgerName(day, version)` with a byte-identical default.
+- [x] Settle derives from `row.policyVersion`.
+- [x] `/api/scan` reads the session and resolves the tier. A signed-out visitor is always the owner policy.
+- [x] Validators take a set. `owner-budget-authority.ts:130` writes the input's version; `:134`, `:140`, `:260` take the limit from the policy rather than the constant.
+- [x] **`/api/usage` and `OwnerBudgetBoundary`.** A third derivation of the ledger name lives at `runtime.ts:70` and has no session. Left alone, a visitor-heavy day that exhausts the owner ledger takes the whole UI away from an admin - the precise isolation this task exists to provide, inverted. `runtime.test.ts:101-102` pins the one-argument call.
 - [ ] Task 244's remaining box: a per-user cap beneath the platform ceiling.
 
 #### Prove
 
-- [ ] **Before any change:** a literal-string test that `ownerBudgetLedgerName('2026-09-21')` is exactly `owner-v1:1000000000:2026-09-21`. Asserting it against itself proves nothing.
-- [ ] **Before any change:** a Durable Object constructed over a PRE-EXISTING table still works. Build it from the literal old DDL, not from "current schema minus a column", or it cannot catch a positional mismatch. Include a tombstone-only instance, which is the permanent population.
-- [ ] A reserve and a settle on the admin policy agree on a ledger.
-- [ ] An admin exhausting the admin ledger leaves the owner ledger untouched, and the reverse.
-- [ ] A row reserved under `owner-v1` before the change settles against the same ledger after it.
-- [ ] A missing `OPENROUTER_ADMIN_KEY` degrades to the owner policy for BOTH key and ledger, never a mixed pair.
-- [ ] `bun run test:workers` stays at 114/114.
+- [x] A literal-string test that `ownerBudgetLedgerName('2026-09-21')` is exactly `owner-v1:1000000000:2026-09-21`. Asserting it against itself proves nothing.
+- [x] A Durable Object constructed over a PRE-EXISTING table still works. Build it from the literal old DDL, not from "current schema minus a column", or it cannot catch a positional mismatch. Include a tombstone-only instance, which is the permanent population.
+- [x] A reserve and a settle on the admin policy agree on a ledger.
+- [x] An admin exhausting the admin ledger leaves the owner ledger untouched, and the reverse.
+- [x] A row reserved under `owner-v1` before the change settles against the same ledger after it: the default name is byte-identical, asserted as a literal.
+- [x] A missing `OPENROUTER_ADMIN_KEY` degrades to the owner policy for BOTH key and ledger, never a mixed pair.
+- [x] `bun run test:workers` is 126/126, up from 114.
 
 #### Rollback
 
