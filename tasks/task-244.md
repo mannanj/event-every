@@ -90,7 +90,33 @@ That is a storage change inside the budget authority, which task-201 owns and
 which has failing tests today. Doing it from this branch would mean editing the
 money-handling code while it is already red, so it waits.
 
-#### The backstop Green Light has and this does not
+#### The backstop question, answered
+
+Green Light keeps both uncapped tiers under a monthly budget governor - a
+platform ceiling rather than a per-user fairness rule. Event Every has no
+monthly governor, which looked like a gap worth filling.
+
+It is not, and the reason is in `policy.ts`:
+
+> `$1/day, matched to the ceiling the OpenRouter key itself carries.`
+
+**The key is the backstop.** Each OpenRouter key will not honour spending past
+its own daily limit, so a runaway tier stops at the provider whatever this app
+believes. Building a monthly governor here would add a second ceiling underneath
+one that already exists and is enforced by somebody else's billing system - more
+accounting to keep correct, for a guarantee already held.
+
+What Green Light needs a monthly governor for is a different shape: many users
+sharing one key, where a per-user daily cap does not bound the total. Event
+Every gives each TIER its own key, so the total is bounded by construction.
+
+So: no monthly ceiling. The thing to keep true instead is the invariant that
+already exists - `OWNER_DAILY_LIMIT_NANODOLLARS` must never exceed what the key
+will actually allow, per key. If a key's limit is raised, raise it here too; if
+it is lowered, lower it here FIRST, or OpenRouter's 402 becomes the control and
+this app stops being the thing that says no.
+
+#### The difference from Green Light, stated
 
 In Green Light both tiers still sit under a monthly budget governor - a platform ceiling rather than a per-user fairness rule. Event Every has only the daily authority, so an uncapped account here is uncapped full stop. That is a real difference from the design being copied and it is stated rather than papered over. See task-201, which owns the budget authority.
 
