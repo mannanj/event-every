@@ -62,7 +62,13 @@ test.describe('a healthy deployment', () => {
   test('the route manifest is enforced at the edge', async ({ request }) => {
     // A GET at a POST-only route must be refused by admission before it
     // reaches any handler, with the Allow header naming the one method.
-    const response = await request.get('/api/scan');
+    //
+    // /api/sync/push rather than /api/scan, deliberately. The scan route sits
+    // behind a tighter edge rate limit, so probing it from a smoke test that
+    // runs on every deploy answers 429 and fails for a reason that has nothing
+    // to do with the deployment. This asserts the same admission layer against
+    // a route that is not metered that way.
+    const response = await request.get('/api/sync/push');
     expect(response.status()).toBe(405);
     expect(response.headers().allow).toBe('POST');
   });

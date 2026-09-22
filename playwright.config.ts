@@ -33,16 +33,26 @@ export default defineConfig({
     video: 'retain-on-failure',
     ...(isOffline ? { proxy: { server: 'http://127.0.0.1:9', bypass: 'localhost,127.0.0.1,::1' } } : {}),
   },
-  projects: [
-    {
-      name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
-    },
-    {
-      name: 'webkit',
-      use: { ...devices['Desktop Safari'] },
-    },
-  ],
+  // One browser against production, both locally.
+  //
+  // The prod smoke test is mostly API assertions, where a second engine proves
+  // nothing and doubles the request rate against a live origin. Running both
+  // fired fourteen requests in eight seconds and tripped Cloudflare's rate
+  // limiting, which then failed three tests for reasons that had nothing to do
+  // with the deployment - a smoke test that reports a false alarm is only
+  // marginally better than one that reports a false all-clear.
+  projects: isProd
+    ? [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }]
+    : [
+        {
+          name: 'chromium',
+          use: { ...devices['Desktop Chrome'] },
+        },
+        {
+          name: 'webkit',
+          use: { ...devices['Desktop Safari'] },
+        },
+      ],
   webServer: isProd
     ? undefined
     : {
