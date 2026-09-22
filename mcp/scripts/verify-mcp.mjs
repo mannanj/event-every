@@ -129,7 +129,9 @@ if (REQUIRE_AUTH && !TOKEN) {
   // anything. It is the one cost of a tool surface that grows silently: adding
   // a tool feels free, and it is not.
   //
-  // MCP_MAX_LIST_BYTES turns it from an observation into a gate.
+  // MCP_MAX_LIST_BYTES turns it from an observation into a gate. Ours is set
+  // to 26000 against a measured 17300 across ten tools - about 4,300 tokens.
+  // Roughly 50% headroom: adding a tool passes, doubling the surface does not.
   {
     const bytes = Buffer.byteLength(JSON.stringify(list?.result?.tools ?? []), "utf8");
     const ceiling = Number(process.env.MCP_MAX_LIST_BYTES || 0);
