@@ -59,5 +59,10 @@ export const MCP_TOOLS: readonly { name: string; does: string; costs: string }[]
     does: 'Imports an .ics file. Parsed, not inferred.',
     costs: 'Nothing.',
   },
+  {
+    name: 'request_photo_upload',
+    does: 'Hands you a one-time link to send a photo from your own phone. Lasts 15 minutes.',
+    costs: 'The scan it triggers spends from the daily budget.',
+  },
   { name: 'remove_event', does: 'Removes an event from every device.', costs: 'Nothing.' },
 ];

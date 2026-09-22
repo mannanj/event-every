@@ -226,6 +226,46 @@ if (addedEvent?.id) {
     : fail('remove_event cleans up after itself', JSON.stringify(removed?.result ?? removed).slice(0, 200));
 }
 
+// 7b. The upload handoff ─────────────────────────────────────────────────────
+console.log('\n7b. the photo handoff');
+{
+  const minted = await rpc('tools/call', { name: 'request_photo_upload', arguments: {} });
+  const link = minted?.result?.structuredContent;
+  link?.url?.includes('/upload?t=')
+    ? ok('request_photo_upload mints a link', `${Math.round(link.expiresInSeconds / 60)} min`)
+    : fail('request_photo_upload mints a link', JSON.stringify(minted?.result ?? minted).slice(0, 200));
+
+  if (link?.url) {
+    // The link is a capability. It must not also be an actor token: presenting
+    // it as a bearer credential has to get nowhere.
+    const token = new URL(link.url).searchParams.get('t');
+    const asBearer = await fetch(`${APP}/api/mcp/events?from=2026-01-01`, {
+      headers: { authorization: `Bearer ${token}` },
+    });
+    check('the upload link is not a bearer token', 401, asBearer.status);
+
+    // A 1x1 PNG, redeemed the way the phone does it.
+    const PIXEL = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+    const redeemed = await fetch(`${APP}/api/mcp/handoff`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'redeem', token, imageBase64: PIXEL, mimeType: 'image/png' }),
+    });
+    // A 1x1 pixel has no events in it, so anything but a 5xx is the transport
+    // working: the token verified, the image validated, the scanner answered.
+    redeemed.status < 500
+      ? ok('a redeem with a real link is accepted', String(redeemed.status))
+      : fail('a redeem with a real link is accepted', String(redeemed.status));
+
+    const forged = await fetch(`${APP}/api/mcp/handoff`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'redeem', token: 'forged.token', imageBase64: PIXEL, mimeType: 'image/png' }),
+    });
+    check('a forged upload token is refused', 403, forged.status);
+  }
+}
+
 // 8. A token from nowhere ────────────────────────────────────────────────────
 console.log('\n8. an invented token');
 {

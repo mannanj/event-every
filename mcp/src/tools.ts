@@ -8,6 +8,7 @@ import {
   listEvents,
   removeEvent,
   saveEvents,
+  mintUploadLink,
   scanInput,
   type Caller,
   type McpEventView,
@@ -481,6 +482,48 @@ export function createEventEveryMcpServer(env: ToolEnv): McpServer {
       backupOriginal: args.backupOriginal as boolean | undefined,
     }),
   });
+
+  server.registerTool(
+    'request_photo_upload',
+    {
+      title: 'Ask for a photo the assistant cannot reach',
+      description:
+        'Returns a one-time link the person opens to send a photo from their own ' +
+        'device. Use this when they have a picture you cannot get at: on their ' +
+        'phone, in their camera roll, not on the web. Show them the link and say ' +
+        'it lasts fifteen minutes. The events are saved to their account when ' +
+        'they upload, so afterwards use list_events to see what arrived. Prefer ' +
+        'read_image_into_events whenever you already have a URL or the bytes.',
+      annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+      inputSchema: {},
+      outputSchema: {
+        url: z.string(),
+        expiresInSeconds: z.number().int(),
+        email: z.string(),
+      },
+    },
+    async () => {
+      const caller = requireCaller();
+      if (!caller) return refusal('unauthenticated', SIGN_IN);
+      try {
+        const link = await mintUploadLink(env, caller);
+        return {
+          content: [
+            {
+              type: 'text' as const,
+              text:
+                `Open this to send a photo, within ${Math.round(link.expiresInSeconds / 60)} ` +
+                `minutes:\n\n${link.url}\n\nIt uploads to ${link.email} and nowhere else. ` +
+                'Once they have sent it, list_events will show what was read out of it.',
+            },
+          ],
+          structuredContent: link,
+        };
+      } catch (error) {
+        return problem(said(error, 'Could not make an upload link.'));
+      }
+    },
+  );
 
   server.registerTool(
     'remove_event',

@@ -32,6 +32,10 @@ export const ROUTE_MANIFEST: Readonly<Record<string, RoutePolicy>> = {
   // of the scanner's own 8MiB ceiling. /api/scan admits 12MiB for the same
   // reason; this is that plus the .ics and page-text cases.
   '/api/mcp/scan': policy('POST', 16 * MiB),
+  // Two jobs, one path: the MCP Worker mints an upload link with an actor
+  // token, and the person's browser redeems it with the photo. The ceiling is
+  // the redeem half, which carries an image as base64.
+  '/api/mcp/handoff': policy('POST', 16 * MiB),
   // Attachment backup. `file` returns bytes rather than JSON, which is why it
   // is a GET with no body: the admission policy pins the media type of what
   // comes IN, and nothing comes in here. `upload` carries base64 in JSON, so

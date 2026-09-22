@@ -190,29 +190,39 @@ export async function verifyMcpGrant(
   return { ok: true, payload };
 }
 
+/**
+ * `purpose` and `ttlSeconds` exist so a THIRD short-lived assertion - the
+ * upload handoff link - can reuse this rather than copy it. A different purpose
+ * produces a token that cannot verify as an actor token, and vice versa, which
+ * is the same separation the grant already has. One implementation of "sign a
+ * short-lived assertion" is one place to get it right.
+ */
 export async function signActor(
   identity: { sub: string; email: string },
   secret: string,
+  options: { purpose?: string; ttlSeconds?: number } = {},
 ): Promise<string> {
-  const payload: ActorPayload = {
+  const purpose = options.purpose ?? ACTOR_PURPOSE;
+  const payload = {
     ...identity,
-    exp: currentSeconds() + ACTOR_TTL_SECONDS,
+    exp: currentSeconds() + (options.ttlSeconds ?? ACTOR_TTL_SECONDS),
     nonce: crypto.randomUUID(),
-    aud: ACTOR_PURPOSE,
+    aud: purpose,
   };
   const encoded = b64urlEncode(JSON.stringify(payload));
-  return `${encoded}.${await sign(ACTOR_PURPOSE, encoded, secret)}`;
+  return `${encoded}.${await sign(purpose, encoded, secret)}`;
 }
 
 /** Null means "acting for nobody", which every caller must treat as unauthorized. */
 export async function verifyActor(
   token: string,
   secret: string,
-  options: { nowSeconds?: number } = {},
+  options: { nowSeconds?: number; purpose?: string } = {},
 ): Promise<ActorPayload | null> {
+  const purpose = options.purpose ?? ACTOR_PURPOSE;
   const parts = split(token);
   if (!parts) return null;
-  if (!constantTimeEqual(parts.signature, await sign(ACTOR_PURPOSE, parts.encoded, secret))) {
+  if (!constantTimeEqual(parts.signature, await sign(purpose, parts.encoded, secret))) {
     return null;
   }
 
@@ -224,7 +234,7 @@ export async function verifyActor(
     if (typeof payload?.sub !== 'string' || typeof payload?.email !== 'string') return null;
     if (!payload.sub || !payload.email) return null;
     if (typeof payload?.exp !== 'number') return null;
-    if (payload?.aud !== ACTOR_PURPOSE) return null;
+    if (payload?.aud !== purpose) return null;
     if (payload.exp <= (options.nowSeconds ?? currentSeconds())) return null;
     return payload;
   } catch {

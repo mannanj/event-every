@@ -43,4 +43,8 @@ The session cookie is deliberately host-only — no `Domain` attribute — so th
 - [x] Refusal tests, live: a stranger at the bridge sent to sign-in, a grant bound to another state refused 400, an invented bearer token 401, a filterless list refused. Expiry and unknown-signer are covered by unit tests, which can move the clock.
 - [x] A test proving one account's MCP token cannot read another account's events. Four ways: a list read, a known id, a removal by id, and the ciphertext copied across so the envelope is what refuses rather than the WHERE clause.
 
+#### Done 2026-09-21
+
+All scope and proof boxes closed. Deployed, and the whole chain verified against the live pair by `mcp/scripts/verify-oauth-live.mjs`.
+
 - Location: new `mcp/` Worker, `src/app/api/mcp/`, `src/server/accounts/auth.ts`, `migrations/accounts/`

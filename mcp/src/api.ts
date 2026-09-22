@@ -209,3 +209,25 @@ export async function scanInput(
     caller,
   );
 }
+
+export type HandoffLink = {
+  url: string;
+  expiresInSeconds: number;
+  email: string;
+};
+
+/**
+ * Ask the app for a one-time upload link.
+ *
+ * The Worker never sees the photo. It hands over a link and the person uploads
+ * to the app directly, which is the only shape that works when the file is on a
+ * phone and the client cannot reach it.
+ */
+export async function mintUploadLink(env: ToolEnv, caller: Caller): Promise<HandoffLink> {
+  return call<HandoffLink>(
+    env,
+    '/api/mcp/handoff',
+    { method: 'POST', body: JSON.stringify({ action: 'mint' }) },
+    caller,
+  );
+}
