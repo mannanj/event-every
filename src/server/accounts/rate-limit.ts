@@ -69,7 +69,7 @@ export interface LimitVerdict {
  * legible as an address or an IP when debugging.
  */
 export async function bucketKey(
-  kind: 'email' | 'ip',
+  kind: 'email' | 'ip' | 'scan',
   value: string,
   secret: string | undefined,
 ): Promise<string> {
@@ -150,6 +150,34 @@ export async function spend(
 export const SIGN_IN_LIMITS = {
   perEmail: { max: 3, windowSeconds: 15 * 60 },
   perIp: { max: 60, windowSeconds: 60 * 60 },
+} as const;
+
+/**
+ * How much of a day one person may take.
+ *
+ * WHY A PER-USER CAP EXISTS BENEATH THE PLATFORM CEILING. The owner ledger is
+ * $1 a day shared by everybody who is not an admin. Without a second limit
+ * underneath it, the first visitor to scan forty posters ends the day for
+ * everyone else - and task-201 measured the worse version of that, where a
+ * handful of FAILED calls burned 97% of a day at the full reservation.
+ *
+ * The platform ceiling answers "has this app spent too much". This answers "has
+ * one person taken too much of it". They are different questions and a single
+ * number cannot answer both, which is the argument Green Light's design makes
+ * and the gap Event Every had.
+ *
+ * TWENTY A DAY, and the arithmetic is deliberate. An image scan reserves
+ * 50,000,000 nanodollars, so the day holds twenty of them; a text scan reserves
+ * 20,000,000, so the day holds fifty. Twenty is therefore "a whole day of
+ * images, or under half a day of text" for one person - generous for real use,
+ * and it still leaves the day survivable when somebody loops. It is a fairness
+ * rule, not a spending limit: the ledger is still what says no about money.
+ *
+ * Keyed per UTC day so it lines up with the budget it sits under, and hashed
+ * like every other bucket so the table is not a log of who scanned what.
+ */
+export const SCAN_LIMITS = {
+  perIdentity: { max: 20, windowSeconds: 24 * 60 * 60 },
 } as const;
 
 /**

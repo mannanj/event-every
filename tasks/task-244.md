@@ -24,7 +24,7 @@ Collapsing them into one flag is the mistake this shape exists to avoid. "May by
 
 - [x] `src/server/accounts/admin.ts`: `DEFAULT_ADMIN_EMAILS = ['hello@mannan.is']`, an env override, `isAdminEmail`, `shouldEnforceDailyCaps`.
 - [x] Migration: `account.unlimited INTEGER NOT NULL DEFAULT 0`.
-- [ ] BLOCKED, see below. Thread it into the scan path once there is a cap to lift.
+- [x] Threaded into the scan path. See tasks/task-245.md for the design that made it possible without a schema change.
 - [x] Tests: an ordinary account is capped, an admin is not, an unlimited account is not, and an unlimited account gets nothing else.
 
 #### The part that needs a decision, not code

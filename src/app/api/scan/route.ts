@@ -11,6 +11,7 @@ import { OWNER_MODEL_CHAINS } from '@/platform/provider/policy';
 import { MAX_EXCERPT_CHARS, verifyCandidates } from '@/server/typesafe/verify';
 import { typeSafeAvailable } from '@/server/typesafe/client';
 import { resolveSpendPolicy } from '@/server/accounts/spend-tier';
+import { chargeScanCap } from '@/server/accounts/scan-cap';
 
 type E1SourceHandle = Extract<SourceHandle, { kind: 'text' | 'image' }>;
 
@@ -64,6 +65,22 @@ export async function POST(request: NextRequest): Promise<Response> {
     // from its own ledger and its own key; everybody else, including every
     // signed-out visitor, is on the shared capped one.
     const policyVersion = await resolveSpendPolicy(request);
+
+    // BEFORE ANY SPEND. The budget ledger says no about money; this says no
+    // about one person taking the whole day from everyone else. Charged here
+    // rather than after the scan, because a refusal that happens after the
+    // provider call has already been paid for is not a limit.
+    const identity = request.headers.get('x-event-every-identity') ?? 'unknown';
+    const cap = await chargeScanCap(identity, policyVersion);
+    if (!cap.allowed) {
+      return NextResponse.json(
+        {
+          error: 'You have scanned a lot today. Try again tomorrow.',
+          code: 'scan_cap_reached',
+        },
+        { status: 429, headers: { 'Retry-After': String(cap.retryAfter) } },
+      );
+    }
 
     const result = await runCoordinatedScanJob({
       requestId,

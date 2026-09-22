@@ -55,7 +55,7 @@ The cost: `policy_version` carries two meanings, generation and tier. Acceptable
 - [x] `/api/scan` reads the session and resolves the tier. A signed-out visitor is always the owner policy.
 - [x] Validators take a set. `owner-budget-authority.ts:130` writes the input's version; `:134`, `:140`, `:260` take the limit from the policy rather than the constant.
 - [x] **`/api/usage` and `OwnerBudgetBoundary`.** A third derivation of the ledger name lives at `runtime.ts:70` and has no session. Left alone, a visitor-heavy day that exhausts the owner ledger takes the whole UI away from an admin - the precise isolation this task exists to provide, inverted. `runtime.test.ts:101-102` pins the one-argument call.
-- [ ] Task 244's remaining box: a per-user cap beneath the platform ceiling.
+- [x] Task 244's remaining box: a per-user cap beneath the platform ceiling. `SCAN_LIMITS.perIdentity`, 20 a day, charged in `/api/scan` before any spend.
 
 #### Prove
 
