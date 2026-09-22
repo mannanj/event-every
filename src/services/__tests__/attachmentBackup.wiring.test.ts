@@ -23,8 +23,23 @@ describe('the upload side is connected', () => {
     expect(hook).toContain('backupEntryFiles');
   });
 
-  test('it is not awaited, so a slow upload cannot hold up a save', () => {
-    expect(hook).toMatch(/void backupEntryFiles\(/);
+  test('NOTHING IS SENT until the account has been asked', () => {
+    // The one that matters, and the one this got wrong first time. The upload
+    // used to fire unconditionally on the reasoning that the server refuses
+    // when the switch is off - which it does, after receiving the photograph.
+    // A signed-out visitor's picture left the device on every save.
+    //
+    // So the status call must come BEFORE the upload call, textually and in
+    // execution.
+    expect(hook).toContain('readBackupStatus');
+    expect(hook.indexOf('readBackupStatus')).toBeLessThan(hook.indexOf('backupEntryFiles('));
+    expect(hook).toMatch(/if \(status\?\.enabled !== true\) return;/);
+  });
+
+  test('it does not hold up a save', () => {
+    // Fired without the caller awaiting it: the save has already succeeded and
+    // somebody is waiting to see their events.
+    expect(hook).toMatch(/void \(async \(\) => \{/);
   });
 
   test('it is skipped when there are no files', () => {

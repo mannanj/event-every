@@ -37,6 +37,45 @@ const STATE_TTL_SECONDS = 600;
 const stateKey = (state: string) => `mcp:authreq:${state}`;
 
 /**
+ * Binds the browser that STARTED an authorization to the one that finishes it.
+ *
+ * WITHOUT THIS, ANY SIGNED-IN PERSON CAN BE MADE TO CONNECT SOMEBODY ELSE'S
+ * ASSISTANT TO THEIR ACCOUNT WITH ONE CLICK. An attacker begins a flow in their
+ * own client, takes the opaque `state`, and sends a victim the app's bridge URL
+ * carrying it. The victim's session signs a grant for the victim's account, the
+ * callback completes the authorization the ATTACKER started, and the attacker's
+ * client receives a token for the victim's calendar. Nothing in the state, the
+ * grant or the PKCE exchange prevents that: every one of them is about the
+ * client and the account, and none is about the browser.
+ *
+ * So /authorize sets this, and /callback refuses without it. The attacker's
+ * browser holds the cookie; the victim's does not.
+ *
+ * Host-only, HttpOnly, SameSite=Lax - Lax rather than Strict because the
+ * callback IS a cross-site navigation back from the app, and Strict would
+ * withhold the cookie on exactly the request that needs it.
+ */
+const FLOW_COOKIE = 'ee_mcp_flow';
+const FLOW_TTL_SECONDS = STATE_TTL_SECONDS;
+
+function readCookie(header: string | null, name: string): string | null {
+  if (!header) return null;
+  for (const part of header.split(';')) {
+    const [key, ...rest] = part.trim().split('=');
+    if (key === name) return decodeURIComponent(rest.join('='));
+  }
+  return null;
+}
+
+/** Compared in constant time: it is a secret that gates completing a flow. */
+function sameFlow(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let index = 0; index < a.length; index += 1) diff |= a.charCodeAt(index) ^ b.charCodeAt(index);
+  return diff === 0;
+}
+
+/**
  * 32 bytes, base64url. The app's bridge and its sign-in page both validate the
  * shape `[A-Za-z0-9_-]{1,128}`, so anything minted here has to satisfy it.
  */
@@ -95,9 +134,22 @@ async function handleAuthorize(request: Request, env: Env): Promise<Response> {
     expirationTtl: STATE_TTL_SECONDS,
   });
 
+  // A secret this browser holds, checked at /callback. See FLOW_COOKIE.
+  const flow = newState();
+  await env.OAUTH_KV.put(`mcp:flow:${state}`, flow, { expirationTtl: FLOW_TTL_SECONDS });
+
   const bridge = new URL('/api/mcp/authorize', env.APP_ORIGIN);
   bridge.searchParams.set('state', state);
-  return Response.redirect(bridge.toString(), 302);
+
+  return new Response(null, {
+    status: 302,
+    headers: {
+      Location: bridge.toString(),
+      'Cache-Control': 'no-store',
+      'Set-Cookie':
+        `${FLOW_COOKIE}=${flow}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${FLOW_TTL_SECONDS}`,
+    },
+  });
 }
 
 async function handleCallback(request: Request, env: Env): Promise<Response> {
@@ -108,6 +160,24 @@ async function handleCallback(request: Request, env: Env): Promise<Response> {
 
   const stored = await env.OAUTH_KV.get(stateKey(state));
   if (!stored) return fail(400, 'That took too long. Start connecting again.');
+
+  // THE BROWSER THAT STARTED THIS MUST BE THE ONE FINISHING IT. Checked before
+  // the grant, because a request from a browser that never began a flow should
+  // not reach the verifier at all - and because failing here costs an attacker
+  // the state, which is burned below whatever happens.
+  const expectedFlow = await env.OAUTH_KV.get(`mcp:flow:${state}`);
+  const presentedFlow = readCookie(request.headers.get('cookie'), FLOW_COOKIE);
+  const boundToThisBrowser =
+    expectedFlow !== null && presentedFlow !== null && sameFlow(expectedFlow, presentedFlow);
+
+  await env.OAUTH_KV.delete(`mcp:flow:${state}`);
+
+  if (!boundToThisBrowser) {
+    await env.OAUTH_KV.delete(stateKey(state));
+    // Deliberately the same shape of refusal as a bad grant: which check failed
+    // is information for somebody probing.
+    return fail(403, 'That sign-in could not be verified.');
+  }
 
   // Burn the state before touching the grant, so a forged grant cannot be
   // brute-forced against a live one. The burn is best-effort - KV deletes are

@@ -24,7 +24,12 @@ export const ROUTE_MANIFEST: Readonly<Record<string, RoutePolicy>> = {
   //
   // Split by verb in the PATH rather than by method, because a policy admits
   // GET or POST and nothing else.
+  // Asking and doing, deliberately apart. The GET shows a consent page; only
+  // the POST signs a grant, and it needs a token tied to the session that a
+  // cross-site link cannot carry. This route used to sign on the GET, which
+  // meant a link could connect a stranger's assistant to your account.
   '/api/mcp/authorize': policy('GET', 0),
+  '/api/mcp/authorize/confirm': policy('POST', 0),
   '/api/mcp/events': policy('GET', 0),
   '/api/mcp/events/save': policy('POST', 64 * 1024),
   '/api/mcp/events/remove': policy('POST', 1024),

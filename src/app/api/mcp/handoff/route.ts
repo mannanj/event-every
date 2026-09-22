@@ -10,7 +10,7 @@ import {
 import { accountDek } from '@/server/accounts/store';
 import { mcpJson, requireActor } from '@/server/mcp/actor';
 import { readEventsByIds, writeEvents } from '@/server/mcp/events';
-import { HANDOFF_TTL_SECONDS, signHandoff, verifyHandoff } from '@/server/mcp/handoff';
+import { HANDOFF_TTL_SECONDS, burnHandoff, signHandoff, verifyHandoff } from '@/server/mcp/handoff';
 import { mcpEnv } from '@/server/mcp/env';
 import { keepOriginal, resolveBackup } from '@/server/mcp/original';
 import { reviewDraftsToCalendarEvents } from '@/services/reviewEvent';
@@ -108,6 +108,14 @@ async function redeem(request: Request, input: z.infer<typeof Redeem>) {
   // One message for expired, forged and malformed alike. Which one it was is
   // information for somebody probing, not for somebody who waited too long.
   if (!who) return mcpJson({ error: 'That upload link has expired. Ask for a new one.' }, 403);
+
+  // SPEND IT BEFORE DOING ANY WORK. Burning first means a second upload of the
+  // same link loses the race rather than racing the scan - and the scan is the
+  // part that costs money. An already-spent link gets the same message as an
+  // expired one, because from the person's side they are the same thing.
+  if (!(await burnHandoff(accountsDb(env), input.token, who.sub))) {
+    return mcpJson({ error: 'That upload link has expired. Ask for a new one.' }, 403);
+  }
 
   const dataUrl = `data:${input.mimeType};base64,${input.imageBase64}`;
   try {

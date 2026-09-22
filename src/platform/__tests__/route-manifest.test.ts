@@ -69,6 +69,7 @@ describe('route manifest', () => {
       '/api/sync/pull': { method: 'GET', maxBodyBytes: 0, allow: 'GET' },
       '/api/sync/push': { method: 'POST', maxBodyBytes: 4 * 1024 * 1024, allow: 'POST' },
       '/api/mcp/authorize': { method: 'GET', maxBodyBytes: 0, allow: 'GET' },
+      '/api/mcp/authorize/confirm': { method: 'POST', maxBodyBytes: 0, allow: 'POST' },
       '/api/mcp/events': { method: 'GET', maxBodyBytes: 0, allow: 'GET' },
       '/api/mcp/events/save': { method: 'POST', maxBodyBytes: 64 * 1024, allow: 'POST' },
       '/api/mcp/events/remove': { method: 'POST', maxBodyBytes: 1024, allow: 'POST' },

@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { InputHistoryEntry } from '@/types/input';
 import { inputStorage } from '@/services/inputStorage';
-import { backupEntryFiles, restoreEntryFiles } from '@/services/attachmentBackup';
+import { backupEntryFiles, readBackupStatus, restoreEntryFiles } from '@/services/attachmentBackup';
 
 /**
  * Input history, with a second layer underneath it.
@@ -37,17 +37,31 @@ export function useInputHistory() {
       const id = await inputStorage.addHistoryEntry(entry);
       await refresh();
 
-      // NOT AWAITED. Saving an input has already succeeded by the time this
-      // runs, and the person is waiting to see their events - making them wait
-      // on an upload would be charging them for a backup they may not even have
-      // turned on. The server checks the account setting and answers an empty
-      // list when it is off, so this is a no-op for most people.
+      // ASK BEFORE SENDING, and the order here is the whole point.
       //
-      // Errors cannot escape: backupEntryFiles catches everything and returns
-      // [], because a failed backup must never turn a successful save into an
-      // error the person sees.
+      // This used to call backupEntryFiles unconditionally, on the reasoning
+      // that the server refuses when the switch is off. It does - but it
+      // refuses AFTER the request arrives, and the request is the photograph.
+      // So a signed-out visitor's picture left their device on every save, up
+      // to ten files of six megabytes each, to be answered 401 and discarded.
+      // "A no-op for most people" was true of the effect and false of the only
+      // part that mattered.
+      //
+      // readBackupStatus answers null when signed out or unconfigured, and
+      // `enabled` false when the switch is off. Either way nothing is encoded
+      // and nothing is sent.
       if (entry.files.length > 0) {
-        void backupEntryFiles(id, entry.files);
+        void (async () => {
+          const status = await readBackupStatus();
+          if (status?.enabled !== true) return;
+          // NOT AWAITED BY THE CALLER. The save has already succeeded and the
+          // person is waiting to see their events; making them wait on a
+          // backup would be charging them for it. Errors cannot escape either -
+          // backupEntryFiles catches everything and answers [], because a
+          // failed backup must never turn a successful save into a visible
+          // error.
+          await backupEntryFiles(id, entry.files);
+        })();
       }
 
       return id;

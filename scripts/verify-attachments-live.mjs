@@ -31,6 +31,8 @@ const ok = (label, detail = '') => console.log(`  ok    ${label.padEnd(46)} ${de
 const fail = (label, detail) => { failures += 1; console.log(`  FAIL  ${label.padEnd(46)} ${detail}`); };
 const check = (label, expected, actual) =>
   String(expected) === String(actual) ? ok(label, String(actual)) : fail(label, `expected ${expected}, got ${actual}`);
+const expect_boolean = (label, value) =>
+  typeof value === 'boolean' ? ok(label, String(value)) : fail(label, `not a boolean: ${value}`);
 
 const headers = { cookie: `${COOKIE}=${SESSION}`, 'Content-Type': 'application/json' };
 const api = (path, init = {}) => fetch(`${APP}${path}`, { ...init, headers: { ...headers, ...init.headers } });
@@ -46,9 +48,14 @@ console.log(`Attachment backup, against the real bucket\n  ${APP}\n`);
 
 // 1. The switch ──────────────────────────────────────────────────────────────
 console.log('1. the account setting');
+/** Whatever the account had before this ran, so cleanup can put it back. */
+let SWITCH_WAS_ON = false;
 {
   const before = await (await api('/api/attachments')).json();
-  check('starts off', false, before.enabled);
+  SWITCH_WAS_ON = before.enabled === true;
+  // Not an assertion about the account: a real account may legitimately have it
+  // on already. What is asserted is that the value is readable and boolean.
+  expect_boolean('the switch reads back', before.enabled);
 
   const turned = await api('/api/attachments/settings', {
     method: 'POST',
@@ -137,14 +144,31 @@ console.log('\n6. removal');
     : ok('gone from the listing too');
 }
 
-// 7. Leave nothing behind ────────────────────────────────────────────────────
+// 7. Leave nothing behind, and NOTHING ELSE EITHER ───────────────────────────
 console.log('\n7. cleanup');
 {
-  await api('/api/attachments/remove', { method: 'POST', body: JSON.stringify({ all: true }) });
-  await api('/api/attachments/settings', { method: 'POST', body: JSON.stringify({ enabled: false }) });
+  // THIS USED TO POST { all: true }, WHICH DELETES EVERY BACKUP ON THE ACCOUNT.
+  // A verification script that destroys the data it was pointed at is a trap:
+  // it is safe on the throwaway account it was written for and catastrophic the
+  // first time somebody runs it against their own. Remove only what this run
+  // created, by id.
+  await api('/api/attachments/remove', {
+    method: 'POST',
+    body: JSON.stringify({ ids: [FILE_ID, `${FILE_ID}-nope`] }),
+  });
+
+  // The switch goes back to whatever it was, not to off. This run turned it on;
+  // an account that already had it on must not be quietly turned off by a test.
+  await api('/api/attachments/settings', {
+    method: 'POST',
+    body: JSON.stringify({ enabled: SWITCH_WAS_ON }),
+  });
+
   const after = await (await api('/api/attachments')).json();
-  check('switch back off', false, after.enabled);
-  check('nothing left', 0, (after.attachments ?? []).length);
+  check('switch restored to how it was found', SWITCH_WAS_ON, after.enabled);
+  (after.attachments ?? []).some((one) => one.id === FILE_ID)
+    ? fail('this run left nothing of its own', 'still listed')
+    : ok('this run left nothing of its own');
 }
 
 console.log(failures ? `\nFAILED (${failures})` : '\nREAL BUCKET ROUND TRIP PASSED');
