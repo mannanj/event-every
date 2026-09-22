@@ -39,8 +39,8 @@ The session cookie is deliberately host-only — no `Domain` attribute — so th
 
 #### Prove
 
-- [ ] A scripted end-to-end run of the whole flow with no human clicking anything, reading the magic link out of the Worker log the way `mcp/scripts/verify-oauth.mjs` does in the skeleton.
-- [ ] Refusal tests: a grant replayed after expiry, a grant bound to another state, an actor token from an unknown signer, a tool call with no token.
+- [x] A scripted end-to-end run of the whole flow with no human clicking anything: `mcp/scripts/verify-oauth-live.mjs`. Production sends real mail, so there is no link to scrape - the session is seeded into D1 instead, and that is the only step skipped.
+- [x] Refusal tests, live: a stranger at the bridge sent to sign-in, a grant bound to another state refused 400, an invented bearer token 401, a filterless list refused. Expiry and unknown-signer are covered by unit tests, which can move the clock.
 - [x] A test proving one account's MCP token cannot read another account's events. Four ways: a list read, a known id, a removal by id, and the ciphertext copied across so the envelope is what refuses rather than the WHERE clause.
 
 - Location: new `mcp/` Worker, `src/app/api/mcp/`, `src/server/accounts/auth.ts`, `migrations/accounts/`
