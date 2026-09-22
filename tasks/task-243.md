@@ -31,7 +31,7 @@ Off by default. Uploading somebody's photographs because they signed in is not a
 - [x] The two account-menu items, with a second click before deleting
 - [x] Upload on save: called from `useInputHistory.addEntry`, not awaited
 - [x] Restore on miss: `ensureFiles`, called when an entry is loaded from history
-- [ ] The R2 bucket itself, and the migration applied
+- [x] The R2 bucket itself, and the migration applied
 
 #### Decisions, stated
 
@@ -44,6 +44,6 @@ Off by default. Uploading somebody's photographs because they signed in is not a
 - [x] 18 tests against real SQLite running the actual migrations, not a mock
 - [x] Mutation-validated: storing plaintext fails 5, dropping `account_id` from the lookup fails 1
 - [x] 15 tests on the client half, all on failing quietly
-- [ ] A round trip through a real bucket, not an in-memory one
+- [x] A round trip through a real bucket: `scripts/verify-attachments-live.mjs`, run against production. Bytes identical in and out, the sealed filename survived, removal really deleted the object.
 
 - Location: `src/server/accounts/attachments.ts`, `src/app/api/attachments/`, `src/services/attachmentBackup.ts`, `src/hooks/useAttachmentBackup.ts`, `migrations/accounts/0003_attachments.sql`

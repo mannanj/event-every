@@ -19,6 +19,7 @@
     "assert:e1-protected": "bun scripts/assert-e1-protected.ts",
     "verify:e1:offline": "bun scripts/run-e1-offline.ts",
     "build:cloudflare": "opennextjs-cloudflare build",
+    "verify:attachments:live": "node scripts/verify-attachments-live.mjs",
     "check:prod-like": "node scripts/prod-like-check.mjs",
     "cf:types": "bun scripts/run-c1-a-cloudflare.ts app-types",
     "cf:types:keepalive": "bun scripts/run-c1-a-cloudflare.ts keepalive-types",
