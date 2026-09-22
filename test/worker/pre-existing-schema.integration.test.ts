@@ -122,9 +122,15 @@ describe('a Durable Object over a pre-existing schema', () => {
     expect(status).toBeDefined();
   });
 
-  it('still reports the terminal outcome it was holding', async () => {
-    // Not just "does not throw": the row written under the old schema has to
-    // remain readable, which is what a positional mismatch would silently break.
+  it('still reads a row written under the old schema', async () => {
+    // NOT `status({ requestDigest })`. STATUS_KEYS is an exact empty key set,
+    // so anything passed there is rejected as malformed before storage is
+    // touched - the earlier version of this test asserted `toBeDefined()` on
+    // that refusal and proved nothing at all.
+    //
+    // Reading the row through the instance's own storage is the assertion that
+    // matters: a positional column mismatch would break exactly this while
+    // construction still appeared to succeed.
     const stub = authority('pre-existing-readable');
     const digest = 'b'.repeat(64);
     const executionId = crypto.randomUUID();
@@ -137,7 +143,20 @@ describe('a Durable Object over a pre-existing schema', () => {
       );
     });
 
-    await expect(stub.status({ requestDigest: digest })).resolves.toBeDefined();
+    // Forces construction over the existing table first.
+    await expect(stub.status({})).resolves.toBeDefined();
+
+    const rows = await runInDurableObject(
+      stub,
+      (_instance: ProviderRequestAuthority, state: DurableObjectStateLike) =>
+        state.storage.sql
+          .exec('SELECT request_digest, execution_id, terminal_class FROM provider_request_tombstone')
+          .toArray(),
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0].request_digest).toBe(digest);
+    expect(rows[0].execution_id).toBe(executionId);
+    expect(rows[0].terminal_class).toBe('failed');
   });
 
   it('accepts an empty database, which is how a brand new one starts', async () => {

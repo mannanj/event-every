@@ -99,15 +99,28 @@ describe('uploading', () => {
     expect(body.entryId).toBe('entry-1');
     expect(body.files[0].id).toBe('file-1');
     expect(body.files[0].data).toBe(btoa('\x01\x02\x03'));
-    // Not sent unless asked for: the account setting is the default, and the
-    // server decides. An override has to be deliberate.
+    // The account setting decides, and the server enforces it.
     expect(body.override).toBeUndefined();
   });
 
-  test('an override is passed through when it is meant', async () => {
+  test('a browser cannot override the account setting', async () => {
+    // The route used to accept `override: true` from the request body, which
+    // made the switch advisory for anything that could set a field. An
+    // assistant's per-call override still exists, on the MCP routes, where the
+    // caller is authenticated differently.
     stub(() => json({ stored: ['file-1'] }, 201));
-    await backupEntryFiles('entry-1', [storedFile('file-1', [1])], { override: true });
-    expect(JSON.parse(String(calls[0]!.init!.body)).override).toBe(true);
+    await backupEntryFiles('entry-1', [storedFile('file-1', [1])]);
+    expect(JSON.parse(String(calls[0]!.init!.body))).not.toHaveProperty('override');
+  });
+
+  test('more files than the route takes are sent in batches', async () => {
+    // Eleven files at a route that admits three fails the whole request,
+    // including the three it would have accepted.
+    stub(() => json({ stored: [] }, 201));
+    await backupEntryFiles('entry-1', Array.from({ length: 7 }, (_, at) => storedFile(`f${at}`, [at])));
+    expect(calls).toHaveLength(3);
+    expect(JSON.parse(String(calls[0]!.init!.body)).files).toHaveLength(3);
+    expect(JSON.parse(String(calls[2]!.init!.body)).files).toHaveLength(1);
   });
 
   test('nothing to upload makes no request at all', async () => {

@@ -95,14 +95,15 @@ async function toBase64(file: File): Promise<string> {
 /**
  * Send one entry's originals up.
  *
- * `override` is an explicit yes for this one call even though the account
- * switch is off - the same override the MCP tools take. The server checks the
- * account setting itself, so leaving it out is not a way to upload anyway.
+ * No override from a browser. The account switch decides, and the server
+ * enforces it - this used to accept one, which made the setting advisory for
+ * anything that could set a field. An assistant's per-call override still
+ * exists, on the MCP routes, where the caller is authenticated differently and
+ * is acting on an explicit instruction.
  */
 export async function backupEntryFiles(
   entryId: string,
   files: readonly StoredInputFile[],
-  options: { override?: boolean } = {},
 ): Promise<string[]> {
   if (files.length === 0) return [];
   // Batched to the route's own limit. Sending eleven files to a route that
@@ -111,7 +112,7 @@ export async function backupEntryFiles(
   if (files.length > UPLOAD_BATCH) {
     const done: string[] = [];
     for (let at = 0; at < files.length; at += UPLOAD_BATCH) {
-      done.push(...(await backupEntryFiles(entryId, files.slice(at, at + UPLOAD_BATCH), options)));
+      done.push(...(await backupEntryFiles(entryId, files.slice(at, at + UPLOAD_BATCH))));
     }
     return done;
   }
@@ -129,11 +130,7 @@ export async function backupEntryFiles(
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'same-origin',
-      body: JSON.stringify({
-        entryId,
-        files: payload,
-        ...(options.override ? { override: true } : {}),
-      }),
+      body: JSON.stringify({ entryId, files: payload }),
     });
     if (!response.ok) return [];
     return ((await response.json()) as { stored: string[] }).stored ?? [];

@@ -19,8 +19,26 @@ import path from 'node:path';
  */
 
 const appRoot = path.resolve(import.meta.dir, '..', '..', '..');
-const packageSrc = path.join(homedir(), 'Documents', 'mcp-connector', 'src');
 const vendored = path.join(appRoot, 'src', 'vendor', 'mcp-connector');
+
+/**
+ * Where the shared package lives, if it is here at all.
+ *
+ * Checked as a SIBLING first and only then under `~/Documents`. Keying solely
+ * on a home directory meant the drift half could never run anywhere but this
+ * laptop - on CI or another machine it skipped silently, and a test that can
+ * only fail in one place is a test that mostly does not run.
+ *
+ * MCP_CONNECTOR_SRC overrides both, so CI can point at a checkout.
+ */
+function findPackageSrc(): string | null {
+  const candidates = [
+    process.env.MCP_CONNECTOR_SRC,
+    path.resolve(appRoot, '..', 'mcp-connector', 'src'),
+    path.join(homedir(), 'Documents', 'mcp-connector', 'src'),
+  ].filter((one): one is string => Boolean(one));
+  return candidates.find((one) => existsSync(one)) ?? null;
+}
 
 const PAIRS = [
   ['index.tsx', 'connector.tsx'],
@@ -37,9 +55,12 @@ describe('the vendored connector', () => {
   });
 
   test('has not drifted from the shared package', () => {
-    if (!existsSync(packageSrc)) {
-      // A clone without the sibling package still builds: the copy is
-      // committed. Nothing to compare against, so nothing to assert.
+    const packageSrc = findPackageSrc();
+    if (!packageSrc) {
+      // A clone without the package still builds, because the copy is
+      // committed. Nothing to compare against, so nothing to assert - but say
+      // so, rather than passing silently and looking like coverage.
+      console.log('  (skipped: shared package not found; set MCP_CONNECTOR_SRC)');
       return;
     }
 

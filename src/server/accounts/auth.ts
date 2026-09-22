@@ -95,8 +95,17 @@ export async function createLoginToken(
     // started at an assistant's "connect" button lands on the home page instead
     // of back in the flow. That is a bad minute, not a bad day.
     //
-    // Delete this once 0002 has been applied everywhere and stayed applied.
-    if (mcpState !== null) throw error;
+    // NARROWED. This caught every error, so a transient D1 failure became a
+    // silent retry of a slightly different INSERT - which would succeed, and
+    // hide the fault. Only a complaint about the column itself is worth a
+    // second attempt.
+    //
+    // 0002 is applied in production, so this is now belt for a deploy that has
+    // not happened yet. Delete it once nothing can be older than 0002.
+    const missingColumn = /no column named mcp_state|no such column/i.test(
+      error instanceof Error ? error.message : String(error),
+    );
+    if (!missingColumn || mcpState !== null) throw error;
     await db
       .prepare(
         `INSERT INTO login_token (token_hash, email, created_at, expires_at)
@@ -134,7 +143,10 @@ export async function consumeLoginToken(
       .prepare('SELECT email, expires_at, used_at, mcp_state FROM login_token WHERE token_hash = ?')
       .bind(hash)
       .first<Row>();
-  } catch {
+  } catch (error) {
+    // Narrowed for the same reason as the insert: a blanket catch turns a
+    // database fault into a second query that works, and hides it.
+    if (!/no such column/i.test(error instanceof Error ? error.message : String(error))) throw error;
     row = await db
       .prepare('SELECT email, expires_at, used_at FROM login_token WHERE token_hash = ?')
       .bind(hash)

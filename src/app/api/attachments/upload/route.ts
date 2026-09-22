@@ -43,12 +43,20 @@ const Body = z.object({
   entryId: z.string().min(1).max(200),
   files: z.array(Incoming).min(1).max(MAX_FILES),
   /**
-   * An explicit yes for this one request, for a caller that means it even
-   * though the account switch is off. The account setting is the default, not
-   * a ceiling: see the MCP tools, where the same override exists so an
-   * assistant can back up one thing without turning anything on.
+   * REMOVED, deliberately.
+   *
+   * This route is reached by a browser carrying a session cookie, and it used
+   * to accept `override: true` from the request body - directly under a comment
+   * saying the switch "is not a hint to the browser". Any page, or any stale
+   * tab, could set it and upload with the switch off. The setting was
+   * advisory after all.
+   *
+   * The MCP tools still take an override, because an assistant is a different
+   * caller with a different reason: it is acting on an explicit instruction for
+   * one call. That path goes through /api/mcp/*, which is reached with a signed
+   * actor token rather than a cookie, and resolves the choice in
+   * server/mcp/original.ts. A browser has the switch, and the switch is enough.
    */
-  override: z.boolean().optional(),
 });
 
 function decode(base64: string): Uint8Array | null {
@@ -77,7 +85,7 @@ export async function POST(request: Request) {
   const parsed = Body.safeParse(body);
   if (!parsed.success) return attachmentJson({ error: 'That is not a usable file.' }, 400);
 
-  if (parsed.data.override !== true && !(await backupEnabled(db, account.id))) {
+  if (!(await backupEnabled(db, account.id))) {
     return attachmentJson({ error: 'Attachment backup is off for this account.', skipped: true }, 409);
   }
 
