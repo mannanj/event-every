@@ -2,7 +2,8 @@ import type { Metadata } from 'next';
 
 import SiteFooter from '@/components/SiteFooter';
 import SiteHeader from '@/components/SiteHeader';
-import McpConnect from '@/components/McpConnect';
+import { McpConnector } from '@/vendor/mcp-connector/connector';
+import '@/vendor/mcp-connector/styles.css';
 import {
   DEFAULT_MCP_ENDPOINT,
   MCP_TOOLS,
@@ -44,10 +45,15 @@ export default function McpGuidePage() {
           always do, in your own browser, and you can disconnect whenever you like.
         </p>
 
-        <McpConnect
+        {/* The panel shared by Green Light, Sun Signal, mannan.is and Meet
+            Time. Vendored rather than imported, because bun satisfies a `file:`
+            dependency with per-file symlinks Turbopack will not follow - and
+            asserted against its source by a test, so the copy cannot drift. */}
+        <McpConnector
+          className="mt-8"
           endpoint={endpoint}
-          command={mcpClaudeCodeCommand(endpoint)}
-          instruction={mcpAgentInstruction(endpoint)}
+          claudeCodeCommand={mcpClaudeCodeCommand(endpoint)}
+          agentInstruction={mcpAgentInstruction(endpoint)}
         />
 
         <h2 className="display text-xl text-black mt-12">What it can do</h2>

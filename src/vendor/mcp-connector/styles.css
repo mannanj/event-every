@@ -1,0 +1,277 @@
+/* GENERATED FROM @mannan/mcp-connector/styles.css - DO NOT EDIT HERE.
+   Edit ~/Documents/mcp-connector and re-run: node bin/sync.mjs <this dir> */
+/*
+ * The connector's structure. Colour, radius and typeface all come from custom
+ * properties so an app can theme it without overriding a single selector.
+ *
+ * NO SCROLLBAR ON THE VALUE FIELD, and this is deliberate rather than an
+ * oversight. Two earlier attempts both failed on a real machine:
+ *   - styling ::-webkit-scrollbar swaps WebKit's overlay bar for a classic one
+ *     that reserves space INSIDE the box, growing the field 4px in Safari only
+ *     (measured: chromium 32/0, webkit 36/4);
+ *   - scrollbar-width: thin then looked correct in headless browsers, which
+ *     default to overlay bars - but on a system set to "show scroll bars:
+ *     always" it draws a permanent bar that still eats height.
+ * The values here are copy targets, not prose. Truncate with an ellipsis and
+ * let the button hand over the whole string.
+ */
+
+.mcp-connector {
+  /* Defaults are deliberately neutral: an app that sets nothing still reads. */
+  --mcpc-fg: #101416;
+  --mcpc-muted: #55605b;
+  --mcpc-line: #c7cdbf;
+  --mcpc-surface: transparent;
+  --mcpc-accent: #0d8a5a;
+  --mcpc-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  --mcpc-radius: 7px;
+  --mcpc-gap: 12px;
+
+  color: var(--mcpc-fg);
+}
+
+.mcpc-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: var(--mcpc-gap);
+}
+
+.mcpc-title {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.mcpc-docs {
+  flex: none;
+  color: var(--mcpc-accent);
+  font-size: 12px;
+  /* Not bold. It leads out of the menu, so it should sit quieter than the
+     title it shares a line with, not compete with it. */
+  font-weight: 400;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.mcpc-docs.is-locked {
+  color: var(--mcpc-muted);
+  opacity: .5;
+  cursor: not-allowed;
+}
+
+.mcpc-rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mcpc-gap);
+}
+
+.mcpc-rows.is-locked {
+  filter: blur(3px);
+  pointer-events: none;
+  user-select: none;
+}
+
+.mcpc-snippet__label {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--mcpc-muted);
+  font-family: var(--mcpc-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+}
+
+/* The ROW is the field: one bordered box holding the value and its copy
+   control, rather than two bordered boxes sitting beside each other. */
+.mcpc-snippet__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--mcpc-line);
+  border-radius: var(--mcpc-radius);
+  background: var(--mcpc-surface);
+}
+
+/* No scrollbar at all. A bar drawn here is permanent for anyone whose system
+   shows scrollbars always, it eats height inside the field, and these values
+   are copy targets rather than things read in place - the ellipsis says there
+   is more and the button hands over all of it. */
+.mcpc-snippet__value {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--mcpc-fg);
+  font-family: var(--mcpc-mono);
+  font-size: 12px;
+}
+
+.mcpc-snippet__copy {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 3px;
+  border: 0;
+  background: none;
+  color: var(--mcpc-muted);
+  cursor: pointer;
+  transition: color 120ms ease;
+}
+
+.mcpc-snippet__copy svg {
+  width: 100%;
+  height: 100%;
+}
+
+.mcpc-snippet__copy:hover {
+  color: var(--mcpc-fg);
+}
+
+.mcpc-snippet__copy:focus-visible {
+  outline: 2px solid var(--mcpc-accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Confirmation borrows the app's accent, so each keeps its own green. */
+.mcpc-snippet__check {
+  color: var(--mcpc-accent);
+}
+
+@media (min-width: 640px) {
+  }
+
+/* ─── the AI-Generated mark ───────────────────────────────────────────────
+   Sits above a guide's heading. Quiet by default: it is a disclosure, not a
+   banner. */
+.mcpc-ai {
+  /* Its own defaults rather than the connector's: this one FLOATS, so its
+     surface must be opaque. `--mcpc-surface: transparent` is correct for a
+     connector rendered inline, and renders this popover unreadable over the
+     text it covers. An app that themes the connector themes this too. */
+  --mcpc-fg: #101416;
+  --mcpc-muted: #55605b;
+  --mcpc-line: #c7cdbf;
+  --mcpc-surface: #ffffff;
+  --mcpc-accent: #0d8a5a;
+  --mcpc-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  --mcpc-radius: 7px;
+
+  position: relative;
+  display: inline-flex;
+  /* Guides stack their heading block in a flex column, whose default
+     align-items would stretch this pill the full measure. */
+  align-self: flex-start;
+}
+
+.mcpc-ai__badge {
+  font-family: var(--mcpc-mono);
+  font-size: 0.625rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--mcpc-muted);
+  background: none;
+  border: 1px solid var(--mcpc-line);
+  border-radius: 999px;
+  padding: 3px 9px;
+  cursor: help;
+  line-height: 1.4;
+  transition:
+    color 120ms ease,
+    border-color 120ms ease;
+}
+
+.mcpc-ai__badge:hover,
+.mcpc-ai__badge[aria-expanded='true'] {
+  color: var(--mcpc-fg);
+  border-color: var(--mcpc-fg);
+}
+
+.mcpc-ai__badge:focus-visible {
+  outline: 2px solid var(--mcpc-accent);
+  outline-offset: 2px;
+}
+
+.mcpc-ai__note {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 8px;
+  z-index: 70;
+  width: 300px;
+  max-width: calc(100vw - 32px);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  background: var(--mcpc-surface);
+  border: 1px solid var(--mcpc-line);
+  border-radius: var(--mcpc-radius);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.09);
+}
+
+.mcpc-ai__text {
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--mcpc-muted);
+}
+
+.mcpc-ai__show {
+  align-self: flex-start;
+  font-family: inherit;
+  font-size: 0.8125rem;
+  color: var(--mcpc-accent);
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.mcpc-ai__challenge {
+  display: block;
+}
+
+.mcpc-ai__address {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--mcpc-mono);
+  font-size: 0.75rem;
+}
+
+.mcpc-ai__address a {
+  color: var(--mcpc-fg);
+  text-decoration: none;
+  word-break: break-all;
+}
+
+.mcpc-ai__address a:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.mcpc-ai__copy {
+  flex: none;
+  font-family: var(--mcpc-mono);
+  font-size: 0.625rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--mcpc-muted);
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+.mcpc-ai__copy:hover {
+  color: var(--mcpc-fg);
+}
