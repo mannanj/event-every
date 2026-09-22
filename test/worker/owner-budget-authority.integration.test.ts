@@ -76,11 +76,23 @@ function binding(overrides: Partial<BudgetBinding> = {}): BudgetBinding {
   };
 }
 
+/**
+ * The reservation amounts these tests fill the day with.
+ *
+ * Named, because several tests fill the budget exactly and then assert what
+ * happens at the boundary. Doing that with literals means the arithmetic lives
+ * in four places and goes stale in all of them the next time the daily limit
+ * moves - which is what happened when it went from $5.00 to $1.00.
+ */
+const TEXT_RESERVATION = 20_000_000;
+const IMAGE_RESERVATION = 50_000_000;
+const TIMEZONE_RESERVATION = 1_000_000;
+
 function imageBinding(overrides: Partial<BudgetBinding> = {}): BudgetBinding {
   return binding({
     route: 'scan',
     variant: 'scan-image',
-    reservationNanodollars: 50_000_000,
+    reservationNanodollars: IMAGE_RESERVATION,
     ...overrides,
   });
 }
@@ -234,7 +246,17 @@ describe('OwnerBudgetAuthority SQLite Durable Object', () => {
 
   it('serializes two real concurrent requests racing for the final daily slot', async () => {
     const stub = authority('final-slot');
-    for (let index = 0; index < 99; index++) {
+    // DERIVED, not counted. This filled the day with a hardcoded 99 image
+    // reservations, which was exactly right when the daily limit was $5.00 and
+    // silently wrong the moment it became $1.00 - the day filled after 20 and
+    // the twenty-first assertion failed with "exhausted", which reads like the
+    // authority is broken rather than like the test is out of date.
+    //
+    // A test that hardcodes a number derived from a policy constant is a test
+    // that fails the next time somebody changes the policy, and blames the
+    // wrong file when it does.
+    const slots = OWNER_DAILY_LIMIT_NANODOLLARS / IMAGE_RESERVATION;
+    for (let index = 0; index < slots - 1; index += 1) {
       await expect(stub.reserve(imageBinding())).resolves.toMatchObject({ status: 'reserved' });
     }
     const results = await Promise.all([
@@ -271,15 +293,23 @@ describe('OwnerBudgetAuthority SQLite Durable Object', () => {
 
     await evictDurableObject(stub);
     await expect(stub.commit(first)).resolves.toEqual(committed);
-    for (let index = 0; index < 99; index++) {
+
+    // Fill the rest of the day EXACTLY, so the next reserve is the first one
+    // that cannot fit. `first` is already committed and still counts against
+    // admission, which is the property this test exists to prove - so the fill
+    // is the limit minus that hold, minus what is spent below it.
+    const timezoneHolds = 10;
+    const tail = TEXT_RESERVATION + timezoneHolds * TIMEZONE_RESERVATION;
+    const images = (OWNER_DAILY_LIMIT_NANODOLLARS - TEXT_RESERVATION - tail) / IMAGE_RESERVATION;
+    for (let index = 0; index < images; index += 1) {
       await expect(stub.reserve(imageBinding())).resolves.toMatchObject({ status: 'reserved' });
     }
     await expect(stub.reserve(binding())).resolves.toMatchObject({ status: 'reserved' });
-    for (let index = 0; index < 10; index++) {
+    for (let index = 0; index < timezoneHolds; index += 1) {
       await expect(stub.reserve(binding({
         route: 'resolve-timezone',
         variant: 'resolve-timezone',
-        reservationNanodollars: 1_000_000,
+        reservationNanodollars: TIMEZONE_RESERVATION,
       }))).resolves.toMatchObject({ status: 'reserved' });
     }
     await expect(stub.reserve(binding())).resolves.toMatchObject({ status: 'exhausted' });

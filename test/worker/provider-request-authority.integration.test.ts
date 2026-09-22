@@ -8,7 +8,26 @@ import {
   OWNER_VARIANT_POLICY,
   PRE_PERMIT_LEASE_MS,
   REPLAY_RETENTION_MS,
+  ownerBudgetLedgerName,
 } from '../../src/platform/provider/policy';
+
+/**
+ * The ledger a day's budget lives in.
+ *
+ * DERIVED, NEVER SPELLED OUT. These tests used to reserve against a Durable
+ * Object named after the day alone while the authority under test settled
+ * against `ownerBudgetLedgerName(day)` - two different objects, so settlement
+ * looked up a ledger that had never held the reservation, failed, and stayed
+ * pending forever.
+ *
+ * That is precisely the failure `ownerBudgetLedgerName` documents: "Both the
+ * reserve and the settle paths must derive the name here. If they ever
+ * disagree, a request settles against a ledger it never reserved from." The
+ * production code obeys it on both sides. The test did not, so it broke the
+ * moment the name gained the policy and the limit.
+ */
+const budgetLedger = (day: string) =>
+  env.OWNER_BUDGET_AUTHORITY.idFromName(ownerBudgetLedgerName(day));
 
 type RequestStub = ReturnType<(typeof env)['PROVIDER_REQUEST_AUTHORITY']['get']>;
 type RequestState =
@@ -167,7 +186,7 @@ async function claim(stub: RequestStub, input = beginInput()) {
 
 async function claimWithBudget(stub: RequestStub, input: BeginInput) {
   const prepared = await beginPrepared(stub, input);
-  const budget = env.OWNER_BUDGET_AUTHORITY.get(env.OWNER_BUDGET_AUTHORITY.idFromName(input.proposedAuthorityDay));
+  const budget = env.OWNER_BUDGET_AUTHORITY.get(budgetLedger(input.proposedAuthorityDay));
   const budgetBinding = {
     executionId: prepared.executionId,
     requestAuthorityName: input.requestDigest,
@@ -534,7 +553,7 @@ describe('ProviderRequestAuthority SQLite Durable Object', () => {
     const stub = authority('settlement-outbox');
     const input = beginInput({ proposedAuthorityDay: day });
     const prepared = await beginPrepared(stub, input);
-    const budgetId = env.OWNER_BUDGET_AUTHORITY.idFromName(day);
+    const budgetId = budgetLedger(day);
     const budget = env.OWNER_BUDGET_AUTHORITY.get(budgetId);
     const budgetBinding = {
       executionId: prepared.executionId,
@@ -586,7 +605,7 @@ describe('ProviderRequestAuthority SQLite Durable Object', () => {
     const stub = authority('outbox-alarm-eviction');
     const input = beginInput({ proposedAuthorityDay: day, requestDigest: digest('7') });
     const prepared = await beginPrepared(stub, input);
-    const budget = env.OWNER_BUDGET_AUTHORITY.get(env.OWNER_BUDGET_AUTHORITY.idFromName(day));
+    const budget = env.OWNER_BUDGET_AUTHORITY.get(budgetLedger(day));
     const budgetBinding = {
       executionId: prepared.executionId,
       requestAuthorityName: input.requestDigest,
@@ -1549,7 +1568,7 @@ describe('ProviderRequestAuthority SQLite Durable Object', () => {
     const reservedStub = authority('reserved-expiry-release');
     const reservedInput = beginInput({ proposedAuthorityDay: reservedDay, requestDigest: digest('e') });
     const reservedPrepared = await beginPrepared(reservedStub, reservedInput);
-    const reservedBudget = env.OWNER_BUDGET_AUTHORITY.get(env.OWNER_BUDGET_AUTHORITY.idFromName(reservedDay));
+    const reservedBudget = env.OWNER_BUDGET_AUTHORITY.get(budgetLedger(reservedDay));
     const reservedBinding = {
       executionId: reservedPrepared.executionId,
       requestAuthorityName: reservedInput.requestDigest,
@@ -1581,7 +1600,7 @@ describe('ProviderRequestAuthority SQLite Durable Object', () => {
     const committedStub = authority('committed-expiry-full');
     const committedInput = beginInput({ proposedAuthorityDay: committedDay, requestDigest: digest('f') });
     const prepared = await beginPrepared(committedStub, committedInput);
-    const committedBudget = env.OWNER_BUDGET_AUTHORITY.get(env.OWNER_BUDGET_AUTHORITY.idFromName(committedDay));
+    const committedBudget = env.OWNER_BUDGET_AUTHORITY.get(budgetLedger(committedDay));
     const binding = {
       executionId: prepared.executionId,
       requestAuthorityName: committedInput.requestDigest,
