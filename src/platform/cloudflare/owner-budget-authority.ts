@@ -124,10 +124,21 @@ export class OwnerBudgetAuthority extends DurableObject<Record<string, never>> {
       if (concurrentPolicy?.frozenCode) return exhausted(input.authorityDay);
 
       if (!concurrentPolicy) {
+        // THE INPUT'S VERSION, not the constant. These are the same value
+        // today, which is the only reason writing the constant here has never
+        // shown up: the row is written with one and compared against the other
+        // on the very next line.
+        //
+        // The moment a second policy exists - task-245 gives the admin tier its
+        // own ledger by giving it its own policy version - that asymmetry
+        // becomes permanent breakage. The admin ledger's first reserve would
+        // open a day stamped `owner-v1`, and every later reserve against it
+        // would compare `admin-v1` to `owner-v1` and answer `conflict` for the
+        // rest of the day, forever, with nothing saying why.
         this.ctx.storage.sql.exec(
           'INSERT INTO owner_budget_policy (authority_day, policy_version, limit_nanodollars, frozen_code, created_at_ms) VALUES (?, ?, ?, NULL, ?)',
           input.authorityDay,
-          OWNER_POLICY_VERSION,
+          input.policyVersion,
           OWNER_DAILY_LIMIT_NANODOLLARS,
           nowMs,
         );

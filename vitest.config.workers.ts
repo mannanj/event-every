@@ -24,6 +24,7 @@ export default defineConfig(async () => {
         'test/worker/deny-egress.integration.test.ts',
         'test/worker/owner-budget-authority.integration.test.ts',
         'test/worker/provider-request-authority.integration.test.ts',
+        'test/worker/pre-existing-schema.integration.test.ts',
       ],
       setupFiles: ['./test/worker/deny-egress.setup.ts'],
     },
