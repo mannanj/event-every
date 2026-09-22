@@ -349,6 +349,40 @@ console.log('\n7b. the photo handoff');
   }
 }
 
+// 7c. Disconnecting ─────────────────────────────────────────────────────────
+console.log('\n7c. disconnecting');
+{
+  // The token works right now - that was proved above. After disconnecting it
+  // must stop, which is the whole claim the /mcp page makes.
+  const before = await rpc('tools/call', { name: 'whoami', arguments: {} });
+  before?.result?.structuredContent?.email
+    ? ok('the connection works before disconnecting')
+    : fail('the connection works before disconnecting', JSON.stringify(before).slice(0, 160));
+
+  const disconnected = await fetch(`${APP}/api/mcp/disconnect`, {
+    method: 'POST',
+    headers: { cookie: `ee_session=${SESSION}` },
+  });
+  check('POST /api/mcp/disconnect', 200, disconnected.status);
+  const { revoked } = await disconnected.json().catch(() => ({ revoked: 0 }));
+  revoked > 0 ? ok('it revoked something', String(revoked)) : fail('it revoked something', String(revoked));
+
+  const after = await fetch(`${MCP}/mcp`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json, text/event-stream',
+      Origin: 'https://claude.ai',
+      Authorization: `Bearer ${access}`,
+    },
+    body: JSON.stringify({ jsonrpc: '2.0', id: 500, method: 'tools/list' }),
+  });
+  check('THE TOKEN STOPS WORKING', 401, after.status);
+
+  const signedOut = await fetch(`${APP}/api/mcp/disconnect`, { method: 'POST' });
+  check('a stranger cannot disconnect somebody', 401, signedOut.status);
+}
+
 // 8. A token from nowhere ────────────────────────────────────────────────────
 console.log('\n8. an invented token');
 {
