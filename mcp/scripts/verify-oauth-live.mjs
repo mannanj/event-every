@@ -82,6 +82,13 @@ authorizeUrl.searchParams.set('state', 'client-state');
 
 const authorize = await fetch(authorizeUrl, { redirect: 'manual' });
 check('GET /authorize', 302, authorize.status);
+
+// The Worker binds the browser that started this flow. A client follows the
+// redirect chain with a cookie jar; this harness has to keep it by hand.
+const flowCookie = (authorize.headers.get('set-cookie') ?? '').split(';')[0] ?? '';
+flowCookie.startsWith('ee_mcp_flow=')
+  ? ok('the browser that began the flow is bound')
+  : fail('the browser that began the flow is bound', flowCookie.slice(0, 60) || 'no cookie set');
 const bridge = authorize.headers.get('location') ?? '';
 bridge.startsWith(`${APP}/api/mcp/authorize?state=`)
   ? ok('bounces to the app bridge', new URL(bridge).pathname)
@@ -95,17 +102,58 @@ anonymousTo.includes('/signin?state=')
   ? ok('signed out goes to sign-in, keeping the state')
   : fail('signed out goes to sign-in, keeping the state', anonymousTo.slice(0, 120));
 
-// 4. The bridge, signed IN ───────────────────────────────────────────────────
-console.log('\n4. the bridge, with a real session cookie');
-const bridged = await fetch(bridge, {
+// 4. The bridge ASKS rather than signing ─────────────────────────────────────
+console.log('\n4. the bridge asks before it signs');
+const asked = await fetch(bridge, {
   redirect: 'manual',
   headers: { cookie: `ee_session=${SESSION}` },
 });
-check('GET the bridge', 302, bridged.status);
+check('GET the bridge', 200, asked.status);
+const page = await asked.text();
+
+// The property that closes the one-click account takeover: a GET must NOT
+// produce a grant, however good the session is.
+page.includes('/callback?state=') || page.includes('grant=')
+  ? fail('a GET does not hand back a grant', 'the page contains one')
+  : ok('a GET does not hand back a grant');
+page.includes('Connect an assistant?')
+  ? ok('a consent page is shown instead')
+  : fail('a consent page is shown instead', page.slice(0, 120));
+
+// The consent token reaches the browser only inside this page.
+const consentAction = page.match(/action="([^"]*\/confirm[^"]*)"/)?.[1] ?? '';
+const consent = consentAction ? new URL(consentAction, APP).searchParams.get('consent') : null;
+consent ? ok('a consent token is issued to this session') : fail('a consent token is issued to this session', consentAction.slice(0, 80));
+
+// 4b. Confirming ─────────────────────────────────────────────────────────────
+console.log('\n4b. confirming');
+const confirmUrl = new URL(consentAction || '/api/mcp/authorize/confirm', APP);
+const bridged = await fetch(confirmUrl, {
+  method: 'POST',
+  redirect: 'manual',
+  headers: { cookie: `ee_session=${SESSION}` },
+});
+check('POST the confirmation', 302, bridged.status);
 const callback = bridged.headers.get('location') ?? '';
 callback.startsWith(`${MCP}/callback?state=`) && callback.includes('grant=')
   ? ok('grant issued and sent to /callback')
   : fail('grant issued and sent to /callback', callback.slice(0, 120));
+
+// A confirmation without the token, which is what a cross-site form could send.
+{
+  const forged = new URL('/api/mcp/authorize/confirm', APP);
+  forged.searchParams.set('state', new URL(bridge).searchParams.get('state') ?? '');
+  forged.searchParams.set('consent', 'not-the-real-token');
+  const refused = await fetch(forged, {
+    method: 'POST',
+    redirect: 'manual',
+    headers: { cookie: `ee_session=${SESSION}` },
+  });
+  const to = refused.headers.get('location') ?? '';
+  to.includes('/callback') && to.includes('grant=')
+    ? fail('a forged consent token is refused', 'it signed a grant')
+    : ok('a forged consent token is refused', String(refused.status));
+}
 
 // 5. A grant cannot be replayed against another state ────────────────────────
 console.log('\n5. refusals');
@@ -122,7 +170,33 @@ console.log('\n5. refusals');
 
 // 6. /callback, then exchange the code IMMEDIATELY ───────────────────────────
 console.log('\n6. callback and token exchange');
-const completed = await fetch(callback, { redirect: 'manual' });
+// Without the flow cookie this is exactly the attacker's position: a valid
+// state, a valid grant, and a browser that never started the flow.
+{
+  const unbound = await fetch(callback, { redirect: 'manual' });
+  check('a browser that did not start the flow is refused', 403, unbound.status);
+}
+
+// That refusal burns the state, so the run needs a fresh authorization to
+// finish against. The server is right and the harness has to keep up - the same
+// trap ~/Documents/mcp documents about negative probes stealing the real one.
+const second = await fetch(authorizeUrl, { redirect: 'manual' });
+const secondFlow = (second.headers.get('set-cookie') ?? '').split(';')[0] ?? '';
+const secondBridge = second.headers.get('location') ?? '';
+const secondAsked = await fetch(secondBridge, { headers: { cookie: `ee_session=${SESSION}` } });
+const secondPage = await secondAsked.text();
+const secondAction = secondPage.match(/action="([^"]*\/confirm[^"]*)"/)?.[1] ?? '';
+const secondConfirm = await fetch(new URL(secondAction, APP), {
+  method: 'POST',
+  redirect: 'manual',
+  headers: { cookie: `ee_session=${SESSION}` },
+});
+const secondCallback = secondConfirm.headers.get('location') ?? '';
+
+const completed = await fetch(secondCallback, {
+  redirect: 'manual',
+  headers: { cookie: secondFlow },
+});
 check('GET /callback', 302, completed.status);
 const back = completed.headers.get('location') ?? '';
 const code = back ? new URL(back).searchParams.get('code') : null;
@@ -256,6 +330,15 @@ console.log('\n7b. the photo handoff');
     redeemed.status < 500
       ? ok('a redeem with a real link is accepted', String(redeemed.status))
       : fail('a redeem with a real link is accepted', String(redeemed.status));
+
+    // The link is spent. A second redeem must lose, or a link sitting in a
+    // chat transcript can be replayed until the day's budget is gone.
+    const replayed = await fetch(`${APP}/api/mcp/handoff`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'redeem', token, imageBase64: PIXEL, mimeType: 'image/png' }),
+    });
+    check('the same link cannot be redeemed twice', 403, replayed.status);
 
     const forged = await fetch(`${APP}/api/mcp/handoff`, {
       method: 'POST',
