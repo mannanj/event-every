@@ -281,7 +281,7 @@ if (process.env.EE_VERIFY_SCAN) {
   const sharedBefore = await usage(null);
   const scanned = await rpc('tools/call', {
     name: 'read_text_into_events',
-    arguments: { text: 'Verification tea, Friday 3pm to 4pm, at the library.' },
+    arguments: { text: `Verification tea ${Date.now()}, Friday 3pm to 4pm, at the library.` },
   });
   const scanText = scanned?.result?.content?.[0]?.text ?? JSON.stringify(scanned).slice(0, 200);
   scanned?.result && !scanned.result.isError

@@ -845,7 +845,7 @@ function validBeginInput(input: unknown): input is ProviderRequestBeginInput {
   if (!Array.isArray(input.bindingCandidates) || input.bindingCandidates.length < 1 || input.bindingCandidates.length > 2) return false;
   if (!input.bindingCandidates.every(validCandidate)) return false;
   if (new Set(input.bindingCandidates.map(({ version }) => version)).size !== input.bindingCandidates.length) return false;
-  if (!validUtcDay(input.proposedAuthorityDay) || input.policyVersion !== OWNER_POLICY_VERSION) return false;
+  if (!validUtcDay(input.proposedAuthorityDay) || !isSpendPolicyVersion(input.policyVersion)) return false;
   if (!Number.isSafeInteger(input.reservationNanodollars) || input.reservationNanodollars < 0) return false;
   const policy = OWNER_VARIANT_POLICY[input.variant as keyof typeof OWNER_VARIANT_POLICY];
   return policy !== undefined && policy.route === input.route && policy.reservationNanodollars === input.reservationNanodollars;
@@ -996,7 +996,7 @@ function outboxCost(row: OutboxRow): CostOutcome {
 
 function assertRequestRow(row: RequestRow): void {
   if (!REQUEST_DIGEST.test(row.requestDigest) || !UUID.test(row.executionId) || !SHAPE_VERSION.test(row.shapeKeyVersion) || !REQUEST_DIGEST.test(row.shapeDigest)) throw schemaError();
-  if (!validUtcDay(row.authorityDay) || row.policyVersion !== OWNER_POLICY_VERSION) throw schemaError();
+  if (!validUtcDay(row.authorityDay) || !isSpendPolicyVersion(row.policyVersion)) throw schemaError();
   const policy = OWNER_VARIANT_POLICY[row.variant];
   if (!policy || policy.route !== row.route || policy.reservationNanodollars !== row.reservationNanodollars) throw schemaError();
   for (const value of [row.reservationNanodollars, row.createdAtMs, row.phaseDeadlineMs, row.transportDeadlineMs, row.committedUntilMs, row.costNanodollars, row.terminalAtMs, row.replayExpiresAtMs]) {

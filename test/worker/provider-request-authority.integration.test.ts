@@ -4,6 +4,7 @@ import { env, evictDurableObject, runDurableObjectAlarm, runInDurableObject } fr
 import type { ProviderRequestAuthority } from '../../src/platform/cloudflare/provider-request-authority';
 import type { DurableObjectStateLike } from '../../src/platform/contracts';
 import {
+  ADMIN_POLICY_VERSION,
   OWNER_POLICY_VERSION,
   OWNER_VARIANT_POLICY,
   PRE_PERMIT_LEASE_MS,
@@ -232,6 +233,21 @@ async function forceReplayExpiry(stub: RequestStub): Promise<void> {
 }
 
 describe('ProviderRequestAuthority SQLite Durable Object', () => {
+  // Task 245 gave the admin tier its own ledger but this authority still
+  // refused any begin that was not the owner's, answering `conflict` - so no
+  // admin scan could ever run. Found by a live scan through MCP, which is the
+  // first path that ever carried an admin policy this far.
+  it('begins, and reads back after eviction, a request under the admin policy', async () => {
+    const stub = authority('admin-policy');
+    const input = beginInput({ policyVersion: ADMIN_POLICY_VERSION });
+    const prepared = await beginPrepared(stub, input);
+    await evictDurableObject(stub);
+    await expect(stub.begin(input)).resolves.toEqual(prepared);
+    expect((await requestRows(stub))[0]).toMatchObject({ policy_version: ADMIN_POLICY_VERSION });
+    // Same request id, other policy: still one request, still a conflict.
+    await expect(stub.begin({ ...input, policyVersion: OWNER_POLICY_VERSION })).resolves.toEqual({ status: 'conflict' });
+  });
+
   it('creates the exact accepted schemas and survives eviction before and after every durable phase', { timeout: 30_000 }, async () => {
     const stub = authority('schema-phases');
     const input = beginInput();
