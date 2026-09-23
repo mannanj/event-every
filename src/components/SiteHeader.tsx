@@ -11,7 +11,7 @@ import {
   mcpAgentInstruction,
   mcpClaudeCodeCommand,
 } from '@/lib/mcp-info';
-import { McpConnector, McpDisconnect } from '@/vendor/mcp-connector/connector';
+import { McpConnector, type McpConnection } from '@/vendor/mcp-connector/connector';
 import '@/vendor/mcp-connector/styles.css';
 
 /**
@@ -30,15 +30,31 @@ function formatBytes(bytes: number): string {
 }
 
 /**
- * Ends every assistant connection on this account. All of them, never one:
- * this Worker revokes by account (see mcp/src/authHandler.ts, handleRevoke),
- * so the shared panel is given no `load` and offers only that.
+ * The connector panel's own "Connected" section reads and writes this through
+ * these two module-level functions, so their identity is stable across every
+ * render - `load` is an effect dependency in the shared package, and a fresh
+ * closure each render would re-fetch on every keystroke elsewhere on the page.
+ *
+ * `/api/mcp/disconnect` still exists and still ends every connection at once;
+ * these call the finer-grained sibling that lists and cuts off one at a time
+ * (src/app/api/mcp/connections/route.ts).
  */
-async function disconnectAllAssistants(): Promise<number> {
-  const response = await fetch('/api/mcp/disconnect', { method: 'POST', credentials: 'same-origin' });
-  const body = (await response.json().catch(() => null)) as { revoked?: number; error?: string } | null;
-  if (!response.ok) throw new Error(body?.error ?? 'disconnect failed');
-  return body?.revoked ?? 0;
+async function loadMcpConnections(): Promise<McpConnection[]> {
+  const response = await fetch('/api/mcp/connections', { credentials: 'same-origin' });
+  const body = (await response.json().catch(() => null)) as { connections?: McpConnection[]; error?: string } | null;
+  if (!response.ok) throw new Error(body?.error ?? 'connections failed');
+  return body?.connections ?? [];
+}
+
+async function disconnectMcpConnection(id: string): Promise<void> {
+  const response = await fetch(`/api/mcp/connections?id=${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+    credentials: 'same-origin',
+  });
+  if (!response.ok) {
+    const body = (await response.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(body?.error ?? 'disconnect failed');
+  }
 }
 
 export default function SiteHeader({ showHow = false }: { showHow?: boolean }) {
@@ -129,9 +145,13 @@ export default function SiteHeader({ showHow = false }: { showHow?: boolean }) {
                         {children}
                       </Link>
                     )}
+                    connections={
+                      account.signedIn === true
+                        ? { load: loadMcpConnections, disconnect: disconnectMcpConnection }
+                        : undefined
+                    }
                   />
                 ),
-                disconnect: () => <McpDisconnect disconnect={disconnectAllAssistants} />,
               }}
               renderLink={(href, className, children) => (
                 <Link href={href} className={className} data-testid="sign-in-link">

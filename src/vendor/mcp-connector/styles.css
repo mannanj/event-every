@@ -276,87 +276,72 @@
   color: var(--mcpc-fg);
 }
 
-/* Disconnect MCP - the panel behind the account menu's second line. */
+/* Connected - the foot of the panel, signed in only. A rule above it, the
+   same small caps label as the snippets, then one line per assistant:
+   name | Disconnect (centred in the space left of the date) | date. */
 
-.mcpc-disconnect__lede,
-.mcpc-disconnect__note {
-  margin: 0 0 var(--mcpc-gap);
-  color: var(--mcpc-muted);
-  font-size: 12px;
-  line-height: 1.45;
+.mcpc-connections {
+  margin-top: var(--mcpc-gap);
+  padding-top: 10px;
+  border-top: 1px solid var(--mcpc-line);
 }
 
-.mcpc-disconnect__list {
-  margin: 0 0 var(--mcpc-gap);
+.mcpc-connections__note {
+  margin: 0;
+  color: var(--mcpc-muted);
+  font-size: 13px;
+}
+
+.mcpc-connections__list {
+  margin: 0;
   padding: 0;
   list-style: none;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
 }
 
-.mcpc-disconnect__row {
-  display: flex;
+.mcpc-connections__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
-  gap: 8px;
+  column-gap: 10px;
   font-size: 13px;
 }
 
-.mcpc-disconnect__name {
-  flex: 1;
-  min-width: 0;
+.mcpc-connections__name {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.mcpc-disconnect__when {
-  color: var(--mcpc-muted);
-  font-size: 12px;
-  white-space: nowrap;
-}
-
-.mcpc-disconnect__one {
-  flex: none;
+.mcpc-connections__cut {
+  justify-self: center;
   padding: 2px 6px;
   border: 0;
-  border-radius: var(--mcpc-radius);
+  border-radius: 5px;
   background: none;
   color: var(--mcpc-accent);
   font: inherit;
-  font-size: 12px;
   cursor: pointer;
 }
 
-.mcpc-disconnect__one:hover {
+.mcpc-connections__cut:hover {
   text-decoration: underline;
 }
 
-.mcpc-disconnect__all {
-  width: 100%;
-  padding: 8px 10px;
-  border: 1px solid var(--mcpc-line);
-  border-radius: var(--mcpc-radius);
-  background: none;
-  color: var(--mcpc-fg);
-  font: inherit;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.mcpc-disconnect__all.is-confirming {
-  border-color: currentColor;
-}
-
-.mcpc-disconnect__one:disabled,
-.mcpc-disconnect__all:disabled {
+.mcpc-connections__cut:disabled {
   opacity: .5;
   cursor: default;
 }
 
-.mcpc-disconnect__one:focus-visible,
-.mcpc-disconnect__all:focus-visible {
+.mcpc-connections__cut:focus-visible {
   outline: 2px solid var(--mcpc-accent);
   outline-offset: 2px;
+}
+
+.mcpc-connections__when {
+  justify-self: end;
+  color: var(--mcpc-muted);
+  white-space: nowrap;
 }

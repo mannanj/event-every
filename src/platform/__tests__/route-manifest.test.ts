@@ -42,9 +42,11 @@ describe('route manifest', () => {
     }
   });
 
-  test('every implemented route exports exactly its one policy method', () => {
+  test('every implemented route exports exactly its policy methods', () => {
     for (const { route, path } of routes('src/app/api')) {
-      expect(exportedHttpMethods(path), path).toEqual([ROUTE_MANIFEST[route].method]);
+      const policy = ROUTE_MANIFEST[route];
+      const expected = [...(policy.methods ?? [policy.method])].sort();
+      expect(exportedHttpMethods(path).sort(), path).toEqual(expected);
     }
   });
 
@@ -71,6 +73,7 @@ describe('route manifest', () => {
       '/api/mcp/authorize': { method: 'GET', maxBodyBytes: 0, allow: 'GET' },
       '/api/mcp/authorize/confirm': { method: 'POST', maxBodyBytes: 0, allow: 'POST' },
       '/api/mcp/disconnect': { method: 'POST', maxBodyBytes: 0, allow: 'POST' },
+      '/api/mcp/connections': { method: 'GET', methods: ['GET', 'DELETE'], maxBodyBytes: 0, allow: 'GET, DELETE' },
       '/api/mcp/events': { method: 'GET', maxBodyBytes: 0, allow: 'GET' },
       '/api/mcp/events/save': { method: 'POST', maxBodyBytes: 64 * 1024, allow: 'POST' },
       '/api/mcp/events/remove': { method: 'POST', maxBodyBytes: 1024, allow: 'POST' },

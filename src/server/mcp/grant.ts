@@ -70,6 +70,20 @@ export const SCAN_ON_BEHALF_HEADER = 'x-event-every-on-behalf';
 export const REVOKE_PURPOSE = 'ee.mcp.revoke.v1';
 export const REVOKE_TTL_SECONDS = 60;
 
+/**
+ * Seeing and disconnecting one connection at a time.
+ *
+ * The same bridge as REVOKE, pointed at a narrower job: REVOKE ends every
+ * connection on the account, while a MANAGE token lets the Worker's
+ * /connections route list them and end just one. Its own purpose, for the
+ * same reason every purpose here is its own: a token minted to list
+ * connections must never verify as one that can end all of them, or an actor
+ * token, or a grant. Sixty seconds, because it is one page load or one click,
+ * not a session.
+ */
+export const MANAGE_PURPOSE = 'ee.mcp.manage.v1';
+export const MANAGE_TTL_SECONDS = 60;
+
 export interface McpGrantPayload {
   /** Account id. */
   sub: string;

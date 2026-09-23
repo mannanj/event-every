@@ -1,6 +1,19 @@
-export type RoutePolicy = Readonly<{ method: 'GET' | 'POST'; maxBodyBytes: number; allow: string; retired?: boolean }>;
+export type HttpMethod = 'GET' | 'POST' | 'DELETE';
+/**
+ * `methods`, when given, is the full set a path admits; `method` stays its
+ * first entry so every single-method call site keeps working unchanged. Only
+ * `/api/mcp/connections` needs more than one verb on one path — GET to list,
+ * DELETE to disconnect one — because a dynamic `:id` segment cannot be a
+ * static key in this manifest, and query-string-addressed DELETE means the
+ * split-by-verb-in-the-path trick the other /api/mcp routes use would just be
+ * two paths for the same resource.
+ */
+export type RoutePolicy = Readonly<{ method: HttpMethod; methods?: readonly HttpMethod[]; maxBodyBytes: number; allow: string; retired?: boolean }>;
 const MiB = 1024 * 1024;
 const policy = (method: RoutePolicy['method'], maxBodyBytes: number, retired = false): RoutePolicy => ({ method, maxBodyBytes, allow: method, ...(retired ? { retired } : {}) });
+const policyMulti = (methods: readonly HttpMethod[], maxBodyBytes: number, retired = false): RoutePolicy => ({
+  method: methods[0], methods, maxBodyBytes, allow: methods.join(', '), ...(retired ? { retired } : {}),
+});
 const SCRAPE_URL_POLICY = policy('POST', 4 * 1024);
 export const ROUTE_MANIFEST: Readonly<Record<string, RoutePolicy>> = {
   '/api/auth/check': policy('GET', 0), '/api/auth/logout': policy('POST', 0), '/api/auth/verify': policy('POST', 2 * 1024, true),
@@ -34,6 +47,13 @@ export const ROUTE_MANIFEST: Readonly<Record<string, RoutePolicy>> = {
   // and nothing else: disconnecting is not something a link should be able to
   // do to somebody, which is the lesson the authorize bridge taught.
   '/api/mcp/disconnect': policy('POST', 0),
+  // Seeing and ending one connection. GET lists; DELETE disconnects the id
+  // named in `?id=`, not a JSON body — this route has no body at all (0
+  // bytes), which skips the media-type check that pins every other route to
+  // application/json (see the note in authorize/route.ts about bodies) and
+  // lets the id ride in the query string instead, the same way the consent
+  // token does.
+  '/api/mcp/connections': policyMulti(['GET', 'DELETE'], 0),
   '/api/mcp/events': policy('GET', 0),
   '/api/mcp/events/save': policy('POST', 64 * 1024),
   '/api/mcp/events/remove': policy('POST', 1024),

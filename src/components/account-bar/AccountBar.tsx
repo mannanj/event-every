@@ -37,11 +37,6 @@ export interface AccountBarMcp {
    * close callback so a link inside it can dismiss the popover on the way out.
    */
   panel?: (close: () => void) => React.ReactNode;
-  /**
-   * The "Disconnect MCP" panel, e.g. the shared McpDisconnect. Given, it is the
-   * menu's second line, right under "MCP Connector".
-   */
-  disconnect?: (close: () => void) => React.ReactNode;
 }
 
 /**
@@ -181,7 +176,7 @@ export default function AccountBar({
 }: AccountBarProps) {
   // The menu, or one of the MCP panels in its place - hanging from the address
   // the way the menu does, so the account corner is one control, not two.
-  const [view, setView] = useState<'closed' | 'menu' | 'mcp' | 'disconnect'>('closed');
+  const [view, setView] = useState<'closed' | 'menu' | 'mcp'>('closed');
   const open = view !== 'closed';
   const close = useCallback(() => setView('closed'), []);
   const wrapper = useDismiss(open, close);
@@ -256,17 +251,6 @@ export default function AccountBar({
                   MCP Connector
                 </button>
               )}
-              {mcpInMenu && mcp?.disconnect && (
-                <button
-                  type="button"
-                  className={styles.item}
-                  role="menuitem"
-                  onClick={() => setView('disconnect')}
-                  data-testid="menu-mcp-disconnect"
-                >
-                  Disconnect MCP
-                </button>
-              )}
               {items?.map((item) => (
                 <button
                   key={item.key}
@@ -326,17 +310,6 @@ export default function AccountBar({
           {view === 'mcp' && mcp?.panel && (
             <div className={`${styles.mcpPanel} mcp-panel`} role="dialog" aria-label="MCP Connector" data-testid="mcp-panel">
               {mcp.panel(close)}
-            </div>
-          )}
-
-          {view === 'disconnect' && mcp?.disconnect && (
-            <div
-              className={`${styles.mcpPanel} mcp-panel`}
-              role="dialog"
-              aria-label="Disconnect MCP"
-              data-testid="mcp-disconnect-panel"
-            >
-              {mcp.disconnect(close)}
             </div>
           )}
         </div>

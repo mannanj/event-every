@@ -1,6 +1,7 @@
 import type { AuthRequest, OAuthHelpers } from '@cloudflare/workers-oauth-provider';
 
 import { REVOKE_PURPOSE, verifyActor, verifyMcpGrant } from '../../src/server/mcp/grant';
+import { handleConnections } from './connections';
 
 /**
  * Everything that is not the MCP API itself: the OAuth authorize and callback.
@@ -106,6 +107,10 @@ export const authHandler = {
     if (url.pathname === '/callback') return handleCallback(request, env);
     if (url.pathname === '/revoke' && request.method === 'POST') {
       return handleRevoke(request, env);
+    }
+    if (url.pathname === '/connections' || url.pathname.startsWith('/connections/')) {
+      const response = await handleConnections(request, env.OAUTH_PROVIDER, env.MCP_GRANT_SECRET);
+      if (response) return response;
     }
 
     if (url.pathname === '/' || url.pathname === '/health') {

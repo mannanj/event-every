@@ -70,7 +70,8 @@ export async function admitEdgeRequest(
       identity,
     };
   }
-  if (request.method !== policy.method) {
+  const allowedMethods = policy.methods ?? [policy.method];
+  if (!allowedMethods.includes(request.method as RoutePolicy['method'])) {
     return rejectAdmission('method_not_allowed', { Allow: policy.allow });
   }
   if (policy.retired) return rejectAdmission('route_retired');
