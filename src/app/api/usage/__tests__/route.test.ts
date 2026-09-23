@@ -69,3 +69,10 @@ test('usage rejects an internal result with extra or inconsistent fields', async
   expect(response.status).toBe(503);
   expect(JSON.stringify(await response.json())).not.toContain('must-not-leak');
 });
+
+test('a signed-out caller is never answered from a ledger stamped with the admin policy', async () => {
+  if (current.status !== 'available') throw new Error('expected available fixture');
+  current = { ...current, policyVersion: 'admin-v1' };
+  const response = await GET(new NextRequest('http://localhost/api/usage'));
+  expect(response.status).toBe(503);
+});

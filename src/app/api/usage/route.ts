@@ -2,12 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { resolveSpendPolicy } from '@/server/accounts/spend-tier';
 import { z } from 'zod';
 import { getPlatformRuntime } from '@/platform/runtime';
+import { ADMIN_POLICY_VERSION, OWNER_POLICY_VERSION } from '@/platform/provider/policy';
 
 const NO_STORE = { 'Cache-Control': 'no-store' } as const;
 const amount = z.number().int().safe().nonnegative();
 const UsageResponseSchema = z.object({
   status: z.literal('available'),
-  policyVersion: z.literal('owner-v1'),
+  policyVersion: z.enum([OWNER_POLICY_VERSION, ADMIN_POLICY_VERSION]),
   authorityDay: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   limitNanodollars: amount,
   spentNanodollars: amount,
@@ -30,7 +31,12 @@ export async function GET(request: NextRequest): Promise<Response> {
   const policyVersion = await resolveSpendPolicy(request);
   const result = await getPlatformRuntime().ownerBudgetStatus(authorityDay, policyVersion);
   const parsed = UsageResponseSchema.safeParse(result);
-  if (!parsed.success || parsed.data.authorityDay !== authorityDay) {
+  // An admin ledger reports `admin-v1` once it has been spent from, and before
+  // that reports the default. Either is this caller's own ledger; a ledger
+  // stamped with the OTHER tier's version is not, and says unavailable.
+  const ownLedger = parsed.success
+    && (parsed.data.policyVersion === policyVersion || parsed.data.policyVersion === OWNER_POLICY_VERSION);
+  if (!parsed.success || !ownLedger || parsed.data.authorityDay !== authorityDay) {
     return NextResponse.json(
       { error: 'Owner budget unavailable.', code: 'owner_budget_unavailable' },
       { status: 503, headers: NO_STORE },
