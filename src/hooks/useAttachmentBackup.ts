@@ -1,14 +1,22 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 
 import {
-  backfillHistory,
   readBackupStatus,
   removeAllBackups,
   setBackupEnabled,
   type BackupStatus,
 } from '@/services/attachmentBackup';
+import {
+  backfillWasInterrupted,
+  getBackfillState,
+  startBackfill,
+  stopBackfill,
+  subscribeBackfill,
+} from '@/services/backfillRun';
+
+const IDLE = { progress: null, failed: 0 };
 
 /**
  * The two account-menu lines, and the state behind them.
@@ -40,10 +48,11 @@ export function useAttachmentBackup(signedIn: boolean | undefined): AttachmentBa
   const [status, setStatus] = useState<BackupStatus | null>(null);
   const [busy, setBusy] = useState(false);
   const [confirming, setConfirming] = useState(false);
-  const [progress, setProgress] = useState<number | null>(null);
-  const [failed, setFailed] = useState(0);
-  const running = useRef(false);
-  const stopped = useRef(false);
+  const { progress, failed } = useSyncExternalStore(
+    subscribeBackfill,
+    getBackfillState,
+    () => IDLE,
+  );
 
   useEffect(() => {
     if (signedIn !== true) {
@@ -51,13 +60,32 @@ export function useAttachmentBackup(signedIn: boolean | undefined): AttachmentBa
       return;
     }
     let active = true;
-    void readBackupStatus().then((next) => {
-      if (active) setStatus(next);
+    void readBackupStatus().then(async (next) => {
+      if (!active) return;
+      setStatus(next);
+      // Picks up a run the last visit cut off, from where the account's own
+      // list says it got to.
+      if (next?.enabled && backfillWasInterrupted()) {
+        await startBackfill(new Set(next.attachments.map((file) => file.id)));
+        const after = await readBackupStatus();
+        if (active) setStatus(after);
+      }
     });
     return () => {
       active = false;
     };
   }, [signedIn]);
+
+  // The browser's own "leave site?" prompt, only while something is uploading.
+  useEffect(() => {
+    if (progress === null) return;
+    const warn = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [progress]);
 
   const toggle = useCallback(async () => {
     if (!status || busy) return;
@@ -73,22 +101,10 @@ export function useAttachmentBackup(signedIn: boolean | undefined): AttachmentBa
     setBusy(false);
 
     if (answer !== true) {
-      stopped.current = true;
+      stopBackfill();
       return;
     }
-    if (running.current) return;
-    running.current = true;
-    stopped.current = false;
-    setFailed(0);
-    const result = await backfillHistory(
-      new Set(status.attachments.map((file) => file.id)),
-      ({ doneBytes, totalBytes }) =>
-        setProgress(totalBytes === 0 ? 100 : Math.floor((doneBytes / totalBytes) * 100)),
-      () => stopped.current,
-    ).catch(() => ({ attempted: 0, stored: 0 }));
-    running.current = false;
-    setProgress(null);
-    if (!stopped.current) setFailed(result.attempted - result.stored);
+    await startBackfill(new Set(status.attachments.map((file) => file.id)));
     setStatus(await readBackupStatus());
   }, [status, busy]);
 
