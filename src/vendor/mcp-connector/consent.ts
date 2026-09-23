@@ -16,7 +16,7 @@
  * depends on nothing, and the same file runs in Next, a bare Worker and Node.
  *
  *   GET  /api/mcp/authorize?state=…          -> consentResponse({...})
- *   POST <action> (state + consent token)    -> verify, sign grant, redirect
+ *   POST <action> (state + consent token)    -> verify, sign grant, grantRedirect()
  */
 
 export interface ConsentPage {
@@ -101,7 +101,16 @@ ${page.abilities.map((ability) => `      <li>${e(ability)}</li>`).join('\n')}
 </main></body></html>`;
 }
 
-/** The page as a response, with headers that keep it out of caches and referrers. */
+/**
+ * The page as a response, with headers that keep it out of caches and referrers.
+ *
+ * Its CSP sets no form-action, and must stay that way: browsers check the
+ * Continue POST's redirect against form-action too, and Continue 302s to the
+ * MCP Worker's /callback on another origin. An app whose own CSP replaces
+ * these headers with `form-action 'self'` gets a Continue that silently does
+ * nothing, so it must add the callback's origin to form-action on the
+ * authorize route - `consentFormAction()` builds that directive.
+ */
 export function consentResponse(page: ConsentPage): Response {
   return new Response(consentHtml(page), {
     status: 200,
@@ -118,6 +127,41 @@ export function consentResponse(page: ConsentPage): Response {
       'Content-Security-Policy': "frame-ancestors 'none'",
     },
   });
+}
+
+/**
+ * The confirm POST's answer: send the browser to the MCP Worker's /callback.
+ *
+ * Always 302, never 307 or 308. Those replay the POST, and a POST to another
+ * site carries no SameSite=Lax cookie - the Worker's flow cookie stays home and
+ * /callback refuses. `NextResponse.redirect(url)` is 307 by default, which is
+ * how this was once got wrong. The grant rides in the URL for exactly one hop,
+ * so the response keeps it out of caches and out of the next page's Referer.
+ */
+export function grantRedirect(callback: string | URL, grant: string, state: string): Response {
+  const to = new URL(callback);
+  to.searchParams.set('state', state);
+  to.searchParams.set('grant', grant);
+  return new Response(null, {
+    status: 302,
+    headers: {
+      Location: to.toString(),
+      'Cache-Control': 'no-store, private',
+      'Referrer-Policy': 'no-referrer',
+    },
+  });
+}
+
+/**
+ * The `form-action` directive an app-wide CSP needs on the authorize route.
+ *
+ * Only for an app whose own CSP replaces `consentResponse()`'s headers. Throws
+ * without a callback URL rather than falling back to `'self'`, which would
+ * block Continue silently - the failure should be loud and at deploy time.
+ */
+export function consentFormAction(callbackUrl: string | undefined): string {
+  if (!callbackUrl) throw new Error('consentFormAction: the MCP callback URL is not configured');
+  return `form-action 'self' ${new URL(callbackUrl).origin}`;
 }
 
 /**

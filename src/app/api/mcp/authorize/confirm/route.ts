@@ -2,7 +2,7 @@ import { readSession } from '@/server/accounts/auth';
 import { accountsConfigured, accountsDb, accountsEnv, appOrigin } from '@/server/accounts/env';
 import { mcpConfigured, mcpEnv } from '@/server/mcp/env';
 import { signMcpGrant } from '@/server/mcp/grant';
-import { back, consentToken, constantTimeEqual, sessionId, STATE } from '../../shared';
+import { back, consentToken, constantTimeEqual, grantRedirect, sessionId, STATE } from '../../shared';
 
 export const dynamic = 'force-dynamic';
 
@@ -50,17 +50,5 @@ export async function POST(request: Request) {
     mcp.MCP_GRANT_SECRET!,
   );
 
-  const callback = new URL('/callback', mcp.MCP_ORIGIN!);
-  callback.searchParams.set('state', state);
-  callback.searchParams.set('grant', grant);
-  return new Response(null, {
-    status: 302,
-    headers: {
-      Location: callback.toString(),
-      'Cache-Control': 'no-store',
-      // The grant is in the URL for exactly one hop. Do not let it ride along
-      // as a Referer to wherever the client goes next.
-      'Referrer-Policy': 'no-referrer',
-    },
-  });
+  return grantRedirect(new URL('/callback', mcp.MCP_ORIGIN!), grant, state);
 }

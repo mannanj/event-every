@@ -22,7 +22,7 @@ export function back(origin: string, path: string): Response {
  * only inside the consent form. constantTimeEqual compares it. Both are shared
  * with every app's bridge - see the vendored consent module.
  */
-export { consentToken, constantTimeEqual } from '@/vendor/mcp-connector/consent';
+export { consentToken, constantTimeEqual, grantRedirect } from '@/vendor/mcp-connector/consent';
 
 export function sessionId(cookieHeader: string | null): string | null {
   if (!cookieHeader) return null;

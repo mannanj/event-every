@@ -23,6 +23,7 @@
  *
  * Exits non-zero on any failure.
  */
+import { parseConsentForm } from '../../src/vendor/mcp-connector/consent-form.mjs';
 
 const APP = (process.env.APP_ORIGIN || 'https://eventevery.com').replace(/\/$/, '');
 const MCP = (process.env.MCP_ORIGIN || 'https://event-every-mcp.mannanteam.workers.dev').replace(/\/$/, '');
@@ -120,10 +121,17 @@ page.includes('Connect an assistant?')
   ? ok('a consent page is shown instead')
   : fail('a consent page is shown instead', page.slice(0, 120));
 
-// The consent token reaches the browser only inside this page.
-// The attribute is HTML-escaped, so `&` arrives as `&amp;`.
-const consentAction = (page.match(/action="([^"]*\/confirm[^"]*)"/)?.[1] ?? '').replace(/&amp;/g, '&');
-const consent = consentAction ? new URL(consentAction, APP).searchParams.get('consent') : null;
+// The consent token reaches the browser only inside this page. The shared
+// parser reads the form as a browser would, `&amp;` and all.
+const confirmAction = (html) => {
+  try {
+    return parseConsentForm(html, APP).action.toString();
+  } catch {
+    return '';
+  }
+};
+const consentAction = confirmAction(page);
+const consent = consentAction ? new URL(consentAction).searchParams.get('consent') : null;
 consent ? ok('a consent token is issued to this session') : fail('a consent token is issued to this session', consentAction.slice(0, 80));
 
 // 4b. Confirming ─────────────────────────────────────────────────────────────
@@ -186,7 +194,7 @@ const secondFlow = (second.headers.get('set-cookie') ?? '').split(';')[0] ?? '';
 const secondBridge = second.headers.get('location') ?? '';
 const secondAsked = await fetch(secondBridge, { headers: { cookie: `ee_session=${SESSION}` } });
 const secondPage = await secondAsked.text();
-const secondAction = (secondPage.match(/action="([^"]*\/confirm[^"]*)"/)?.[1] ?? '').replace(/&amp;/g, '&');
+const secondAction = confirmAction(secondPage);
 const secondConfirm = await fetch(new URL(secondAction, APP), {
   method: 'POST',
   redirect: 'manual',
