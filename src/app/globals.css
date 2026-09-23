@@ -398,3 +398,142 @@ html {
     transition: none;
   }
 }
+
+/* ─── the MCP guide and connector popover ────────────────────────────────
+   The shared page every app in the family uses (Calendar, MeetTime), with its
+   tokens copied rather than re-chosen, so /mcp reads as the same page with
+   Event Every's words in it. */
+.mcp-guide {
+  --ink: #0b0b0b;
+  --paper: #ffffff;
+  --ground: #f3f3f3;
+  --rule: #dddddd;
+  --rule-strong: #a8a8a8;
+  --muted: #6f6f6f;
+  --link: #1a56db;
+  --link-hover: #143fa8;
+  --space-sm: 13px;
+  --space-lg: 38px;
+  background: var(--ground);
+  color: var(--ink);
+}
+
+.mcp-guide__column {
+  width: 100%;
+  max-width: 60rem;
+  margin: 0 auto;
+  padding: 64px 20px 72px;
+}
+
+.mcp-guide__column > .stack--section {
+  max-width: 44rem;
+}
+
+.mcp-guide .stack {
+  display: flex;
+  flex-direction: column;
+}
+
+.mcp-guide .stack--section {
+  gap: var(--space-lg);
+}
+
+.mcp-guide .stack--element {
+  gap: var(--space-sm);
+}
+
+.mcp-guide .display {
+  font-family: inherit;
+  font-size: clamp(1.375rem, 3.2vw, 1.625rem);
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: 1.15;
+  margin: 0;
+  text-wrap: balance;
+}
+
+.mcp-guide .title {
+  font-size: 1.375rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  margin: 0;
+}
+
+.mcp-guide .lede {
+  font-size: 1.0625rem;
+  color: var(--muted);
+  margin: 0;
+  max-width: 46ch;
+  text-wrap: pretty;
+}
+
+.mcp-guide .toolist {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.mcp-guide .toolist > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.mcp-guide .toolist dt {
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+
+.mcp-guide .toolist dd {
+  margin: 0;
+  font-size: 0.9375rem;
+  color: var(--muted);
+}
+
+.mcp-guide .guide__back,
+.mcp-guide .guide__action {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 0.875rem;
+  color: var(--link);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.mcp-guide .guide__back:hover,
+.mcp-guide .guide__action:hover {
+  color: var(--link-hover);
+}
+
+.mcp-guide .guide__action:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* Declared ON the package's own elements: it sets its defaults there, and a
+   declaration on an element beats one inherited from an ancestor. */
+.mcp-guide .mcp-connector,
+.mcp-panel .mcp-connector {
+  --mcpc-fg: #0b0b0b;
+  --mcpc-muted: #6f6f6f;
+  --mcpc-line: #dddddd;
+  --mcpc-surface: transparent;
+  --mcpc-accent: #1a56db;
+  --mcpc-mono: ui-monospace, SFMono-Regular, monospace;
+  --mcpc-radius: 7px;
+}
+
+.mcp-guide .mcpc-ai {
+  --mcpc-fg: #0b0b0b;
+  --mcpc-muted: #6f6f6f;
+  --mcpc-line: #dddddd;
+  --mcpc-surface: #ffffff;
+  --mcpc-accent: #1a56db;
+  --mcpc-mono: ui-monospace, SFMono-Regular, monospace;
+  --mcpc-radius: 7px;
+}

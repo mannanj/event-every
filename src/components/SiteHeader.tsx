@@ -6,6 +6,13 @@ import { usePathname } from 'next/navigation';
 import { useAccount } from '@/components/AccountProvider';
 import AccountBar, { type AccountBarItem } from '@/components/account-bar/AccountBar';
 import { useAttachmentBackup } from '@/hooks/useAttachmentBackup';
+import {
+  DEFAULT_MCP_ENDPOINT,
+  mcpAgentInstruction,
+  mcpClaudeCodeCommand,
+} from '@/lib/mcp-info';
+import { McpConnector } from '@/vendor/mcp-connector/connector';
+import '@/vendor/mcp-connector/styles.css';
 
 /**
  * The bar every screen wears.
@@ -43,24 +50,26 @@ export default function SiteHeader({ showHow = false }: { showHow?: boolean }) {
           onSelect: backup.toggle,
           testId: 'attachment-backup-toggle',
         },
-        {
-          key: 'delete-backups',
-          label: backup.confirming
-            ? 'Delete them. This cannot be undone.'
-            : 'Delete attachments from my account',
-          disabled: backup.busy || backup.count === 0,
-          note:
-            backup.count === 0
-              ? 'Nothing backed up yet.'
-              : `${backup.count} ${backup.count === 1 ? 'file' : 'files'}, ${formatBytes(backup.bytes)}. This device keeps its own copies.`,
-          // The first click only arms it, so the menu has to stay open for the
-          // second one to be possible.
-          keepOpen: !backup.confirming,
-          onSelect: backup.removeAll,
-          testId: 'attachment-backup-delete',
-        },
       ]
     : [];
+  // Nothing to delete until something has actually been backed up.
+  if (backup.available && backup.count > 0) {
+    items.push(
+      {
+        key: 'delete-backups',
+        label: backup.confirming
+          ? 'Delete them. This cannot be undone.'
+          : 'Delete attachments from my account',
+        disabled: backup.busy,
+        note: `${backup.count} ${backup.count === 1 ? 'file' : 'files'}, ${formatBytes(backup.bytes)}. This device keeps its own copies.`,
+        // The first click only arms it, so the menu has to stay open for the
+        // second one to be possible.
+        keepOpen: !backup.confirming,
+        onSelect: backup.removeAll,
+        testId: 'attachment-backup-delete',
+      },
+    );
+  }
 
   return (
     <nav className="sticky top-0 z-40 backdrop-blur-md bg-white/55 border-b border-black/10">
@@ -87,17 +96,23 @@ export default function SiteHeader({ showHow = false }: { showHow?: boolean }) {
               busyLabel={account.syncing ? 'syncing' : null}
               hideSignIn={onSignIn}
               items={items}
-              // The mark opens the guide rather than a popover: connecting is a
-              // thing somebody does once, in a terminal or a client's settings,
-              // and the page can say what an assistant will be able to see. A
-              // popover cannot, and this is not a decision to make from a
-              // tooltip.
               mcp={{
                 enabled: true,
                 tooltip: 'Connect your assistant',
-                onOpen: () => {
-                  window.location.href = '/mcp';
-                },
+                panel: (close) => (
+                  <McpConnector
+                    endpoint={DEFAULT_MCP_ENDPOINT}
+                    claudeCodeCommand={mcpClaudeCodeCommand(DEFAULT_MCP_ENDPOINT)}
+                    agentInstruction={mcpAgentInstruction(DEFAULT_MCP_ENDPOINT)}
+                    title="MCP Connector"
+                    docsHref="/mcp"
+                    renderDocsLink={(href, children) => (
+                      <Link href={href} className="mcpc-docs" onClick={close}>
+                        {children}
+                      </Link>
+                    )}
+                  />
+                ),
               }}
               renderLink={(href, className, children) => (
                 <Link href={href} className={className} data-testid="sign-in-link">

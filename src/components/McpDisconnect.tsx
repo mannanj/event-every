@@ -57,26 +57,29 @@ export default function McpDisconnect() {
   }
 
   return (
-    <div className="mt-6 border-2 border-black bg-white p-4" data-testid="mcp-disconnect">
-      <p className="text-sm text-black">
-        <strong>Disconnect everything.</strong> Ends every assistant connection on this
-        account. Any assistant using one stops working straight away.
+    <div className="stack stack--element" data-testid="mcp-disconnect">
+      <h2 className="title">Disconnect</h2>
+      <p className="lede">
+        Ends every assistant connection on this account. Any assistant using one stops
+        working straight away.
       </p>
-      <button
-        type="button"
-        disabled={busy}
-        onClick={() => void disconnect()}
-        className="mt-3 w-full border-2 border-black bg-white px-4 py-2 font-semibold text-black transition-colors hover:bg-black hover:text-white disabled:opacity-50"
-        data-testid="mcp-disconnect-button"
-      >
-        {busy
-          ? 'Disconnecting...'
-          : confirming
-            ? 'Disconnect them. This cannot be undone.'
-            : 'Disconnect'}
-      </button>
+      <div>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => void disconnect()}
+          className="guide__action"
+          data-testid="mcp-disconnect-button"
+        >
+          {busy
+            ? 'Disconnecting...'
+            : confirming
+              ? 'Disconnect them. This cannot be undone.'
+              : 'Disconnect everything'}
+        </button>
+      </div>
       {result && (
-        <p className="mt-3 text-sm text-black" data-testid="mcp-disconnect-result">
+        <p className="lede" data-testid="mcp-disconnect-result">
           {result}
         </p>
       )}

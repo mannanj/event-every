@@ -207,3 +207,24 @@
 .mcpButton[aria-expanded='true'] .tip {
   opacity: 0;
 }
+
+/* The connector popover, as Calendar, Meet Time and mannan.is draw it. */
+.mcpPanel {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 10px;
+  width: 316px;
+  max-width: calc(100vw - 32px);
+  background: var(--ab-paper, #ffffff);
+  border: 1px solid #a8a8a8;
+  border-radius: 9px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.09);
+  font-size: 0.8125rem;
+  text-align: left;
+  z-index: 60;
+}

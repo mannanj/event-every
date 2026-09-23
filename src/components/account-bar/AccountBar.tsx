@@ -30,8 +30,13 @@ export interface AccountBarMcp {
   enabled: boolean;
   /** What the tooltip says. Kept a prop because "coming soon" is temporary. */
   tooltip: string;
-  /** Only called when enabled. */
+  /** Only called when enabled. Ignored when `panel` is given. */
   onOpen?: () => void;
+  /**
+   * The popover the mark opens, e.g. the shared connector panel. Handed a
+   * close callback so a link inside it can dismiss the popover on the way out.
+   */
+  panel?: (close: () => void) => React.ReactNode;
 }
 
 /**
@@ -120,14 +125,19 @@ function useDismiss(open: boolean, close: () => void) {
 }
 
 function McpMark({ mcp }: { mcp: AccountBarMcp }) {
+  const [open, setOpen] = useState(false);
+  const close = useCallback(() => setOpen(false), []);
+  const wrapper = useDismiss(open, close);
+
   return (
-    <div className={styles.mcp}>
+    <div className={styles.mcp} ref={wrapper}>
       <button
         type="button"
         className={styles.mcpButton}
         aria-label={mcp.tooltip}
+        aria-expanded={mcp.panel ? open : undefined}
         disabled={!mcp.enabled}
-        onClick={mcp.enabled ? mcp.onOpen : undefined}
+        onClick={mcp.enabled ? (mcp.panel ? () => setOpen((was) => !was) : mcp.onOpen) : undefined}
         data-testid="mcp-button"
       >
         <McpLogoIcon />
@@ -135,6 +145,17 @@ function McpMark({ mcp }: { mcp: AccountBarMcp }) {
           {mcp.tooltip}
         </span>
       </button>
+
+      {open && mcp.panel && (
+        <div
+          className={`${styles.mcpPanel} mcp-panel`}
+          role="dialog"
+          aria-label={mcp.tooltip}
+          data-testid="mcp-panel"
+        >
+          {mcp.panel(close)}
+        </div>
+      )}
     </div>
   );
 }
