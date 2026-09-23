@@ -3,6 +3,8 @@ import { z } from 'zod';
 import { appOrigin, attachmentsBucket } from '@/server/accounts/env';
 import { accountDek } from '@/server/accounts/store';
 import { mcpJson, requireActor } from '@/server/mcp/actor';
+import { mcpEnv } from '@/server/mcp/env';
+import { SCAN_ON_BEHALF_HEADER, signScanOnBehalf } from '@/server/mcp/grant';
 import { readEventsByIds, writeEvents } from '@/server/mcp/events';
 import {
   IntakeError,
@@ -135,6 +137,13 @@ export async function POST(request: Request) {
         'Content-Type': 'application/json',
         'X-Event-Every-Request-Id': crypto.randomUUID(),
       };
+      // Whose scan this is. Without it /api/scan sees only this Worker's own
+      // address, so every caller would share one per-person cap and nobody
+      // would be recognised as admin.
+      headers[SCAN_ON_BEHALF_HEADER] = await signScanOnBehalf(
+        { sub: actor.sub, email: actor.email },
+        mcpEnv().MCP_GRANT_SECRET ?? '',
+      );
       if (input.timezone) headers['X-Event-Every-Time-Zone'] = input.timezone;
 
       let response: Response;

@@ -5,8 +5,10 @@ import {
   MCP_GRANT_TTL_SECONDS,
   signActor,
   signMcpGrant,
+  signScanOnBehalf,
   verifyActor,
   verifyMcpGrant,
+  verifyScanOnBehalf,
 } from '@/server/mcp/grant';
 
 const SECRET = 'test-grant-secret-not-used-anywhere-real';
@@ -109,5 +111,30 @@ describe('the actor token', () => {
     for (const junk of ['', '.', 'nodot', 'a.', '.b']) {
       expect(await verifyActor(junk, SECRET)).toBeNull();
     }
+  });
+});
+
+describe('the on-behalf scan token', () => {
+  test('names the account it was signed for', async () => {
+    const token = await signScanOnBehalf(WHO, SECRET);
+    expect((await verifyScanOnBehalf(token, SECRET))?.sub).toBe('acct_1');
+  });
+
+  test('is refused under another secret', async () => {
+    const token = await signScanOnBehalf(WHO, SECRET);
+    expect(await verifyScanOnBehalf(token, OTHER)).toBeNull();
+  });
+
+  // Domain separation, both ways. An actor token the Worker hands a tool call
+  // must not become a way to spend as someone at /api/scan, and this token
+  // must not be usable as an actor on the MCP routes.
+  test('an actor token is not an on-behalf token', async () => {
+    const actor = await signActor(WHO, SECRET);
+    expect(await verifyScanOnBehalf(actor, SECRET)).toBeNull();
+  });
+
+  test('an on-behalf token is not an actor token', async () => {
+    const token = await signScanOnBehalf(WHO, SECRET);
+    expect(await verifyActor(token, SECRET)).toBeNull();
   });
 });

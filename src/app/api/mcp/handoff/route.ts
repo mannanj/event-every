@@ -12,6 +12,7 @@ import { mcpJson, requireActor } from '@/server/mcp/actor';
 import { readEventsByIds, writeEvents } from '@/server/mcp/events';
 import { HANDOFF_TTL_SECONDS, burnHandoff, signHandoff, verifyHandoff } from '@/server/mcp/handoff';
 import { mcpEnv } from '@/server/mcp/env';
+import { SCAN_ON_BEHALF_HEADER, signScanOnBehalf } from '@/server/mcp/grant';
 import { keepOriginal, resolveBackup } from '@/server/mcp/original';
 import { reviewDraftsToCalendarEvents } from '@/services/reviewEvent';
 import { createReviewDrafts } from '@/services/scannerDraft';
@@ -128,6 +129,13 @@ async function redeem(request: Request, input: z.infer<typeof Redeem>) {
     'Content-Type': 'application/json',
     'X-Event-Every-Request-Id': crypto.randomUUID(),
   };
+  // Whose scan this is. Without it /api/scan sees only this Worker's own
+  // address, so every caller would share one per-person cap and nobody
+  // would be recognised as admin.
+  headers[SCAN_ON_BEHALF_HEADER] = await signScanOnBehalf(
+    { sub: who.sub, email: who.email },
+    secret,
+  );
   if (input.timezone) headers['X-Event-Every-Time-Zone'] = input.timezone;
 
   let response: Response;

@@ -44,6 +44,19 @@ const GRANT_PURPOSE = 'ee.mcp.grant.v1';
 const ACTOR_PURPOSE = 'ee.mcp.actor.v1';
 
 /**
+ * Who a server-side scan is for. The MCP routes and the photo handoff reach
+ * /api/scan over HTTP from the Worker itself, so the request carries no session
+ * cookie and its edge identity is the Worker's own address - every assistant in
+ * the world would share one per-person cap, and an admin would be charged to
+ * the shared budget. This token names the account instead.
+ *
+ * Its own purpose, so an MCP actor token cannot be replayed here and this one
+ * cannot be replayed as an actor.
+ */
+export const SCAN_ON_BEHALF_PURPOSE = 'ee.scan.on-behalf.v1';
+export const SCAN_ON_BEHALF_HEADER = 'x-event-every-on-behalf';
+
+/**
  * Disconnecting.
  *
  * The app owns the session; the Worker owns the tokens. So ending a connection
@@ -254,4 +267,12 @@ export async function verifyActor(
   } catch {
     return null;
   }
+}
+
+export function signScanOnBehalf(identity: { sub: string; email: string }, secret: string): Promise<string> {
+  return signActor(identity, secret, { purpose: SCAN_ON_BEHALF_PURPOSE, ttlSeconds: ACTOR_TTL_SECONDS });
+}
+
+export function verifyScanOnBehalf(token: string, secret: string): Promise<ActorPayload | null> {
+  return verifyActor(token, secret, { purpose: SCAN_ON_BEHALF_PURPOSE });
 }

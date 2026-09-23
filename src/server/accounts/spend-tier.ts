@@ -2,6 +2,8 @@ import { readSession } from '@/server/accounts/auth';
 import { adminKeyConfigured } from '@/server/accounts/spend-key';
 import { accountsConfigured, accountsDb, accountsEnv } from '@/server/accounts/env';
 import { readCapSubject, shouldEnforceDailyCaps } from '@/server/accounts/admin';
+import { mcpEnv } from '@/server/mcp/env';
+import { SCAN_ON_BEHALF_HEADER, verifyScanOnBehalf } from '@/server/mcp/grant';
 import {
   ADMIN_POLICY_VERSION,
   OWNER_POLICY_VERSION,
@@ -22,24 +24,61 @@ import {
  * capped, shared budget. An exemption that defaults to "exempt" is not a role,
  * it is a hole, and this is the function where that would happen.
  */
-export async function resolveSpendPolicy(request: Request): Promise<SpendPolicyVersion> {
+export interface ScanCaller {
+  policyVersion: SpendPolicyVersion;
+  /** The account the scan is for, or null for a signed-out visitor. */
+  accountId: string | null;
+}
+
+/**
+ * The account behind a request: its session cookie, or - for a scan the MCP
+ * routes or the photo handoff make on someone's behalf - the signed
+ * on-behalf token. Null when neither verifies.
+ */
+async function callerAccountId(request: Request, db: ReturnType<typeof accountsDb>): Promise<string | null> {
+  const account = await readSession(db, request.headers.get('cookie'));
+  if (account) return account.id;
+
+  const token = request.headers.get(SCAN_ON_BEHALF_HEADER);
+  const secret = mcpEnv().MCP_GRANT_SECRET;
+  if (!token || !secret) return null;
+  const onBehalf = await verifyScanOnBehalf(token, secret);
+  return onBehalf?.sub ?? null;
+}
+
+/**
+ * Which budget a request spends from, and whose per-person count it takes.
+ *
+ * The account is known even when the admin key is not configured, because the
+ * per-person cap keys on it either way: a signed-in person is one person
+ * whether they scan from a browser, a phone or an assistant.
+ */
+export async function resolveScanCaller(request: Request): Promise<ScanCaller> {
   try {
     const env = accountsEnv();
-    if (!accountsConfigured(env)) return OWNER_POLICY_VERSION;
+    if (!accountsConfigured(env)) return { policyVersion: OWNER_POLICY_VERSION, accountId: null };
+
+    const db = accountsDb(env);
+    const accountId = await callerAccountId(request, db);
+    if (!accountId) return { policyVersion: OWNER_POLICY_VERSION, accountId: null };
 
     // No admin key means no admin ledger. Choosing the ledger without the key
     // is the one combination that breaks the ceiling invariant, so the absence
     // of either sends the request back to the owner policy entirely.
-    if (!adminKeyConfigured()) return OWNER_POLICY_VERSION;
+    if (!adminKeyConfigured()) return { policyVersion: OWNER_POLICY_VERSION, accountId };
 
-    const account = await readSession(accountsDb(env), request.headers.get('cookie'));
-    if (!account) return OWNER_POLICY_VERSION;
-
-    // Re-derived per request rather than carried on the session, so revoking
-    // the flag takes effect on the next call instead of at the next sign-in.
-    const subject = await readCapSubject(accountsDb(env), account.id);
-    return shouldEnforceDailyCaps(subject) ? OWNER_POLICY_VERSION : ADMIN_POLICY_VERSION;
+    // Re-derived per request rather than carried on the session or the token,
+    // so revoking the flag takes effect on the next call.
+    const subject = await readCapSubject(db, accountId);
+    return {
+      policyVersion: shouldEnforceDailyCaps(subject) ? OWNER_POLICY_VERSION : ADMIN_POLICY_VERSION,
+      accountId,
+    };
   } catch {
-    return OWNER_POLICY_VERSION;
+    return { policyVersion: OWNER_POLICY_VERSION, accountId: null };
   }
+}
+
+export async function resolveSpendPolicy(request: Request): Promise<SpendPolicyVersion> {
+  return (await resolveScanCaller(request)).policyVersion;
 }

@@ -264,6 +264,43 @@ whoText.includes('@')
 const structured = who?.result?.structuredContent;
 structured?.email ? ok('whoami returns structuredContent', structured.email) : fail('whoami returns structuredContent', JSON.stringify(structured));
 
+// 7a. OPT-IN, because it spends: one real text scan through MCP, and which
+// budget it came out of. Without an on-behalf identity the app saw only this
+// Worker's address, so an admin was charged to the shared budget and every
+// assistant shared one per-person cap. EE_EXPECT_TIER says which ledger this
+// account should spend from: 'admin' for an unlimited account, else 'owner'.
+if (process.env.EE_VERIFY_SCAN) {
+  console.log('\n7a. a scan spends from the caller\'s own budget');
+  const usage = async (cookie) => {
+    const response = await fetch(`${APP}/api/usage`, cookie ? { headers: { cookie } } : {});
+    const body = await response.json().catch(() => ({}));
+    // Reserved as well as spent: settlement may land after the tool answers.
+    return (body.spentNanodollars ?? 0) + (body.reservedNanodollars ?? 0);
+  };
+  const mineBefore = await usage(`ee_session=${SESSION}`);
+  const sharedBefore = await usage(null);
+  const scanned = await rpc('tools/call', {
+    name: 'read_text_into_events',
+    arguments: { text: 'Verification tea, Friday 3pm to 4pm, at the library.' },
+  });
+  const scanText = scanned?.result?.content?.[0]?.text ?? JSON.stringify(scanned).slice(0, 200);
+  scanned?.result && !scanned.result.isError
+    ? ok('read_text_into_events succeeds', scanText.slice(0, 60))
+    : fail('read_text_into_events succeeds', scanText.slice(0, 200));
+  const mineAfter = await usage(`ee_session=${SESSION}`);
+  const sharedAfter = await usage(null);
+  mineAfter > mineBefore
+    ? ok('the caller\'s own ledger was charged', `${mineBefore} -> ${mineAfter}`)
+    : fail('the caller\'s own ledger was charged', `${mineBefore} -> ${mineAfter}`);
+  if (process.env.EE_EXPECT_TIER === 'admin') {
+    // The shared ledger can move under other people's traffic, so the proof
+    // is that the two ledgers are different objects, not that one stood still.
+    mineBefore !== sharedBefore
+      ? ok('an admin spends from a ledger that is not the shared one', `${mineAfter} vs ${sharedAfter}`)
+      : fail('an admin spends from a ledger that is not the shared one', `${mineBefore} vs ${sharedBefore}`);
+  }
+}
+
 const marker = `verify-live-${Date.now()}`;
 const added = await rpc('tools/call', {
   name: 'add_events',

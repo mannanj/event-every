@@ -10,7 +10,7 @@ import { resolveScanTimeZone } from '@/server/scanner/scanContext';
 import { OWNER_MODEL_CHAINS } from '@/platform/provider/policy';
 import { MAX_EXCERPT_CHARS, verifyCandidates } from '@/server/typesafe/verify';
 import { typeSafeAvailable } from '@/server/typesafe/client';
-import { resolveSpendPolicy } from '@/server/accounts/spend-tier';
+import { resolveScanCaller } from '@/server/accounts/spend-tier';
 import { chargeScanCap } from '@/server/accounts/scan-cap';
 
 type E1SourceHandle = Extract<SourceHandle, { kind: 'text' | 'image' }>;
@@ -64,13 +64,17 @@ export async function POST(request: NextRequest): Promise<Response> {
     // Which budget this spends from. An admin or unlimited account reserves
     // from its own ledger and its own key; everybody else, including every
     // signed-out visitor, is on the shared capped one.
-    const policyVersion = await resolveSpendPolicy(request);
+    const { policyVersion, accountId } = await resolveScanCaller(request);
 
     // BEFORE ANY SPEND. The budget ledger says no about money; this says no
     // about one person taking the whole day from everyone else. Charged here
     // rather than after the scan, because a refusal that happens after the
     // provider call has already been paid for is not a limit.
-    const identity = request.headers.get('x-event-every-identity') ?? 'unknown';
+    // A signed-in person counts as one person on every device and through any
+    // assistant; only a signed-out visitor is counted by where they connect from.
+    const identity = accountId
+      ? `account:${accountId}`
+      : request.headers.get('x-event-every-identity') ?? 'unknown';
     const cap = await chargeScanCap(identity, policyVersion);
     if (!cap.allowed) {
       return NextResponse.json(
