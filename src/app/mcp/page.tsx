@@ -3,7 +3,6 @@ import Link from 'next/link';
 
 import SiteFooter from '@/components/SiteFooter';
 import SiteHeader from '@/components/SiteHeader';
-import McpDisconnect from '@/components/McpDisconnect';
 import { AiGenerated, McpConnector } from '@/vendor/mcp-connector/connector';
 import { maskEmail } from '@/vendor/mcp-connector/mask';
 import '@/vendor/mcp-connector/styles.css';
@@ -42,7 +41,8 @@ export default function McpGuidePage() {
             <p className="lede">
               Event Every speaks the Model Context Protocol, so an assistant like Claude can
               search your saved events and add new ones for you. You sign in the same way you
-              always do, in your own browser, and you can disconnect whenever you like.
+              always do, in your own browser, and you can disconnect whenever you like from
+              Disconnect MCP in your account menu.
             </p>
           </div>
 
@@ -98,8 +98,6 @@ export default function McpGuidePage() {
               you make it.
             </p>
           </div>
-
-          <McpDisconnect />
 
           <Link href="/" className="guide__back">
             ← Back to Event Every

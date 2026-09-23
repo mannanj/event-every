@@ -309,3 +309,156 @@ export function AiGenerated({
     </span>
   );
 }
+
+/** One connected assistant, as `@mannan/mcp-grant`'s /connections lists it. */
+export interface McpConnection {
+  id: string;
+  /** The name the client registered with. */
+  client: string;
+  /** Unix seconds. */
+  connectedAt: number;
+}
+
+export interface McpDisconnectProps {
+  /**
+   * Lists what is connected. Omit it when the app's Worker can only revoke
+   * everything at once, and the panel offers just that.
+   */
+  load?: () => Promise<McpConnection[]>;
+  /**
+   * Cuts one assistant off by id, or every one when `id` is undefined.
+   * Resolves to how many were disconnected when the server says so.
+   */
+  disconnect: (id?: string) => Promise<number | void>;
+  title?: string;
+  className?: string;
+}
+
+type DisconnectState =
+  | { kind: 'loading' }
+  | { kind: 'failed'; message: string }
+  | { kind: 'ready'; items: McpConnection[] | null; note?: string };
+
+const CONNECTED_ON = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+
+/**
+ * "Disconnect MCP" - the second line of every signed-in account menu, right
+ * under "MCP Connector".
+ *
+ * WHY IT IS IN THE MENU. A connected assistant holds a refresh token that does
+ * not expire, and signing out of the site does nothing to it: it never had the
+ * session. So the way to cut it off has to be where people look for account
+ * controls, not at the bottom of a guide page.
+ *
+ * Disconnecting everything asks twice: it stops every assistant straight away,
+ * which is the right outcome when meant and a bad surprise when mis-clicked.
+ */
+export function McpDisconnect({ load, disconnect, title = 'Disconnect MCP', className }: McpDisconnectProps) {
+  const [state, setState] = useState<DisconnectState>(load ? { kind: 'loading' } : { kind: 'ready', items: null });
+  const [busy, setBusy] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState(false);
+
+  useEffect(() => {
+    if (!load) return;
+    let live = true;
+    load()
+      .then((items) => live && setState({ kind: 'ready', items }))
+      .catch(() => live && setState({ kind: 'failed', message: 'Could not load what is connected.' }));
+    return () => {
+      live = false;
+    };
+  }, [load]);
+
+  const cutOne = async (id: string) => {
+    setBusy(id);
+    try {
+      await disconnect(id);
+      setState((was) =>
+        was.kind === 'ready' && was.items ? { kind: 'ready', items: was.items.filter((c) => c.id !== id) } : was,
+      );
+    } catch {
+      setState({ kind: 'failed', message: 'That did not go through. Try again.' });
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const cutAll = async () => {
+    if (!confirming) {
+      setConfirming(true);
+      return;
+    }
+    setBusy('*');
+    try {
+      const count = await disconnect();
+      const note =
+        typeof count !== 'number'
+          ? 'Disconnected.'
+          : count === 0
+            ? 'There was nothing connected.'
+            : `Disconnected ${count === 1 ? 'one assistant' : `${count} assistants`}.`;
+      setState({ kind: 'ready', items: load ? [] : null, note });
+    } catch {
+      setState({ kind: 'failed', message: 'That did not go through. Try again.' });
+    } finally {
+      setBusy(null);
+      setConfirming(false);
+    }
+  };
+
+  const items = state.kind === 'ready' ? state.items : null;
+  const nothing = items !== null && items.length === 0;
+
+  return (
+    <div className={['mcp-connector', 'mcpc-disconnect', className].filter(Boolean).join(' ')} data-testid="mcp-disconnect">
+      <div className="mcpc-head">
+        <span className="mcpc-title">{title}</span>
+      </div>
+      <p className="mcpc-disconnect__lede">
+        {items
+          ? 'Assistants connected to this account. A disconnected one stops working straight away.'
+          : 'Ends every assistant connection on this account. Any assistant using one stops working straight away.'}
+      </p>
+      {state.kind === 'loading' && <p className="mcpc-disconnect__note">Checking…</p>}
+      {state.kind === 'failed' && (
+        <p className="mcpc-disconnect__note" role="alert">{state.message}</p>
+      )}
+      {state.kind === 'ready' && state.note && (
+        <p className="mcpc-disconnect__note" role="status" data-testid="mcp-disconnect-result">{state.note}</p>
+      )}
+      {state.kind === 'ready' && nothing && !state.note && (
+        <p className="mcpc-disconnect__note">Nothing connected.</p>
+      )}
+      {items && items.length > 0 && (
+        <ul className="mcpc-disconnect__list">
+          {items.map((c) => (
+            <li key={c.id} className="mcpc-disconnect__row">
+              <span className="mcpc-disconnect__name" title={c.client}>{c.client}</span>
+              <span className="mcpc-disconnect__when">{CONNECTED_ON.format(new Date(c.connectedAt * 1000))}</span>
+              <button
+                type="button"
+                className="mcpc-disconnect__one"
+                disabled={busy !== null}
+                onClick={() => void cutOne(c.id)}
+                aria-label={`Disconnect ${c.client}`}
+              >
+                Disconnect
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {state.kind !== 'loading' && !nothing && (items === null || items.length > 1) && (
+        <button
+          type="button"
+          className={`mcpc-disconnect__all${confirming ? ' is-confirming' : ''}`}
+          disabled={busy !== null}
+          onClick={() => void cutAll()}
+          data-testid="mcp-disconnect-button"
+        >
+          {busy === '*' ? 'Disconnecting…' : confirming ? 'Disconnect them. This cannot be undone.' : 'Disconnect everything'}
+        </button>
+      )}
+    </div>
+  );
+}

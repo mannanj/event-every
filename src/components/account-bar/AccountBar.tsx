@@ -37,6 +37,11 @@ export interface AccountBarMcp {
    * close callback so a link inside it can dismiss the popover on the way out.
    */
   panel?: (close: () => void) => React.ReactNode;
+  /**
+   * The "Disconnect MCP" panel, e.g. the shared McpDisconnect. Given, it is the
+   * menu's second line, right under "MCP Connector".
+   */
+  disconnect?: (close: () => void) => React.ReactNode;
 }
 
 /**
@@ -174,9 +179,13 @@ export default function AccountBar({
   hideSignIn = false,
   renderLink,
 }: AccountBarProps) {
-  const [open, setOpen] = useState(false);
-  const close = useCallback(() => setOpen(false), []);
+  // The menu, or one of the MCP panels in its place - hanging from the address
+  // the way the menu does, so the account corner is one control, not two.
+  const [view, setView] = useState<'closed' | 'menu' | 'mcp' | 'disconnect'>('closed');
+  const open = view !== 'closed';
+  const close = useCallback(() => setView('closed'), []);
   const wrapper = useDismiss(open, close);
+  const mcpInMenu = mcp?.enabled === true && mcp.panel !== undefined;
 
   const link = (href: string, className: string, children: React.ReactNode) =>
     renderLink ? (
@@ -191,7 +200,8 @@ export default function AccountBar({
     <div className={styles.bar}>
       {/* The mark sits left of whoever you are, signed in or not, so its
           position never shifts when the bar finds out who you are. */}
-      {mcp && <McpMark mcp={mcp} />}
+      {/* Signed in, the connector moves into the account menu (see below). */}
+      {mcp && !(signedIn === true && mcpInMenu) && <McpMark mcp={mcp} />}
 
       {/* Undefined is the "not asked yet" state. Showing the way in to someone
           already signed in, even for one frame, is worse than showing nothing. */}
@@ -209,7 +219,7 @@ export default function AccountBar({
             type="button"
             className={styles.accountButton}
             aria-expanded={open}
-            onClick={() => setOpen((was) => !was)}
+            onClick={() => setView((was) => (was === 'closed' ? 'menu' : 'closed'))}
             data-testid="account-button"
           >
             <span className={styles.email} title={email ?? ''}>
@@ -230,9 +240,33 @@ export default function AccountBar({
             </svg>
           </button>
 
-          {open && (
+          {view === 'menu' && (
             <div className={styles.menu} role="menu">
-              {/* The address is on the button, so it is not repeated here. */}
+              {/* The address is on the button, so it is not repeated here.
+                  MCP first, then how to undo it, then everything else. */}
+              {mcpInMenu && (
+                <button
+                  type="button"
+                  className={`${styles.item} ${styles.itemIcon}`}
+                  role="menuitem"
+                  onClick={() => setView('mcp')}
+                  data-testid="menu-mcp"
+                >
+                  <McpLogoIcon size={15} />
+                  MCP Connector
+                </button>
+              )}
+              {mcpInMenu && mcp?.disconnect && (
+                <button
+                  type="button"
+                  className={styles.item}
+                  role="menuitem"
+                  onClick={() => setView('disconnect')}
+                  data-testid="menu-mcp-disconnect"
+                >
+                  Disconnect MCP
+                </button>
+              )}
               {items?.map((item) => (
                 <button
                   key={item.key}
@@ -286,6 +320,23 @@ export default function AccountBar({
               >
                 Sign out
               </button>
+            </div>
+          )}
+
+          {view === 'mcp' && mcp?.panel && (
+            <div className={`${styles.mcpPanel} mcp-panel`} role="dialog" aria-label="MCP Connector" data-testid="mcp-panel">
+              {mcp.panel(close)}
+            </div>
+          )}
+
+          {view === 'disconnect' && mcp?.disconnect && (
+            <div
+              className={`${styles.mcpPanel} mcp-panel`}
+              role="dialog"
+              aria-label="Disconnect MCP"
+              data-testid="mcp-disconnect-panel"
+            >
+              {mcp.disconnect(close)}
             </div>
           )}
         </div>

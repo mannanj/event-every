@@ -18,45 +18,11 @@ export function back(origin: string, path: string): Response {
 }
 
 /**
- * A token only this session can produce, for this state.
- *
- * HMAC over the session id and the state, under the grant secret. It reaches
- * the browser only inside the consent page's form, never in a link, so a
- * cross-site GET cannot carry it and a cross-site POST cannot guess it. That is
- * what stops somebody being made to connect a stranger's assistant by clicking
- * a URL.
- *
- * Bound to the SESSION as well as the state: a token minted for one person is
- * useless to another, so it cannot be harvested and re-served.
+ * consentToken: an HMAC over the session id and the state, reaching the browser
+ * only inside the consent form. constantTimeEqual compares it. Both are shared
+ * with every app's bridge - see the vendored consent module.
  */
-export async function consentToken(
-  sessionId: string,
-  state: string,
-  secret: string,
-): Promise<string> {
-  const key = await crypto.subtle.importKey(
-    'raw',
-    new TextEncoder().encode(secret),
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign'],
-  );
-  const mac = await crypto.subtle.sign(
-    'HMAC',
-    key,
-    new TextEncoder().encode(`consent.v1.${sessionId}.${state}`),
-  );
-  let binary = '';
-  for (const byte of new Uint8Array(mac)) binary += String.fromCharCode(byte);
-  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
-
-export function constantTimeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  let diff = 0;
-  for (let index = 0; index < a.length; index += 1) diff |= a.charCodeAt(index) ^ b.charCodeAt(index);
-  return diff === 0;
-}
+export { consentToken, constantTimeEqual } from '@/vendor/mcp-connector/consent';
 
 export function sessionId(cookieHeader: string | null): string | null {
   if (!cookieHeader) return null;

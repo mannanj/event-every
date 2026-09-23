@@ -106,6 +106,13 @@
   background: var(--ab-ground, #f3f3f3);
 }
 
+/* A line that leads with a mark, e.g. "MCP Connector". */
+.itemIcon {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 /* A switch line: a fixed-width column for the tick so the labels of a checked
    and an unchecked item start at the same x. Without it the text jumps sideways
    every time the setting is toggled. */

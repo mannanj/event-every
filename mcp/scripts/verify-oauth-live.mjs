@@ -121,7 +121,8 @@ page.includes('Connect an assistant?')
   : fail('a consent page is shown instead', page.slice(0, 120));
 
 // The consent token reaches the browser only inside this page.
-const consentAction = page.match(/action="([^"]*\/confirm[^"]*)"/)?.[1] ?? '';
+// The attribute is HTML-escaped, so `&` arrives as `&amp;`.
+const consentAction = (page.match(/action="([^"]*\/confirm[^"]*)"/)?.[1] ?? '').replace(/&amp;/g, '&');
 const consent = consentAction ? new URL(consentAction, APP).searchParams.get('consent') : null;
 consent ? ok('a consent token is issued to this session') : fail('a consent token is issued to this session', consentAction.slice(0, 80));
 

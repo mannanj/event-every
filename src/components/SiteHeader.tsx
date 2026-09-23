@@ -11,7 +11,7 @@ import {
   mcpAgentInstruction,
   mcpClaudeCodeCommand,
 } from '@/lib/mcp-info';
-import { McpConnector } from '@/vendor/mcp-connector/connector';
+import { McpConnector, McpDisconnect } from '@/vendor/mcp-connector/connector';
 import '@/vendor/mcp-connector/styles.css';
 
 /**
@@ -27,6 +27,18 @@ function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/**
+ * Ends every assistant connection on this account. All of them, never one:
+ * this Worker revokes by account (see mcp/src/authHandler.ts, handleRevoke),
+ * so the shared panel is given no `load` and offers only that.
+ */
+async function disconnectAllAssistants(): Promise<number> {
+  const response = await fetch('/api/mcp/disconnect', { method: 'POST', credentials: 'same-origin' });
+  const body = (await response.json().catch(() => null)) as { revoked?: number; error?: string } | null;
+  if (!response.ok) throw new Error(body?.error ?? 'disconnect failed');
+  return body?.revoked ?? 0;
 }
 
 export default function SiteHeader({ showHow = false }: { showHow?: boolean }) {
@@ -119,6 +131,7 @@ export default function SiteHeader({ showHow = false }: { showHow?: boolean }) {
                     )}
                   />
                 ),
+                disconnect: () => <McpDisconnect disconnect={disconnectAllAssistants} />,
               }}
               renderLink={(href, className, children) => (
                 <Link href={href} className={className} data-testid="sign-in-link">
