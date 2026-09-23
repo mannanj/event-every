@@ -108,7 +108,10 @@ export function consentResponse(page: ConsentPage): Response {
     headers: {
       'Content-Type': 'text/html; charset=utf-8',
       'Cache-Control': 'no-store, private',
-      'Referrer-Policy': 'no-referrer',
+      // Not no-referrer: under it browsers send `Origin: null` on the page's own
+      // Continue POST, and the origin check rejects it. same-origin still sends
+      // nothing to other sites.
+      'Referrer-Policy': 'same-origin',
       'X-Content-Type-Options': 'nosniff',
       // Nobody may frame the page and overlay the button (clickjacking).
       'X-Frame-Options': 'DENY',

@@ -186,7 +186,7 @@ const secondFlow = (second.headers.get('set-cookie') ?? '').split(';')[0] ?? '';
 const secondBridge = second.headers.get('location') ?? '';
 const secondAsked = await fetch(secondBridge, { headers: { cookie: `ee_session=${SESSION}` } });
 const secondPage = await secondAsked.text();
-const secondAction = secondPage.match(/action="([^"]*\/confirm[^"]*)"/)?.[1] ?? '';
+const secondAction = (secondPage.match(/action="([^"]*\/confirm[^"]*)"/)?.[1] ?? '').replace(/&amp;/g, '&');
 const secondConfirm = await fetch(new URL(secondAction, APP), {
   method: 'POST',
   redirect: 'manual',
