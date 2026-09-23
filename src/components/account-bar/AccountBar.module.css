@@ -130,6 +130,38 @@
   color: var(--ab-muted, #6f6f6f);
 }
 
+/* Sits under the note, indented to the label like the note is. */
+.progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  padding-left: calc(0.85em + 6px);
+}
+
+.progressTrack {
+  flex: 1;
+  height: 4px;
+  background: var(--ab-line, #dddddd);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.progressFill {
+  display: block;
+  height: 100%;
+  background: var(--ab-ink, #0b0b0b);
+  transition: width 200ms ease;
+}
+
+.progressValue {
+  min-width: 3ch;
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  color: var(--ab-muted, #6f6f6f);
+}
+
 .item:disabled {
   opacity: 0.5;
   cursor: default;

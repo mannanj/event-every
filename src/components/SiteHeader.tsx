@@ -44,9 +44,15 @@ export default function SiteHeader({ showHow = false }: { showHow?: boolean }) {
           label: 'Backup attachments to my account',
           checked: backup.enabled,
           disabled: backup.busy,
-          note: backup.enabled
-            ? 'Originals are kept encrypted, so a new device can get them back.'
-            : 'Originals stay on this device only.',
+          note:
+            backup.progress !== null
+              ? 'Backing up what this browser already has.'
+              : backup.failed > 0
+                ? `${backup.failed} ${backup.failed === 1 ? 'file' : 'files'} could not be backed up.`
+                : backup.enabled
+                  ? 'Originals are kept encrypted, so a new device can get them back.'
+                  : 'Originals stay on this device only.',
+          progress: backup.progress,
           onSelect: backup.toggle,
           testId: 'attachment-backup-toggle',
         },

@@ -54,6 +54,8 @@ export interface AccountBarItem {
   disabled?: boolean;
   /** Small grey line under the label, for a consequence worth stating. */
   note?: string | null;
+  /** 0-100 draws a progress bar under the note; null or omitted draws none. */
+  progress?: number | null;
   /**
    * Keep the menu open after this one is chosen. A switch does that anyway; a
    * command needs it when choosing it only arms the real thing, such as a
@@ -255,6 +257,20 @@ export default function AccountBar({
                     {item.label}
                   </span>
                   {item.note && <span className={styles.itemSubnote}>{item.note}</span>}
+                  {typeof item.progress === 'number' && (
+                    <span className={styles.progress} data-testid={item.testId && `${item.testId}-progress`}>
+                      <span
+                        className={styles.progressTrack}
+                        role="progressbar"
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-valuenow={item.progress}
+                      >
+                        <span className={styles.progressFill} style={{ width: `${item.progress}%` }} />
+                      </span>
+                      <span className={styles.progressValue}>{item.progress}%</span>
+                    </span>
+                  )}
                 </button>
               ))}
 

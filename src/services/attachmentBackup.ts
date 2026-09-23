@@ -1,3 +1,4 @@
+import { inputStorage } from '@/services/inputStorage';
 import type { StoredInputFile } from '@/types/input';
 
 /**
@@ -137,6 +138,56 @@ export async function backupEntryFiles(
   } catch {
     return [];
   }
+}
+
+export interface BackfillProgress {
+  doneBytes: number;
+  totalBytes: number;
+}
+
+/**
+ * Send up every original this browser holds that the account does not.
+ *
+ * Turning the switch on used to cover only what was saved afterwards, so the
+ * history already on this device - the thing somebody turns backup on to
+ * protect - never left it. Measured in bytes rather than files, because one
+ * photo can be most of the work and a count would sit still through it.
+ *
+ * `shouldStop` is asked between batches, so turning the switch back off ends
+ * the run at the next boundary instead of finishing it.
+ */
+export async function backfillHistory(
+  alreadyBackedUp: ReadonlySet<string>,
+  onProgress: (progress: BackfillProgress) => void,
+  shouldStop: () => boolean,
+): Promise<{ attempted: number; stored: number }> {
+  const entries = await inputStorage.getAllHistory();
+  const pending = entries
+    .map((entry) => ({
+      entryId: entry.id,
+      files: entry.files.filter((file) => !alreadyBackedUp.has(file.id)),
+    }))
+    .filter((entry) => entry.files.length > 0);
+
+  const totalBytes = pending.reduce(
+    (sum, entry) => sum + entry.files.reduce((inner, file) => inner + file.size, 0),
+    0,
+  );
+  const attempted = pending.reduce((sum, entry) => sum + entry.files.length, 0);
+  let doneBytes = 0;
+  let stored = 0;
+  onProgress({ doneBytes, totalBytes });
+
+  for (const entry of pending) {
+    for (let at = 0; at < entry.files.length; at += UPLOAD_BATCH) {
+      if (shouldStop()) return { attempted, stored };
+      const batch = entry.files.slice(at, at + UPLOAD_BATCH);
+      stored += (await backupEntryFiles(entry.entryId, batch)).length;
+      doneBytes += batch.reduce((sum, file) => sum + file.size, 0);
+      onProgress({ doneBytes, totalBytes });
+    }
+  }
+  return { attempted, stored };
 }
 
 /**

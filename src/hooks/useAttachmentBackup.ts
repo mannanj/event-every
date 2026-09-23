@@ -1,8 +1,9 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import {
+  backfillHistory,
   readBackupStatus,
   removeAllBackups,
   setBackupEnabled,
@@ -27,6 +28,10 @@ export interface AttachmentBackup {
   busy: boolean;
   /** True once removal has been asked for and is waiting to be meant. */
   confirming: boolean;
+  /** 0-100 while this browser's history is being sent up, otherwise null. */
+  progress: number | null;
+  /** Files the last run could not send, such as one over the size limit. */
+  failed: number;
   toggle: () => Promise<void>;
   removeAll: () => Promise<void>;
 }
@@ -35,6 +40,10 @@ export function useAttachmentBackup(signedIn: boolean | undefined): AttachmentBa
   const [status, setStatus] = useState<BackupStatus | null>(null);
   const [busy, setBusy] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  const [progress, setProgress] = useState<number | null>(null);
+  const [failed, setFailed] = useState(0);
+  const running = useRef(false);
+  const stopped = useRef(false);
 
   useEffect(() => {
     if (signedIn !== true) {
@@ -62,6 +71,25 @@ export function useAttachmentBackup(signedIn: boolean | undefined): AttachmentBa
       current ? { ...current, enabled: answer ?? !wanted } : current,
     );
     setBusy(false);
+
+    if (answer !== true) {
+      stopped.current = true;
+      return;
+    }
+    if (running.current) return;
+    running.current = true;
+    stopped.current = false;
+    setFailed(0);
+    const result = await backfillHistory(
+      new Set(status.attachments.map((file) => file.id)),
+      ({ doneBytes, totalBytes }) =>
+        setProgress(totalBytes === 0 ? 100 : Math.floor((doneBytes / totalBytes) * 100)),
+      () => stopped.current,
+    ).catch(() => ({ attempted: 0, stored: 0 }));
+    running.current = false;
+    setProgress(null);
+    if (!stopped.current) setFailed(result.attempted - result.stored);
+    setStatus(await readBackupStatus());
   }, [status, busy]);
 
   const removeAll = useCallback(async () => {
@@ -91,6 +119,8 @@ export function useAttachmentBackup(signedIn: boolean | undefined): AttachmentBa
     bytes: status?.bytes ?? 0,
     busy,
     confirming,
+    progress,
+    failed,
     toggle,
     removeAll,
   };
