@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useState, type ClipboardEvent, type DragEvent, type KeyboardEvent, type ReactNode } from 'react';
-import { describeInput, inputFromFile, inputFromText, InputRefused, type EventEveryInput } from './input-kinds';
+import { acceptAttribute, describeInput, inputFromFile, inputFromText, InputRefused, type EventEveryInput } from './input-kinds';
 
 export * from './input-kinds';
 
@@ -177,7 +177,7 @@ export function EventEveryBar({
           ref={fileRef}
           type="file"
           hidden
-          accept=".ics,text/calendar,image/png,image/jpeg,image/webp"
+          accept={acceptAttribute()}
           onChange={(e) => {
             void fromFile(e.target.files?.[0]);
             e.target.value = '';

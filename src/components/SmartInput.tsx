@@ -5,6 +5,15 @@ import URLPill from './URLPill';
 import ImageModal from './ImageModal';
 import ParticleButton from './ParticleButton';
 import { parseICSFile } from '@/services/icsParser';
+// The same rules the compact input other apps embed uses (packages/event-every-input).
+import {
+  acceptAttribute,
+  findUrls,
+  isCalendarFile as isCalendar,
+  isImageFile as isImage,
+  MAX_SITE_FILE_BYTES as MAX_FILE_SIZE,
+  SITE_IMAGE_TYPES,
+} from '@event-every/input/input-kinds';
 import { inputStorage } from '@/services/inputStorage';
 import { StoredInputFile, InputDraft } from '@/types/input';
 
@@ -23,11 +32,7 @@ export interface SmartInputHandle {
 }
 
 const MIN_TEXT_LENGTH = 3;
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const MAX_FILES = 25;
-const ACCEPTED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/heic'];
-const ACCEPTED_CALENDAR_TYPES = ['text/calendar', 'application/ics'];
-const URL_REGEX = /(https?:\/\/(?:www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b(?:[-a-zA-Z0-9()@:%_\+.~#?&\/=]*))/gi;
 
 function makeFileId(): string {
   return `f-${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -131,13 +136,7 @@ const SmartInput = forwardRef<SmartInputHandle, SmartInputProps>(
     }));
 
     useEffect(() => {
-      const matches = text.match(URL_REGEX);
-      if (matches) {
-        const uniqueUrls = Array.from(new Set(matches));
-        setDetectedUrls(uniqueUrls);
-      } else {
-        setDetectedUrls([]);
-      }
+      setDetectedUrls(findUrls(text));
     }, [text]);
 
     // Restore an in-progress draft (text + files) so a refresh/reload never loses work.
@@ -202,13 +201,8 @@ const SmartInput = forwardRef<SmartInputHandle, SmartInputProps>(
       return () => clearTimeout(handle);
     }, [text, images, calendarFiles]);
 
-    const isImageFile = (file: File): boolean => {
-      return ACCEPTED_IMAGE_TYPES.includes(file.type);
-    };
-
-    const isCalendarFile = (file: File): boolean => {
-      return ACCEPTED_CALENDAR_TYPES.includes(file.type) || file.name.toLowerCase().endsWith('.ics');
-    };
+    const isImageFile = (file: File): boolean => isImage(file, SITE_IMAGE_TYPES);
+    const isCalendarFile = (file: File): boolean => isCalendar(file);
 
     const validateFile = (file: File): string | null => {
       const isImage = isImageFile(file);
@@ -633,7 +627,7 @@ const SmartInput = forwardRef<SmartInputHandle, SmartInputProps>(
             ref={fileInputRef}
             type="file"
             className="hidden"
-            accept={[...ACCEPTED_IMAGE_TYPES, ...ACCEPTED_CALENDAR_TYPES, '.ics'].join(',')}
+            accept={acceptAttribute(SITE_IMAGE_TYPES)}
             multiple
             onChange={handleFileInputChange}
             aria-hidden="true"

@@ -1,5 +1,15 @@
 import { describe, expect, test } from 'bun:test';
-import { describeInput, inputFromFile, inputFromText, InputRefused } from '../src/input-kinds';
+import {
+  acceptAttribute,
+  describeInput,
+  findUrls,
+  inputFromFile,
+  inputFromText,
+  InputRefused,
+  isCalendarFile,
+  isImageFile,
+  SITE_IMAGE_TYPES,
+} from '../src/input-kinds';
 
 describe('inputFromText', () => {
   test('a lone link is a page; words are text; a calendar is a calendar', () => {
@@ -36,4 +46,23 @@ describe('inputFromFile', () => {
 test('describeInput names what is being read', () => {
   expect(describeInput({ kind: 'url', url: 'https://lu.ma/x' })).toBe('Reading lu.ma');
   expect(describeInput({ kind: 'ics', ics: 'x', filename: 'a.ics' })).toBe('Importing a.ics');
+});
+
+describe('the shared rules (also used by Event Every\'s own SmartInput)', () => {
+  test('a calendar file is known by type or by its .ics name', () => {
+    expect(isCalendarFile({ name: 'x.ICS', type: '' })).toBe(true);
+    expect(isCalendarFile({ name: 'x', type: 'application/ics' })).toBe(true);
+    expect(isCalendarFile({ name: 'x.txt', type: 'text/plain' })).toBe(false);
+  });
+
+  test('photos: the readable set by default; the site also takes HEIC', () => {
+    expect(isImageFile({ name: 'a.heic', type: 'image/heic' })).toBe(false);
+    expect(isImageFile({ name: 'a.heic', type: 'image/heic' }, SITE_IMAGE_TYPES)).toBe(true);
+    expect(acceptAttribute()).toBe('image/png,image/jpeg,image/webp,text/calendar,application/ics,.ics');
+  });
+
+  test('findUrls returns each link once, in order', () => {
+    expect(findUrls('see https://a.com/x and http://b.org, then https://a.com/x')).toEqual(['https://a.com/x', 'http://b.org']);
+    expect(findUrls('no links')).toEqual([]);
+  });
 });

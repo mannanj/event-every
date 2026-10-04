@@ -14,14 +14,51 @@ export type EventEveryInput =
   | { kind: 'ics'; ics: string; filename?: string }
   | { kind: 'image'; imageBase64: string; mimeType: ImageType; filename?: string };
 
-export type ImageType = 'image/png' | 'image/jpeg' | 'image/webp';
+/**
+ * THE ONE SET OF INPUT RULES. Event Every's full input on its own site
+ * (src/components/SmartInput.tsx) and this compact one in other apps both
+ * classify files and find links with the functions below, so the two cannot
+ * drift on what counts as a photo, a calendar file or a link.
+ */
 
-const IMAGE_TYPES: ImageType[] = ['image/png', 'image/jpeg', 'image/webp'];
+/** Photo types every Event Every reader takes — the MCP image tool's own list. */
+export const READABLE_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp'] as const;
+export type ImageType = (typeof READABLE_IMAGE_TYPES)[number];
+
+/** Event Every's own uploader also takes these: it converts them in the browser first. */
+export const SITE_IMAGE_TYPES: readonly string[] = [...READABLE_IMAGE_TYPES, 'image/jpg', 'image/heic'];
+
+export const CALENDAR_TYPES: readonly string[] = ['text/calendar', 'application/ics'];
 
 /** Event Every's own ceilings, so a too-big file is refused here and not after an upload. */
 export const MAX_TEXT = 20_000;
 export const MAX_ICS_BYTES = 1_000_000;
+/** Through MCP (base64 in one tool call). */
 export const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+/** Through the site's own uploader. */
+export const MAX_SITE_FILE_BYTES = 10 * 1024 * 1024;
+
+type FileLike = Pick<File, 'name' | 'type'>;
+
+export function isCalendarFile(file: FileLike): boolean {
+  return CALENDAR_TYPES.includes(file.type) || file.name.toLowerCase().endsWith('.ics');
+}
+
+export function isImageFile(file: FileLike, accepted: readonly string[] = READABLE_IMAGE_TYPES): boolean {
+  return accepted.includes(file.type);
+}
+
+/** The `accept` attribute for a file picker taking these photos plus calendar files. */
+export function acceptAttribute(imageTypes: readonly string[] = READABLE_IMAGE_TYPES): string {
+  return [...imageTypes, ...CALENDAR_TYPES, '.ics'].join(',');
+}
+
+const URL_PATTERN = /(https?:\/\/(?:www\.)?[-a-zA-Z0-9@:%._+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b(?:[-a-zA-Z0-9()@:%_+.~#?&/=]*))/gi;
+
+/** Every distinct link in a piece of text, in order. */
+export function findUrls(text: string): string[] {
+  return Array.from(new Set(text.match(URL_PATTERN) ?? []));
+}
 
 /**
  * Typed or pasted text. A lone http(s) link is a page to read; a calendar
@@ -31,7 +68,8 @@ export function inputFromText(raw: string): EventEveryInput | null {
   const text = raw.trim();
   if (!text) return null;
   if (/^BEGIN:VCALENDAR/i.test(text)) return { kind: 'ics', ics: text };
-  if (/^https?:\/\/\S+$/i.test(text)) {
+  const urls = findUrls(text);
+  if (urls.length === 1 && urls[0] === text) {
     try {
       return { kind: 'url', url: new URL(text).toString() };
     } catch {
@@ -55,12 +93,11 @@ function base64(bytes: Uint8Array): string {
 /** A dropped, pasted or picked file. Throws InputRefused with a sentence for the person. */
 export async function inputFromFile(file: File): Promise<EventEveryInput> {
   const name = file.name || undefined;
-  const isIcs = /\.ics$/i.test(file.name) || file.type === 'text/calendar';
-  if (isIcs) {
+  if (isCalendarFile(file)) {
     if (file.size > MAX_ICS_BYTES) throw new InputRefused('That calendar file is over 1 MB.');
     return { kind: 'ics', ics: await file.text(), ...(name && { filename: name }) };
   }
-  if ((IMAGE_TYPES as string[]).includes(file.type)) {
+  if (isImageFile(file)) {
     if (file.size > MAX_IMAGE_BYTES) throw new InputRefused('That photo is over 8 MB.');
     const bytes = new Uint8Array(await file.arrayBuffer());
     return { kind: 'image', imageBase64: base64(bytes), mimeType: file.type as ImageType, ...(name && { filename: name }) };
