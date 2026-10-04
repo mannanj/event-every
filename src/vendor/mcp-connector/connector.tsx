@@ -630,6 +630,16 @@ export function AiGenerated({
   const [address, setAddress] = useState<string | null>(null);
   const wrapper = useRef<HTMLSpanElement>(null);
 
+  // Closing forgets the reveal, so the address is not left sitting in the DOM.
+  // Done where it closes rather than in an effect watching `open`, which would
+  // render once more with the address still in place.
+  const shut = useCallback(() => {
+    setOpen(false);
+    setRevealed(false);
+    setCopied(false);
+    setAddress(null);
+  }, []);
+
   const unlock = () => {
     if (!emailMasked) return;
     try {
@@ -643,10 +653,10 @@ export function AiGenerated({
   useEffect(() => {
     if (!open) return;
     const outside = (event: MouseEvent | TouchEvent) => {
-      if (wrapper.current && !wrapper.current.contains(event.target as Node)) setOpen(false);
+      if (wrapper.current && !wrapper.current.contains(event.target as Node)) shut();
     };
     const escape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setOpen(false);
+      if (event.key === 'Escape') shut();
     };
     document.addEventListener('mousedown', outside);
     document.addEventListener('touchstart', outside);
@@ -656,16 +666,8 @@ export function AiGenerated({
       document.removeEventListener('touchstart', outside);
       document.removeEventListener('keydown', escape);
     };
-  }, [open]);
+  }, [open, shut]);
 
-  // Closing forgets the reveal, so the address is not left sitting in the DOM.
-  useEffect(() => {
-    if (!open) {
-      setRevealed(false);
-      setCopied(false);
-      setAddress(null);
-    }
-  }, [open]);
 
   const copy = async () => {
     if (!address) return;
@@ -684,7 +686,7 @@ export function AiGenerated({
         type="button"
         className="mcpc-ai__badge"
         aria-expanded={open}
-        onClick={() => setOpen((was) => !was)}
+        onClick={() => (open ? shut() : setOpen(true))}
       >
         {label}
       </button>
