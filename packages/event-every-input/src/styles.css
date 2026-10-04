@@ -1,0 +1,261 @@
+/*
+ * Event Every's input, as it appears inside another app. Its colours are
+ * Event Every's own (the blue, and the rainbow the site wears), set as custom
+ * properties so a host can tune them without overriding a selector.
+ */
+
+.eei {
+  --eei-blue: #1a56db;
+  --eei-blue-soft: #eaf0fd;
+  --eei-fg: #0b0b0b;
+  --eei-muted: #6f6f6f;
+  --eei-line: #c9d6f5;
+  --eei-surface: #ffffff;
+  --eei-radius: 6px;
+  --eei-rainbow: linear-gradient(90deg, #ff4d4d, #ff9a3d, #e8b800, #2fb866, #3da5ff, #9b6cff);
+
+  color: var(--eei-fg);
+}
+
+/* Signed out: one blue line — the feature's name, and the way in. */
+.eei--signed-out {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px 8px 12px;
+  border-radius: var(--eei-radius);
+  background: var(--eei-blue);
+  color: #ffffff;
+}
+
+.eei-head {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.eei-signin {
+  flex: none;
+  padding: 4px 12px;
+  border: 0;
+  border-radius: 999px;
+  background: #ffffff;
+  color: var(--eei-blue);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.eei-signin:hover {
+  background: var(--eei-blue-soft);
+}
+
+.eei-signin:focus-visible {
+  outline: 2px solid #ffffff;
+  outline-offset: 2px;
+}
+
+/* Signed in: the input, with the credit floating in its bottom-right corner. */
+.eei-field {
+  position: relative;
+  border: 1px solid var(--eei-blue);
+  border-radius: var(--eei-radius);
+  background: var(--eei-surface);
+  transition: box-shadow 120ms ease;
+}
+
+.eei-field:focus-within {
+  box-shadow: 0 0 0 3px var(--eei-blue-soft);
+}
+
+.eei.is-dragging .eei-field {
+  border-style: dashed;
+  background: var(--eei-blue-soft);
+}
+
+.eei-text {
+  display: block;
+  width: 100%;
+  min-height: 64px;
+  /* Room on the right for the two icons, at the bottom for the credit. */
+  padding: 8px 64px 22px 12px;
+  border: 0;
+  border-radius: var(--eei-radius);
+  background: transparent;
+  color: var(--eei-fg);
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.4;
+  resize: none;
+  outline: none;
+}
+
+.eei-text::placeholder {
+  color: var(--eei-muted);
+}
+
+.eei.is-reading .eei-text {
+  color: var(--eei-muted);
+}
+
+.eei-actions {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: inline-flex;
+  gap: 2px;
+}
+
+.eei-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 5px;
+  border: 0;
+  border-radius: 5px;
+  background: none;
+  color: var(--eei-muted);
+  cursor: pointer;
+}
+
+.eei-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.eei-icon:hover:not(:disabled) {
+  color: var(--eei-blue);
+  background: var(--eei-blue-soft);
+}
+
+.eei-go:not(:disabled) {
+  color: #ffffff;
+  background: var(--eei-blue);
+}
+
+.eei-go:not(:disabled):hover {
+  color: #ffffff;
+  background: var(--eei-blue);
+  filter: brightness(1.1);
+}
+
+.eei-icon:disabled {
+  opacity: .45;
+  cursor: default;
+}
+
+.eei-icon:focus-visible {
+  outline: 2px solid var(--eei-blue);
+  outline-offset: 1px;
+}
+
+.eei-credit {
+  position: absolute;
+  right: 10px;
+  bottom: 5px;
+  color: var(--eei-muted);
+  font-size: 11px;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.eei-rainbow {
+  background: var(--eei-rainbow);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-weight: 700;
+  text-decoration: none;
+  pointer-events: auto;
+}
+
+.eei-rainbow:hover {
+  text-decoration: underline;
+  text-decoration-color: var(--eei-blue);
+}
+
+.eei-status,
+.eei-error {
+  margin: 6px 0 0;
+  font-size: 12px;
+}
+
+.eei-status {
+  color: var(--eei-blue);
+}
+
+.eei-status::before {
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: var(--eei-rainbow);
+  animation: eei-pulse 1s ease-in-out infinite;
+  vertical-align: 0;
+}
+
+@keyframes eei-pulse {
+  50% { opacity: .3; transform: scale(.7); }
+}
+
+.eei-error {
+  color: #c81e1e;
+}
+
+/* "Apply <value>?" — Event Every's mark on a field it has an opinion about. */
+.eei-chip {
+  --eei-blue: #1a56db;
+  --eei-blue-soft: #eaf0fd;
+  --eei-rainbow: linear-gradient(90deg, #ff4d4d, #ff9a3d, #e8b800, #2fb866, #3da5ff, #9b6cff);
+
+  display: inline-flex;
+  align-items: center;
+  max-width: 60%;
+  min-width: 0;
+  padding: 1px 8px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background:
+    linear-gradient(var(--eei-blue-soft), var(--eei-blue-soft)) padding-box,
+    var(--eei-rainbow) border-box;
+  color: var(--eei-blue);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.eei-chip__value {
+  margin-left: .3em;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 700;
+}
+
+.eei-chip--undo {
+  justify-content: center;
+  width: 24px;
+  height: 20px;
+  padding: 0;
+}
+
+.eei-chip--undo svg {
+  width: 13px;
+  height: 13px;
+}
+
+.eei-chip:focus-visible {
+  outline: 2px solid var(--eei-blue);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .eei-status::before { animation: none; }
+}

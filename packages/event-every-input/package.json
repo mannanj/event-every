@@ -1,0 +1,16 @@
+{
+  "name": "@mannan/event-every-input",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Event Every's input, for another app's create-an-event flow. UI only: the host signs in and reads through its own server.",
+  "type": "module",
+  "main": "./src/index.tsx",
+  "types": "./src/index.tsx",
+  "exports": {
+    ".": "./src/index.tsx",
+    "./input-kinds": "./src/input-kinds.ts",
+    "./styles.css": "./src/styles.css"
+  },
+  "files": ["src"],
+  "peerDependencies": { "react": ">=18" }
+}
