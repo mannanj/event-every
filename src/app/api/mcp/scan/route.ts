@@ -15,6 +15,15 @@ import {
 import { keepOriginal, resolveBackup } from '@/server/mcp/original';
 import { parseICSContent } from '@/services/icsParser';
 import { reviewDraftsToCalendarEvents } from '@/services/reviewEvent';
+import { resolveScanTimeZone } from '@/server/scanner/scanContext';
+
+/**
+ * The caller's zone for reading the scanner's wall-clock times — the same one
+ * the scanner was given. Without it the conversion falls back to the runtime's
+ * zone, which on a Worker is UTC.
+ */
+const readerZone = (timezone: string | null | undefined): string | undefined =>
+  timezone ? resolveScanTimeZone(timezone) : undefined;
 import { createReviewDrafts } from '@/services/scannerDraft';
 import { validateScannerImageDataUrl } from '@/server/scanner/image';
 import { ScanResponseSchema } from '@/types/scannerHttp';
@@ -185,7 +194,7 @@ export async function POST(request: Request) {
       }));
       if (drafts.length === 0) return mcpJson({ events: [], found: 0, backedUp: false });
 
-      events = reviewDraftsToCalendarEvents(drafts, prepared.provenance);
+      events = reviewDraftsToCalendarEvents(drafts, prepared.provenance, readerZone(input.timezone));
       found = drafts.length;
     }
   } catch (error) {

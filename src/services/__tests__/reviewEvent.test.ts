@@ -90,6 +90,22 @@ describe('reviewDraftToCalendarEvent', () => {
     expect(event.rawTimezone).toBeUndefined();
   });
 
+  test("a floating time is read in the READER's zone when one is given, not the runtime's", () => {
+    // The MCP routes run on a Worker, whose zone is UTC. "8pm" from someone in
+    // New York used to land at 20:00 UTC — 4pm their time.
+    const event = reviewDraftToCalendarEvent(draft({
+      temporal: claim({
+        start: { kind: 'floating', date: { year: 2026, month: 10, day: 5 }, time: { hour: 20, minute: 0, second: 0 } },
+        end: null,
+        duration: null,
+        allDay: false,
+      }),
+    }), identity, undefined, 'America/New_York');
+
+    expect(event.startDate.toISOString()).toBe('2026-10-06T00:00:00.000Z');
+    expect(event.timezone).toBe('America/New_York');
+  });
+
   test('a date with no time is all-day and lands on that calendar day in any zone', () => {
     const event = reviewDraftToCalendarEvent(draft({
       temporal: claim({

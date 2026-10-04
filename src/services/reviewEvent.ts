@@ -66,6 +66,13 @@ export function reviewDraftToCalendarEvent(
   draft: ReviewDraft,
   identity: ReviewEventIdentity,
   originalInput?: string,
+  /**
+   * The zone a time with no zone of its own is read in. Defaults to the
+   * browser's, which is right in a tab and WRONG on a server: a Worker's zone
+   * is UTC, so "8pm" from an assistant became 20:00 UTC — 4pm in New York.
+   * Server callers pass the caller's zone.
+   */
+  readerTimeZone?: string,
 ): CalendarEvent {
   const candidate = draft.candidate;
   const temporal = candidate.temporal.value;
@@ -76,7 +83,7 @@ export function reviewDraftToCalendarEvent(
   // The source's own zone wins, then the reader's. `resolveTimezone` reports
   // which happened, and the card shows the difference.
   const rawTimezone = startPoint?.timeZone ?? endPoint?.timeZone ?? undefined;
-  const tz = resolveTimezone(rawTimezone, getBrowserTimezone());
+  const tz = resolveTimezone(rawTimezone, readerTimeZone ?? getBrowserTimezone());
 
   // The points outrank the flag. Seen from the model on real input: `allDay:
   // false` beside a date with no time (which put the event at midnight), and
@@ -146,10 +153,12 @@ export function reviewDraftToCalendarEvent(
 export function reviewDraftsToCalendarEvents(
   drafts: readonly ReviewDraft[],
   originalInput?: string,
+  readerTimeZone?: string,
 ): CalendarEvent[] {
   return drafts.map((draft) => reviewDraftToCalendarEvent(
     draft,
     { id: draft.id, created: new Date(draft.createdAt) },
     originalInput,
+    readerTimeZone,
   ));
 }

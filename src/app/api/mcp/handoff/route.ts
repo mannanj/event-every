@@ -15,6 +15,15 @@ import { mcpEnv } from '@/server/mcp/env';
 import { SCAN_ON_BEHALF_HEADER, signScanOnBehalf } from '@/server/mcp/grant';
 import { keepOriginal, resolveBackup } from '@/server/mcp/original';
 import { reviewDraftsToCalendarEvents } from '@/services/reviewEvent';
+import { resolveScanTimeZone } from '@/server/scanner/scanContext';
+
+/**
+ * The caller's zone for reading the scanner's wall-clock times — the same one
+ * the scanner was given. Without it the conversion falls back to the runtime's
+ * zone, which on a Worker is UTC.
+ */
+const readerZone = (timezone: string | null | undefined): string | undefined =>
+  timezone ? resolveScanTimeZone(timezone) : undefined;
 import { createReviewDrafts } from '@/services/scannerDraft';
 import { decodeBase64 } from '@/server/mcp/intake';
 import { validateScannerImageDataUrl } from '@/server/scanner/image';
@@ -169,6 +178,7 @@ async function redeem(request: Request, input: z.infer<typeof Redeem>) {
   const stored: Record<string, unknown>[] = reviewDraftsToCalendarEvents(
     drafts,
     input.filename ?? 'photo',
+    readerZone(input.timezone),
   ).map((event) => ({
     ...(JSON.parse(JSON.stringify(event)) as Record<string, unknown>),
     inputEntryIds: [entryId],
