@@ -1,5 +1,6 @@
 'use client';
 
+import { useCallback, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
@@ -11,6 +12,8 @@ import {
   mcpAgentInstruction,
   mcpClaudeCodeCommand,
 } from '@/lib/mcp-info';
+import { linkedAppsSource } from '@/lib/linked-apps-client';
+import { useLinkedAppsChangedElsewhere } from '@/lib/linked-apps-broadcast';
 import { McpConnector, type McpConnection } from '@/vendor/mcp-connector/connector';
 import '@/vendor/mcp-connector/styles.css';
 
@@ -62,6 +65,9 @@ export default function SiteHeader({ showHow = false }: { showHow?: boolean }) {
   // No point offering the way in from the page that is the way in.
   const onSignIn = usePathname() === '/signin';
   const backup = useAttachmentBackup(account.signedIn);
+  // A sign-in finished in its own window: re-key the panel so it reloads.
+  const [panelKey, setPanelKey] = useState(0);
+  useLinkedAppsChangedElsewhere(useCallback(() => setPanelKey((k) => k + 1), []));
 
   // Only when there is a bucket to back up to. A deployment without one shows
   // the menu it always showed rather than a switch that does nothing.
@@ -135,6 +141,7 @@ export default function SiteHeader({ showHow = false }: { showHow?: boolean }) {
                 tooltip: 'Connect your assistant',
                 panel: (close) => (
                   <McpConnector
+                    key={panelKey}
                     endpoint={DEFAULT_MCP_ENDPOINT}
                     claudeCodeCommand={mcpClaudeCodeCommand(DEFAULT_MCP_ENDPOINT)}
                     agentInstruction={mcpAgentInstruction(DEFAULT_MCP_ENDPOINT)}
@@ -150,6 +157,7 @@ export default function SiteHeader({ showHow = false }: { showHow?: boolean }) {
                         ? { load: loadMcpConnections, disconnect: disconnectMcpConnection }
                         : undefined
                     }
+                    apps={account.signedIn === true ? linkedAppsSource : undefined}
                   />
                 ),
               }}

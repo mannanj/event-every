@@ -2,21 +2,39 @@
 // Edit ~/Documents/mcp-connector and re-run: node bin/sync.mjs <this dir>
 'use client';
 
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 
 /**
  * The MCP connector menu, shared by every app that hands someone a connection.
  *
- * It ships three strings, each labelled with the CLIENT it belongs to rather
- * than the step it is part of, so a person setting this up finds their own tool
- * instead of reading instructions. Docs, when an app has a guide page, sits on
- * the header line: it leads out of the menu, so it belongs beside the title and
- * not below the things you came to copy.
+ *   MCP Connector                                   Docs
+ *   Add this app              Connected  (✳) (>_) (⋯)
+ *   (✳)  https://…/mcp                               ⧉
+ *   (>_) claude mcp add --transport http …           ⧉
+ *   (⋯)  Connect to the MCP server at …              ⧉
+ *   Add other MCPs
+ *   Event Every                                Sign in
+ *
+ * Each string is marked with the CLIENT it belongs to, as an icon of one fixed
+ * size rather than a heading, so a person finds their own tool at a glance and
+ * the panel stays three lines tall. The icon names its client on hover or tap.
+ *
+ * Signed in, the "Add this app" line carries the account's status: the same
+ * three icons, solid for a client that is connected and at half strength for
+ * one that is not. Each opens a small menu under it - what is connected, when,
+ * and Disconnect; or Connect when nothing is - so connecting and cutting off
+ * live on the same line as the strings you connect with.
+ *
+ * "Add other MCPs" is the other direction: THIS app signing in to a sister
+ * app's MCP server (see linked-app.ts). It is drawn only when the app passes
+ * any - an app with no sister apps shows no empty heading.
  *
  * UNSTYLED BY DEFAULT. Every colour, radius and face comes from a custom
  * property (see styles.css), so each app keeps its own skin without overriding
  * selectors and without this package knowing anything about their palettes.
  */
+
+export type McpClientKind = 'claude-ai' | 'claude-code' | 'agent';
 
 export type McpConnectorLabels = {
   /** Defaults to the client names the apps agreed on. */
@@ -24,6 +42,30 @@ export type McpConnectorLabels = {
   claudeCode?: string;
   agent?: string;
 };
+
+/** A sister app this one can sign in to. */
+export interface McpLinkedApp {
+  id: string;
+  name: string;
+  /** Its site, linked from the name. */
+  href?: string;
+}
+
+/** One live sign-in to a sister app. */
+export interface McpAppLink {
+  appId: string;
+  /** Unix seconds. */
+  connectedAt: number;
+}
+
+export interface McpAppsSource {
+  apps: McpLinkedApp[];
+  /** Pass a stable function: it is an effect dependency. */
+  load: () => Promise<McpAppLink[]>;
+  /** Usually a navigation to the app's own /connect route, which leaves the page. */
+  signIn: (appId: string) => void;
+  signOut: (appId: string) => Promise<unknown>;
+}
 
 export type McpConnectorProps = {
   endpoint: string;
@@ -34,25 +76,46 @@ export type McpConnectorProps = {
   /** Lets a Next app pass next/link so the docs link stays client-side. */
   renderDocsLink?: (href: string, children: ReactNode) => ReactNode;
   title?: string;
+  /** The heading over the three strings. */
+  addTitle?: string;
   labels?: McpConnectorLabels;
   /** Rendered fogged and inert, for a visitor who cannot use it yet. */
   locked?: boolean;
   /**
-   * Signed in: what this account has connected, with a way to cut each off,
-   * drawn as a "Connected" section under the three snippets. Omit when nobody
-   * is signed in - there is nothing to list.
+   * Signed in: what this account has connected, drawn as the status on the
+   * "Add this app" line with a menu per client to connect or disconnect.
+   * Omit when nobody is signed in - there is nothing to show.
    */
   connections?: McpConnectionsSource;
+  /** Sister apps this one signs in to. Omit, or pass none, and the section is not drawn. */
+  apps?: McpAppsSource;
+  /** Where "Connect" sends someone for claude.ai. */
+  claudeAiConnectHref?: string;
   className?: string;
 };
 
 const DEFAULT_LABELS: Required<McpConnectorLabels> = {
   endpoint: 'Claude.ai',
   claudeCode: 'Claude Code',
-  agent: 'Agent agnostic',
+  agent: 'OpenAI, Pi, and other agents',
 };
 
+const CLAUDE_AI_CONNECTORS = 'https://claude.ai/settings/connectors';
+
 const COPIED_RESET_MS = 1600;
+
+/**
+ * Which client a connection is, from the name it registered with.
+ *
+ * Claude Code registers as "Claude Code"; claude.ai as "Claude" (or
+ * "claude.ai"). Anything else - Codex, Pi, a script - is an agent.
+ */
+export function clientKind(name: string): McpClientKind {
+  const n = name.trim().toLowerCase();
+  if (/claude[\s-]?code/.test(n)) return 'claude-code';
+  if (/^claude(\.ai)?\b/.test(n) || n === 'anthropic') return 'claude-ai';
+  return 'agent';
+}
 
 /** Two overlapping sheets: the copy affordance every app already used. */
 function CopyGlyph() {
@@ -76,7 +139,95 @@ function CheckGlyph() {
   );
 }
 
-export function CopySnippet({ label, value }: { label: string; value: string }) {
+/*
+ * The three client marks. One 24-unit box each, drawn to the same optical
+ * weight and shown at one size (--mcpc-icon), so a row of them reads as a set.
+ */
+
+/** claude.ai: the spark. */
+function ClaudeAiGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"
+      strokeLinecap="round" aria-hidden="true" focusable="false">
+      <path d="M12 3v6M12 15v6M3 12h6M15 12h6M5.6 5.6l4.2 4.2M14.2 14.2l4.2 4.2M18.4 5.6l-4.2 4.2M9.8 14.2l-4.2 4.2" />
+    </svg>
+  );
+}
+
+/** Claude Code: a terminal prompt. */
+function ClaudeCodeGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+      strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+      <rect x="2.5" y="4" width="19" height="16" rx="3" />
+      <path d="m7 9.5 3 2.5-3 2.5M12.5 15H17" />
+    </svg>
+  );
+}
+
+/** Any other agent: three linked nodes. */
+function AgentGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+      strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+      <circle cx="6" cy="7" r="2.6" />
+      <circle cx="18" cy="7" r="2.6" />
+      <circle cx="12" cy="18" r="2.6" />
+      <path d="M8.6 7h6.8M7.3 9.3l3.4 6.4M16.7 9.3l-3.4 6.4" />
+    </svg>
+  );
+}
+
+const GLYPHS: Record<McpClientKind, () => ReactNode> = {
+  'claude-ai': ClaudeAiGlyph,
+  'claude-code': ClaudeCodeGlyph,
+  agent: AgentGlyph,
+};
+
+const KINDS: McpClientKind[] = ['claude-ai', 'claude-code', 'agent'];
+
+/** Click outside, touch outside, Escape: the three ways every menu here closes. */
+function useDismiss(open: boolean, close: () => void, ref: RefObject<HTMLElement | null>) {
+  useEffect(() => {
+    if (!open) return;
+    const outside = (event: MouseEvent | TouchEvent) => {
+      if (ref.current && !ref.current.contains(event.target as Node)) close();
+    };
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') close();
+    };
+    document.addEventListener('mousedown', outside);
+    document.addEventListener('touchstart', outside);
+    document.addEventListener('keydown', escape);
+    return () => {
+      document.removeEventListener('mousedown', outside);
+      document.removeEventListener('touchstart', outside);
+      document.removeEventListener('keydown', escape);
+    };
+  }, [open, close, ref]);
+}
+
+/**
+ * A client's mark that names itself: the tip shows on hover and focus (CSS),
+ * and a tap pins it, because a phone has no hover.
+ */
+export function ClientIcon({ kind, label }: { kind: McpClientKind; label: string }) {
+  const [pinned, setPinned] = useState(false);
+  const ref = useRef<HTMLSpanElement>(null);
+  const close = useCallback(() => setPinned(false), []);
+  useDismiss(pinned, close, ref);
+  const Glyph = GLYPHS[kind];
+  return (
+    <span ref={ref} className={`mcpc-client${pinned ? ' is-pinned' : ''}`} data-kind={kind}>
+      <button type="button" className="mcpc-icon" aria-label={label} onClick={() => setPinned((p) => !p)}>
+        <Glyph />
+      </button>
+      <span className="mcpc-tip" role="tooltip">{label}</span>
+    </span>
+  );
+}
+
+export function CopySnippet({ label, value, kind }: { label: string; value: string; kind?: McpClientKind }) {
   const [copied, setCopied] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -94,8 +245,10 @@ export function CopySnippet({ label, value }: { label: string; value: string }) 
   }
 
   return (
-    <div className="mcpc-snippet">
-      <span className="mcpc-snippet__label">{label}</span>
+    <div className="mcpc-snippet" data-kind={kind}>
+      {/* With a client mark the label IS the icon's tip; without one (an app
+          still calling CopySnippet on its own) it stays a heading. */}
+      {kind ? <ClientIcon kind={kind} label={label} /> : <span className="mcpc-snippet__label">{label}</span>}
       {/* The field carries the border; the copy control sits INSIDE it as an
           icon. Two bordered boxes side by side read as two controls, when only
           one of them does anything. */}
@@ -114,6 +267,248 @@ export function CopySnippet({ label, value }: { label: string; value: string }) 
   );
 }
 
+type ConnectionsState =
+  | { kind: 'loading' }
+  | { kind: 'failed' }
+  | { kind: 'ready'; items: McpConnection[] };
+
+const CONNECTED_ON = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+const onDate = (seconds: number) => CONNECTED_ON.format(new Date(seconds * 1000));
+
+/** A small menu hanging under its trigger. Shared by the client and sister-app menus. */
+function MenuButton({
+  trigger,
+  triggerClass,
+  label,
+  children,
+  testId,
+}: {
+  trigger: ReactNode;
+  triggerClass: string;
+  label: string;
+  children: (close: () => void) => ReactNode;
+  testId?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLSpanElement>(null);
+  const close = useCallback(() => setOpen(false), []);
+  useDismiss(open, close, ref);
+  return (
+    <span ref={ref} className="mcpc-menuwrap">
+      <button
+        type="button"
+        className={triggerClass}
+        aria-label={label}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+        data-testid={testId}
+      >
+        {trigger}
+      </button>
+      {open && (
+        <span className="mcpc-menu" role="menu" aria-label={label}>
+          {children(close)}
+        </span>
+      )}
+    </span>
+  );
+}
+
+/**
+ * The status on the "Add this app" line: Connected/Disconnected, then one
+ * mark per client, solid when that client is connected.
+ */
+function ConnectionStatus({
+  source,
+  labels,
+  values,
+  claudeAiConnectHref,
+}: {
+  source: McpConnectionsSource;
+  labels: Record<McpClientKind, string>;
+  values: Record<McpClientKind, string>;
+  claudeAiConnectHref: string;
+}) {
+  const { load, disconnect } = source;
+  const [state, setState] = useState<ConnectionsState>({ kind: 'loading' });
+  const [busy, setBusy] = useState<string | null>(null);
+  const [copied, setCopied] = useState<McpClientKind | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    load()
+      .then((items) => live && setState({ kind: 'ready', items }))
+      .catch(() => live && setState({ kind: 'failed' }));
+    return () => {
+      live = false;
+    };
+  }, [load]);
+
+  const cut = async (id: string) => {
+    setBusy(id);
+    try {
+      await disconnect(id);
+      setState((was) => (was.kind === 'ready' ? { kind: 'ready', items: was.items.filter((c) => c.id !== id) } : was));
+    } catch {
+      setState({ kind: 'failed' });
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  // Connecting is done in the client, not here: hand over the string it needs.
+  const connect = async (kind: McpClientKind) => {
+    try {
+      await navigator.clipboard.writeText(values[kind]);
+    } catch {
+      // Denied clipboard: the string is still on screen above.
+    }
+    setCopied(kind);
+    if (kind === 'claude-ai') window.open(claudeAiConnectHref, '_blank', 'noopener');
+  };
+
+  const items = state.kind === 'ready' ? state.items : [];
+  const byKind = (kind: McpClientKind) => items.filter((c) => clientKind(c.client) === kind);
+  const word =
+    state.kind === 'loading' ? 'Checking…' : state.kind === 'failed' ? 'Unavailable' : items.length ? 'Connected' : 'Disconnected';
+
+  return (
+    <span className="mcpc-status" data-testid="mcp-connections" aria-label="Connected assistants">
+      <span className={`mcpc-status__word${items.length ? ' is-on' : ''}`} role="status">{word}</span>
+      {KINDS.map((kind) => {
+        const mine = byKind(kind);
+        const Glyph = GLYPHS[kind];
+        return (
+          <MenuButton
+            key={kind}
+            label={`${labels[kind]}: ${mine.length ? 'connected' : 'not connected'}`}
+            triggerClass={`mcpc-icon mcpc-status__icon${mine.length ? ' is-on' : ''}`}
+            trigger={<Glyph />}
+            testId={`mcp-status-${kind}`}
+          >
+            {() => (
+              <>
+                <span className="mcpc-menu__title">{labels[kind]}</span>
+                {state.kind === 'failed' && <span className="mcpc-menu__note" role="alert">Could not load connections.</span>}
+                {state.kind === 'loading' && <span className="mcpc-menu__note">Checking…</span>}
+                {state.kind === 'ready' && mine.length === 0 && (
+                  <span className="mcpc-menu__row">
+                    <span className="mcpc-menu__note">{copied === kind ? 'Copied. Paste it in.' : 'Not connected'}</span>
+                    <button type="button" className="mcpc-menu__action" role="menuitem" onClick={() => void connect(kind)}>
+                      Connect
+                    </button>
+                  </span>
+                )}
+                {mine.map((c) => (
+                  <span key={c.id} className="mcpc-menu__row mcpc-connections__row">
+                    <span className="mcpc-connections__name" title={c.client}>{c.client}</span>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="mcpc-connections__cut"
+                      disabled={busy !== null}
+                      onClick={() => void cut(c.id)}
+                      aria-label={`Disconnect ${c.client}`}
+                    >
+                      {busy === c.id ? 'Disconnecting…' : 'Disconnect'}
+                    </button>
+                    <span className="mcpc-connections__when">{onDate(c.connectedAt)}</span>
+                  </span>
+                ))}
+              </>
+            )}
+          </MenuButton>
+        );
+      })}
+    </span>
+  );
+}
+
+type AppsState = { kind: 'loading' } | { kind: 'failed' } | { kind: 'ready'; links: McpAppLink[] };
+
+/**
+ * "Add other MCPs": one row per sister app - its name, then Sign in, or Sign
+ * out behind the same small menu the client marks use, with the date.
+ */
+export function McpApps({ apps, load, signIn, signOut }: McpAppsSource) {
+  const [state, setState] = useState<AppsState>({ kind: 'loading' });
+  const [busy, setBusy] = useState<string | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    load()
+      .then((links) => live && setState({ kind: 'ready', links }))
+      .catch(() => live && setState({ kind: 'failed' }));
+    return () => {
+      live = false;
+    };
+  }, [load]);
+
+  const out = async (appId: string, close: () => void) => {
+    setBusy(appId);
+    try {
+      await signOut(appId);
+      setState((was) => (was.kind === 'ready' ? { kind: 'ready', links: was.links.filter((l) => l.appId !== appId) } : was));
+      close();
+    } catch {
+      setState({ kind: 'failed' });
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  if (apps.length === 0) return null;
+  return (
+    <section className="mcpc-apps" aria-label="Other MCPs" data-testid="mcp-apps">
+      <span className="mcpc-section">Add other MCPs</span>
+      <ul className="mcpc-apps__list">
+        {apps.map((app) => {
+          const link = state.kind === 'ready' ? state.links.find((l) => l.appId === app.id) : undefined;
+          return (
+            <li key={app.id} className="mcpc-apps__row" data-testid={`mcp-app-${app.id}`}>
+              {app.href ? (
+                <a className="mcpc-apps__name" href={app.href} target="_blank" rel="noopener">{app.name}</a>
+              ) : (
+                <span className="mcpc-apps__name">{app.name}</span>
+              )}
+              {state.kind === 'loading' && <span className="mcpc-menu__note">Checking…</span>}
+              {state.kind === 'failed' && <span className="mcpc-menu__note" role="alert">Unavailable</span>}
+              {state.kind === 'ready' && !link && (
+                <button type="button" className="mcpc-apps__action" onClick={() => signIn(app.id)}>
+                  Sign in
+                </button>
+              )}
+              {state.kind === 'ready' && link && (
+                <MenuButton label={`Sign out of ${app.name}`} triggerClass="mcpc-apps__action" trigger="Sign out">
+                  {(close) => (
+                    <>
+                      <span className="mcpc-menu__title">{app.name}</span>
+                      <span className="mcpc-menu__row mcpc-connections__row">
+                        <span className="mcpc-connections__name">Signed in</span>
+                        <button
+                          type="button"
+                          role="menuitem"
+                          className="mcpc-connections__cut"
+                          disabled={busy !== null}
+                          onClick={() => void out(app.id, close)}
+                        >
+                          {busy === app.id ? 'Signing out…' : 'Sign out'}
+                        </button>
+                        <span className="mcpc-connections__when">{onDate(link.connectedAt)}</span>
+                      </span>
+                    </>
+                  )}
+                </MenuButton>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
 export function McpConnector({
   endpoint,
   claudeCodeCommand,
@@ -121,12 +516,17 @@ export function McpConnector({
   docsHref,
   renderDocsLink,
   title = 'MCP Connector',
+  addTitle = 'Add this app',
   labels,
   locked = false,
   connections,
+  apps,
+  claudeAiConnectHref = CLAUDE_AI_CONNECTORS,
   className,
 }: McpConnectorProps) {
   const text = { ...DEFAULT_LABELS, ...labels };
+  const byKind: Record<McpClientKind, string> = { 'claude-ai': text.endpoint, 'claude-code': text.claudeCode, agent: text.agent };
+  const values: Record<McpClientKind, string> = { 'claude-ai': endpoint, 'claude-code': claudeCodeCommand, agent: agentInstruction };
   const docs = docsHref
     ? locked
       ? <span className="mcpc-docs is-locked" aria-disabled="true">Docs</span>
@@ -141,15 +541,21 @@ export function McpConnector({
         <span className="mcpc-title">{title}</span>
         {docs}
       </div>
+      <div className="mcpc-subhead">
+        <span className="mcpc-section">{addTitle}</span>
+        {connections && !locked && (
+          <ConnectionStatus source={connections} labels={byKind} values={values} claudeAiConnectHref={claudeAiConnectHref} />
+        )}
+      </div>
       <div
         className={`mcpc-rows${locked ? ' is-locked' : ''}`}
         aria-hidden={locked || undefined}
       >
-        <CopySnippet label={text.endpoint} value={endpoint} />
-        <CopySnippet label={text.claudeCode} value={claudeCodeCommand} />
-        <CopySnippet label={text.agent} value={agentInstruction} />
+        {KINDS.map((kind) => (
+          <CopySnippet key={kind} kind={kind} label={byKind[kind]} value={values[kind]} />
+        ))}
       </div>
-      {connections && !locked && <McpConnections {...connections} />}
+      {apps && apps.apps.length > 0 && !locked && <McpApps {...apps} />}
     </div>
   );
 }
@@ -334,12 +740,6 @@ export interface McpConnectionsSource {
   disconnect: (id: string) => Promise<unknown>;
 }
 
-type ConnectionsState =
-  | { kind: 'loading' }
-  | { kind: 'failed' }
-  | { kind: 'ready'; items: McpConnection[] };
-
-const CONNECTED_ON = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 
 /**
  * The "Connected" section at the foot of the connector panel.

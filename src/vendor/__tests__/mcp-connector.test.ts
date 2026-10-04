@@ -44,6 +44,7 @@ const PAIRS = [
   ['index.tsx', 'connector.tsx'],
   ['styles.css', 'styles.css'],
   ['mask.ts', 'mask.ts'],
+  ['linked-app.ts', 'linked-app.ts'],
 ] as const;
 
 describe('the vendored connector', () => {

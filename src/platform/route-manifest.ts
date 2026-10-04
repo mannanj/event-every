@@ -54,6 +54,12 @@ export const ROUTE_MANIFEST: Readonly<Record<string, RoutePolicy>> = {
   // lets the id ride in the query string instead, the same way the consent
   // token does.
   '/api/mcp/connections': policyMulti(['GET', 'DELETE'], 0),
+  // Signing in to a sister app (Calendar). Static paths on purpose: admission
+  // keys on the exact pathname, so the app rides in `?app=` (and, on the way
+  // back, in the sealed flow cookie). Neither route has a body.
+  '/api/linked-apps': policyMulti(['GET', 'DELETE'], 0),
+  '/api/linked-apps/connect': policy('GET', 0),
+  '/api/linked-apps/callback': policy('GET', 0),
   '/api/mcp/events': policy('GET', 0),
   '/api/mcp/events/save': policy('POST', 64 * 1024),
   '/api/mcp/events/remove': policy('POST', 1024),

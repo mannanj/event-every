@@ -12,6 +12,7 @@
     "type-check:mcp": "cd mcp && bun run type-check",
     "test": "bun test src --parallel",
     "test:e2e": "bunx playwright test",
+    "test:e2e:linked-apps": "bunx playwright test --config playwright.linked-apps.config.ts",
     "test:e2e:ui": "bunx playwright test --ui",
     "test:e2e:prod": "E2E_TARGET=prod bunx playwright test",
     "vendor:scanner": "bun scripts/vendor-event-scanner.ts",

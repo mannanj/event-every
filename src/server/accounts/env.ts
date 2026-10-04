@@ -39,6 +39,11 @@ export interface AccountsEnv {
   /** Keys the rate-limit bucket hashes, so the table is not a log of people. */
   RATE_LIMIT_HASH_SECRET?: string;
 
+  /** Seals the tokens Event Every holds for sister apps (Calendar). Fails closed in production when missing. */
+  LINKED_APPS_SECRET?: string;
+  /** Overrides Calendar's MCP URL; tests point it at a local fake. */
+  CALENDAR_MCP_URL?: string;
+
   /** Absolute origin, used to build the magic link that goes in the email. */
   APP_ORIGIN?: string;
 }

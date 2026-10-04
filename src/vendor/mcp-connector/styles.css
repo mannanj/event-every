@@ -26,6 +26,11 @@
   --mcpc-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
   --mcpc-radius: 7px;
   --mcpc-gap: 12px;
+  /* Every client mark, in the rows and on the status line, at one size. */
+  --mcpc-icon: 16px;
+  /* Menus and tips float over the page, so they need an opaque ground even
+     when the panel itself is transparent. */
+  --mcpc-float: #ffffff;
 
   color: var(--mcpc-fg);
 }
@@ -145,8 +150,246 @@
   color: var(--mcpc-accent);
 }
 
-@media (min-width: 640px) {
-  }
+/* ─── client marks ────────────────────────────────────────────────────────
+   A snippet with a client is one line: the mark, then the field. */
+
+.mcpc-snippet[data-kind] {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.mcpc-snippet[data-kind] .mcpc-snippet__row {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.mcpc-client {
+  position: relative;
+  flex: none;
+  display: inline-flex;
+}
+
+.mcpc-icon {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: calc(var(--mcpc-icon) + 6px);
+  height: calc(var(--mcpc-icon) + 6px);
+  padding: 3px;
+  border: 0;
+  border-radius: 5px;
+  background: none;
+  color: var(--mcpc-muted);
+  cursor: pointer;
+}
+
+.mcpc-icon svg {
+  width: var(--mcpc-icon);
+  height: var(--mcpc-icon);
+}
+
+.mcpc-icon:hover {
+  color: var(--mcpc-fg);
+}
+
+.mcpc-icon:focus-visible {
+  outline: 2px solid var(--mcpc-accent);
+  outline-offset: 1px;
+}
+
+/* The name of the client, on hover or focus, and pinned by a tap. */
+.mcpc-tip {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 6px);
+  z-index: 80;
+  padding: 4px 8px;
+  border: 1px solid var(--mcpc-line);
+  border-radius: 5px;
+  background: var(--mcpc-float);
+  color: var(--mcpc-fg);
+  font-size: 12px;
+  line-height: 1.3;
+  white-space: nowrap;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 100ms ease;
+}
+
+.mcpc-client:hover .mcpc-tip,
+.mcpc-client:focus-within .mcpc-tip,
+.mcpc-client.is-pinned .mcpc-tip {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* ─── "Add this app" + status ─────────────────────────────────────────── */
+
+.mcpc-subhead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: calc(var(--mcpc-icon) + 6px);
+  margin-bottom: 8px;
+}
+
+.mcpc-section {
+  color: var(--mcpc-fg);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.mcpc-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.mcpc-status__word {
+  margin-right: 4px;
+  color: var(--mcpc-muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.mcpc-status__word.is-on {
+  color: var(--mcpc-accent);
+}
+
+/* Half strength until that client is connected. */
+.mcpc-status__icon {
+  opacity: .5;
+}
+
+.mcpc-status__icon.is-on {
+  opacity: 1;
+  color: var(--mcpc-fg);
+}
+
+.mcpc-status__icon:hover,
+.mcpc-status__icon[aria-expanded='true'] {
+  opacity: 1;
+}
+
+/* ─── the small menus under a mark or a Sign out ──────────────────────── */
+
+.mcpc-menuwrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.mcpc-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 80;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 270px;
+  max-width: calc(100vw - 32px);
+  padding: 10px 12px;
+  border: 1px solid var(--mcpc-line);
+  border-radius: var(--mcpc-radius);
+  background: var(--mcpc-float);
+  color: var(--mcpc-fg);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+  text-align: left;
+}
+
+.mcpc-menu__title {
+  color: var(--mcpc-muted);
+  font-family: var(--mcpc-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+}
+
+.mcpc-menu__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.mcpc-menu__row.mcpc-connections__row {
+  display: grid;
+}
+
+.mcpc-menu__note {
+  color: var(--mcpc-muted);
+  font-size: 13px;
+}
+
+.mcpc-menu__action,
+.mcpc-apps__action {
+  padding: 2px 6px;
+  border: 0;
+  border-radius: 5px;
+  background: none;
+  color: var(--mcpc-accent);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.mcpc-menu__action:hover,
+.mcpc-apps__action:hover {
+  text-decoration: underline;
+}
+
+.mcpc-menu__action:focus-visible,
+.mcpc-apps__action:focus-visible {
+  outline: 2px solid var(--mcpc-accent);
+  outline-offset: 2px;
+}
+
+/* ─── "Add other MCPs" ─────────────────────────────────────────────────── */
+
+.mcpc-apps {
+  margin-top: var(--mcpc-gap);
+  padding-top: 10px;
+  border-top: 1px solid var(--mcpc-line);
+}
+
+.mcpc-apps__list {
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.mcpc-apps__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.mcpc-apps__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--mcpc-fg);
+  text-decoration: none;
+}
+
+a.mcpc-apps__name:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
 
 /* ─── the AI-Generated mark ───────────────────────────────────────────────
    Sits above a guide's heading. Quiet by default: it is a disclosure, not a
