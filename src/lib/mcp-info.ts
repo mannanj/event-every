@@ -50,6 +50,11 @@ export const MCP_TOOLS: readonly { name: string; does: string; costs: string }[]
     costs: 'Spends from the daily budget.',
   },
   {
+    name: 'read_into_events',
+    does: 'Reads words, links and photos together, the way the site\'s own input does.',
+    costs: 'Spends from the daily budget.',
+  },
+  {
     name: 'read_link_into_events',
     does: 'Fetches a public page and reads the events on it.',
     costs: 'Spends from the daily budget.',

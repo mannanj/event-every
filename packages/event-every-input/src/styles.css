@@ -78,8 +78,8 @@
   display: block;
   width: 100%;
   min-height: 64px;
-  /* Room on the right for the two icons, at the bottom for the credit. */
-  padding: 8px 64px 22px 12px;
+  /* Room on the right for the three icons, at the bottom for the credit. */
+  padding: 8px 92px 22px 12px;
   border: 0;
   border-radius: var(--eei-radius);
   background: transparent;
@@ -150,6 +150,75 @@
 .eei-icon:focus-visible {
   outline: 2px solid var(--eei-blue);
   outline-offset: 1px;
+}
+
+/* Files held beside the words until the box is sent, as on the site. */
+.eei-files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: -16px 0 0;
+  padding: 0 12px 22px;
+  list-style: none;
+}
+
+.eei-file {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  min-width: 0;
+  padding: 2px 4px 2px 6px;
+  border: 1px solid var(--eei-line);
+  border-radius: 999px;
+  background: var(--eei-blue-soft);
+  color: var(--eei-fg);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.eei-file__kind {
+  display: inline-flex;
+  flex: none;
+  color: var(--eei-blue);
+}
+
+.eei-file__kind svg {
+  width: 12px;
+  height: 12px;
+}
+
+.eei-file__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.eei-file__remove {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--eei-muted);
+  font: inherit;
+  font-size: 14px;
+  line-height: 16px;
+  cursor: pointer;
+}
+
+.eei-file__remove:hover:not(:disabled) {
+  color: var(--eei-fg);
+  background: var(--eei-line);
+}
+
+/* Full size: the same input, with room to write and to drop into. */
+.eei--expanded .eei-text {
+  min-height: 200px;
+  font-size: 15px;
 }
 
 .eei-credit {

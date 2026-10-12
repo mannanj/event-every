@@ -193,6 +193,13 @@ export type ScanInput =
       backupOriginal?: boolean;
     }
   | { kind: 'url'; url: string; timezone?: string; backupOriginal?: boolean }
+  | {
+      kind: 'input';
+      text?: string;
+      images?: { imageBase64: string; mimeType: 'image/png' | 'image/jpeg' | 'image/webp'; filename?: string }[];
+      timezone?: string;
+      backupOriginal?: boolean;
+    }
   | { kind: 'calendar'; ics: string; filename?: string; backupOriginal?: boolean };
 
 export async function scanInput(

@@ -1,24 +1,29 @@
 'use client';
 
 import { useRef, useState, type ClipboardEvent, type DragEvent, type KeyboardEvent, type ReactNode } from 'react';
-import { acceptAttribute, describeInput, inputFromFile, inputFromText, InputRefused, type EventEveryInput } from './input-kinds';
+import { acceptAttribute, collectInput, describeInput, fileKind, InputRefused, MAX_PHOTOS, refusalFor, type EventEveryInput } from './input-kinds';
 
 export * from './input-kinds';
 
 /**
  * Event Every's input, for another app to put at the top of its own
- * create-an-event flow.
+ * create-an-event flow. The same input as Event Every's site, smaller.
  *
  *   signed out:  ┃ Use Event Every                         [Sign in] ┃  (blue)
  *   signed in:   ┌─────────────────────────────────────────────────┐
- *                │ Paste an invite, a link, or drop an .ics / photo │
+ *                │ Paste an invite, a link, or drop an .ics / photo │ ⤢ 📎 →
+ *                │ [▣ shot.png ×]                                   │
  *                │                        Provided by Event Every ↗ │
  *                └─────────────────────────────────────────────────┘
  *
+ * As on the site, what goes in the box is held until it is sent: a link typed
+ * and a screenshot pasted under it are read together, as one input. ⤢ opens
+ * the same input full size.
+ *
  * UI ONLY. It never calls Event Every itself: the host app signs in (OAuth,
  * through its own server - see @mannan/mcp-connector's linked-app.ts) and
- * passes `onRead`, which gets one sorted input and resolves when the host has
- * done with the events. That keeps the token on the host's server and lets
+ * passes `onRead`, which gets everything in the box and resolves when the host
+ * has done with the events. That keeps the token on the host's server and lets
  * each host decide what "use these events" means.
  *
  * Skinned through custom properties (styles.css), like the MCP connector.
@@ -59,18 +64,43 @@ export function EventEveryBar({
   className,
 }: EventEveryBarProps) {
   const [text, setText] = useState('');
+  const [files, setFiles] = useState<File[]>([]);
+  const [expanded, setExpanded] = useState(false);
   const [reading, setReading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const run = async (input: EventEveryInput | null) => {
-    if (!input || reading) return;
+  /** Hold files in the box beside the words; nothing is read until it is sent. */
+  const hold = (added: readonly File[]) => {
+    if (reading || added.length === 0) return;
+    const refused = added.map(refusalFor).find(Boolean);
+    const ok = added.filter((f) => !refusalFor(f));
+    const photos = [...files, ...ok].filter((f) => fileKind(f) === 'photo').length;
+    if (photos > MAX_PHOTOS) {
+      setError(`Up to ${MAX_PHOTOS} photos at a time.`);
+      return;
+    }
+    setError(refused ?? null);
+    if (ok.length) setFiles((held) => [...held, ...ok]);
+  };
+
+  const send = async () => {
+    if (reading) return;
     setError(null);
+    let input: EventEveryInput | null;
+    try {
+      input = await collectInput(text, files);
+    } catch (e) {
+      setError(e instanceof InputRefused ? e.message : 'Could not open that file.');
+      return;
+    }
+    if (!input) return;
     setReading(describeInput(input));
     try {
       await onRead(input);
       setText('');
+      setFiles([]);
     } catch (e) {
       setError(e instanceof Error && e.message ? e.message : 'Event Every could not read that.');
     } finally {
@@ -78,38 +108,29 @@ export function EventEveryBar({
     }
   };
 
-  const fromFile = async (file: File | undefined) => {
-    if (!file) return;
-    try {
-      await run(await inputFromFile(file));
-    } catch (e) {
-      setError(e instanceof InputRefused ? e.message : 'Could not open that file.');
-    }
-  };
-
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault();
-      void run(inputFromText(text));
+      void send();
     }
   };
 
   const onPaste = (e: ClipboardEvent<HTMLTextAreaElement>) => {
-    const file = e.clipboardData.files[0];
-    if (file) {
+    const pasted = Array.from(e.clipboardData.files);
+    if (pasted.length) {
       e.preventDefault();
-      void fromFile(file);
+      hold(pasted);
     }
   };
 
   const onDrop = (e: DragEvent<HTMLElement>) => {
     e.preventDefault();
     setDragging(false);
-    const file = e.dataTransfer.files[0];
-    if (file) void fromFile(file);
+    const dropped = Array.from(e.dataTransfer.files);
+    if (dropped.length) hold(dropped);
     else {
-      const dropped = e.dataTransfer.getData('text/plain');
-      if (dropped) void run(inputFromText(dropped));
+      const words = e.dataTransfer.getData('text/plain');
+      if (words) setText((t) => (t.trim() ? `${t}\n${words}` : words));
     }
   };
 
@@ -128,11 +149,12 @@ export function EventEveryBar({
     );
   }
 
+  const busy = reading !== null;
   return (
     <section
-      className={`${cls} eei--signed-in${dragging ? ' is-dragging' : ''}${reading ? ' is-reading' : ''}`}
+      className={`${cls} eei--signed-in${expanded ? ' eei--expanded' : ''}${dragging ? ' is-dragging' : ''}${busy ? ' is-reading' : ''}`}
       aria-label="Use Event Every"
-      aria-busy={reading ? true : undefined}
+      aria-busy={busy || undefined}
       data-testid="event-every-bar"
       onDragOver={(e) => {
         e.preventDefault();
@@ -145,10 +167,10 @@ export function EventEveryBar({
         <textarea
           className="eei-text"
           aria-label="Use Event Every"
-          rows={2}
+          rows={expanded ? 8 : 2}
           value={text}
           placeholder={placeholder}
-          readOnly={reading !== null}
+          readOnly={busy}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={onKeyDown}
           onPaste={onPaste}
@@ -157,8 +179,18 @@ export function EventEveryBar({
           <button
             type="button"
             className="eei-icon"
-            aria-label="Choose a file"
-            disabled={reading !== null}
+            aria-label={expanded ? 'Make the input smaller' : 'Open the full input'}
+            aria-pressed={expanded}
+            title={expanded ? 'Smaller' : 'Full size'}
+            onClick={() => setExpanded((x) => !x)}
+          >
+            {expanded ? <CollapseGlyph /> : <ExpandGlyph />}
+          </button>
+          <button
+            type="button"
+            className="eei-icon"
+            aria-label="Add a file"
+            disabled={busy}
             onClick={() => fileRef.current?.click()}
           >
             <PaperclipGlyph />
@@ -167,19 +199,39 @@ export function EventEveryBar({
             type="button"
             className="eei-icon eei-go"
             aria-label="Read with Event Every"
-            disabled={reading !== null || !text.trim()}
-            onClick={() => void run(inputFromText(text))}
+            disabled={busy || (!text.trim() && files.length === 0)}
+            onClick={() => void send()}
           >
             <ArrowGlyph />
           </button>
         </span>
+        {files.length > 0 && (
+          <ul className="eei-files" aria-label="Added files">
+            {files.map((file, i) => (
+              <li key={`${file.name}-${i}`} className="eei-file">
+                <span className="eei-file__kind" aria-hidden="true">{fileKind(file) === 'calendar' ? <CalendarGlyph /> : <PhotoGlyph />}</span>
+                <span className="eei-file__name">{file.name || (fileKind(file) === 'calendar' ? 'Calendar file' : 'Photo')}</span>
+                <button
+                  type="button"
+                  className="eei-file__remove"
+                  aria-label={`Remove ${file.name || 'file'}`}
+                  disabled={busy}
+                  onClick={() => setFiles((held) => held.filter((_, j) => j !== i))}
+                >
+                  ×
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
         <input
           ref={fileRef}
           type="file"
           hidden
+          multiple
           accept={acceptAttribute()}
           onChange={(e) => {
-            void fromFile(e.target.files?.[0]);
+            hold(Array.from(e.target.files ?? []));
             e.target.value = '';
           }}
         />
@@ -237,6 +289,45 @@ function ArrowGlyph() {
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"
       strokeLinejoin="round" aria-hidden="true" focusable="false">
       <path d="M5 12h14M13 6l6 6-6 6" />
+    </svg>
+  );
+}
+
+function ExpandGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"
+      strokeLinejoin="round" aria-hidden="true" focusable="false">
+      <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
+    </svg>
+  );
+}
+
+function CollapseGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"
+      strokeLinejoin="round" aria-hidden="true" focusable="false">
+      <path d="M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7" />
+    </svg>
+  );
+}
+
+function PhotoGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"
+      strokeLinejoin="round" aria-hidden="true" focusable="false">
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <circle cx="9" cy="10" r="2" />
+      <path d="m21 16-5-5-9 9" />
+    </svg>
+  );
+}
+
+function CalendarGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"
+      strokeLinejoin="round" aria-hidden="true" focusable="false">
+      <rect x="3" y="5" width="18" height="16" rx="2" />
+      <path d="M3 10h18M8 3v4M16 3v4" />
     </svg>
   );
 }

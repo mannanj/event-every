@@ -11,6 +11,7 @@ import {
   decodeBase64,
   fetchImageAsDataUrl,
   fetchPageText,
+  scrapePage,
 } from '@/server/mcp/intake';
 import { keepOriginal, resolveBackup } from '@/server/mcp/original';
 import { parseICSContent } from '@/services/icsParser';
@@ -27,6 +28,12 @@ const readerZone = (timezone: string | null | undefined): string | undefined =>
 import { createReviewDrafts } from '@/services/scannerDraft';
 import { validateScannerImageDataUrl } from '@/server/scanner/image';
 import { ScanResponseSchema } from '@/types/scannerHttp';
+import { detectUrlsDeterministically } from '@/services/urlDetector';
+import { IMAGE_SCAN_CONCURRENCY, linkForPhotos, readLinks, readText, withTypedLink } from '@/services/readSources';
+import { withTypicalDuration } from '@/services/scanTriage';
+import { triageForScan } from '@/server/typesafe/triage';
+import { mapWithConcurrency } from '@/utils/concurrency';
+import type { CalendarEvent } from '@/types/event';
 
 export const dynamic = 'force-dynamic';
 
@@ -90,6 +97,19 @@ const Body = z.discriminatedUnion('kind', [
     backupOriginal: Backup,
   }),
   z.object({
+    // Everything in the input box at once: the words and the photos beside
+    // them, read through the same steps as the site's own input (readSources).
+    kind: z.literal('input'),
+    text: z.string().max(20_000).optional(),
+    images: z.array(z.object({
+      imageBase64: z.string().min(1).max(16_000_000),
+      mimeType: z.enum(['image/png', 'image/jpeg', 'image/webp']),
+      filename: z.string().max(300).optional(),
+    })).max(10).optional(),
+    timezone: z.string().max(100).nullish(),
+    backupOriginal: Backup,
+  }),
+  z.object({
     kind: z.literal('calendar'),
     /** The .ics text itself. */
     ics: z.string().min(1).max(1_000_000),
@@ -138,66 +158,22 @@ export async function POST(request: Request) {
         name: input.filename ?? 'imported.ics',
         mimeType: 'text/calendar',
       };
+    } else if (input.kind === 'input') {
+      const read = await readInput(input, (scanRequest, durationMinutes, provenance) =>
+        scanOnce(request, env, actor, scanRequest, input.timezone, durationMinutes, provenance));
+      if (read.events.length === 0) return mcpJson({ events: [], found: 0, backedUp: false });
+      events = read.events;
+      found = read.events.length;
+      original = read.original;
     } else {
       const prepared = await prepare(input, request.signal);
       original = prepared.original;
-
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-        'X-Event-Every-Request-Id': crypto.randomUUID(),
-      };
-      // Whose scan this is. Without it /api/scan sees only this Worker's own
-      // address, so every caller would share one per-person cap and nobody
-      // would be recognised as admin.
-      headers[SCAN_ON_BEHALF_HEADER] = await signScanOnBehalf(
-        { sub: actor.sub, email: actor.email },
-        mcpEnv().MCP_GRANT_SECRET ?? '',
-      );
-      if (input.timezone) headers['X-Event-Every-Time-Zone'] = input.timezone;
-
-      let response: Response;
-      try {
-        response = await fetch(new URL('/api/scan', appOrigin(request, env)).toString(), {
-          method: 'POST',
-          headers,
-          body: JSON.stringify(prepared.scanRequest),
-        });
-      } catch (error) {
-        console.error('mcp scan unreachable', error instanceof Error ? error.message : 'unknown');
-        return mcpJson({ error: 'The scanner could not be reached.' }, 502);
-      }
-
-      if (!response.ok) {
-        // The budget and governor answers are worth passing through verbatim:
-        // "try again tomorrow" is actionable and "something failed" is not.
-        const detail = (await response.json().catch(() => null)) as
-          | { error?: string; code?: string; resetAt?: string }
-          | null;
-        return mcpJson(
-          {
-            error: detail?.error ?? 'The scanner could not read that.',
-            ...(detail?.code ? { code: detail.code } : {}),
-            ...(detail?.resetAt ? { resetAt: detail.resetAt } : {}),
-          },
-          response.status,
-        );
-      }
-
-      const scan = ScanResponseSchema.safeParse(await response.json().catch(() => null));
-      if (!scan.success) return mcpJson({ error: 'The scanner could not read that.' }, 502);
-
-      const createdAt = new Date().toISOString();
-      const drafts = createReviewDrafts(scan.data, () => ({
-        id: crypto.randomUUID(),
-        exportUid: crypto.randomUUID(),
-        createdAt,
-      }));
-      if (drafts.length === 0) return mcpJson({ events: [], found: 0, backedUp: false });
-
-      events = reviewDraftsToCalendarEvents(drafts, prepared.provenance, readerZone(input.timezone));
-      found = drafts.length;
+      events = await scanOnce(request, env, actor, prepared.scanRequest, input.timezone, null, prepared.provenance);
+      if (events.length === 0) return mcpJson({ events: [], found: 0, backedUp: false });
+      found = events.length;
     }
   } catch (error) {
+    if (error instanceof ScanRefused) return mcpJson(error.body, error.status);
     if (error instanceof IntakeError) return mcpJson({ error: error.message }, 400);
     console.error('mcp intake failed', error instanceof Error ? error.message : 'unknown');
     return mcpJson({ error: 'Could not read that.' }, 500);
@@ -302,5 +278,137 @@ async function prepare(
       ? { bytes, name: input.filename ?? `original.${mimeType.split('/')[1]}`, mimeType }
       : null,
     provenance: input.imageUrl ?? input.filename ?? 'image',
+  };
+}
+
+/** /api/scan said no: its answer goes back to the assistant as it came. */
+class ScanRefused extends Error {
+  constructor(readonly status: number, readonly body: Record<string, unknown>) {
+    super(String(body.error ?? 'refused'));
+  }
+}
+
+type ScanRequestBody = { kind: 'text'; text: string } | { kind: 'image'; dataUrl: string };
+
+/**
+ * One scan through /api/scan, as the browser makes it, turned into calendar
+ * events the way the site's page does: the scanner's drafts, then a typical
+ * duration where the source stated no end (verification's guess per event,
+ * else triage's for the batch).
+ */
+async function scanOnce(
+  request: Request,
+  env: Parameters<typeof appOrigin>[1],
+  actor: { sub: string; email: string },
+  scanRequest: ScanRequestBody,
+  timezone: string | null | undefined,
+  durationMinutes: number | null,
+  provenance: string,
+): Promise<CalendarEvent[]> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'X-Event-Every-Request-Id': crypto.randomUUID(),
+  };
+  // Whose scan this is. Without it /api/scan sees only this Worker's own
+  // address, so every caller would share one per-person cap and nobody
+  // would be recognised as admin.
+  headers[SCAN_ON_BEHALF_HEADER] = await signScanOnBehalf(
+    { sub: actor.sub, email: actor.email },
+    mcpEnv().MCP_GRANT_SECRET ?? '',
+  );
+  if (timezone) headers['X-Event-Every-Time-Zone'] = timezone;
+
+  let response: Response;
+  try {
+    response = await fetch(new URL('/api/scan', appOrigin(request, env)).toString(), {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(scanRequest),
+    });
+  } catch (error) {
+    console.error('mcp scan unreachable', error instanceof Error ? error.message : 'unknown');
+    throw new ScanRefused(502, { error: 'The scanner could not be reached.' });
+  }
+
+  if (!response.ok) {
+    // The budget and governor answers are worth passing through verbatim:
+    // "try again tomorrow" is actionable and "something failed" is not.
+    const detail = (await response.json().catch(() => null)) as
+      | { error?: string; code?: string; resetAt?: string }
+      | null;
+    throw new ScanRefused(response.status, {
+      error: detail?.error ?? 'The scanner could not read that.',
+      ...(detail?.code ? { code: detail.code } : {}),
+      ...(detail?.resetAt ? { resetAt: detail.resetAt } : {}),
+    });
+  }
+
+  const scan = ScanResponseSchema.safeParse(await response.json().catch(() => null));
+  if (!scan.success) throw new ScanRefused(502, { error: 'The scanner could not read that.' });
+
+  const createdAt = new Date().toISOString();
+  const drafts = createReviewDrafts(scan.data, () => ({
+    id: crypto.randomUUID(),
+    exportUid: crypto.randomUUID(),
+    createdAt,
+  }));
+  const verified = new Map((scan.data.verification ?? []).map((one) => [one.candidateId, one.durationMinutes]));
+  return reviewDraftsToCalendarEvents(drafts, provenance, readerZone(timezone)).map((event, index) => {
+    const { candidate } = drafts[index];
+    return withTypicalDuration(event, candidate.temporal.value?.end != null, verified.get(candidate.candidateId) ?? durationMinutes);
+  });
+}
+
+/**
+ * The input box, read on the server through the site's own steps
+ * (services/readSources): text alone is found-links, fetched pages, triage,
+ * scan; photos are scanned one by one and take their link from the words
+ * typed beside them.
+ */
+async function readInput(
+  input: Extract<z.infer<typeof Body>, { kind: 'input' }>,
+  scan: (request: ScanRequestBody, durationMinutes: number | null, provenance: string) => Promise<CalendarEvent[]>,
+): Promise<{ events: CalendarEvent[]; original: { bytes: Uint8Array; name: string; mimeType: string } | null }> {
+  const text = input.text?.trim() ?? '';
+  const images = input.images ?? [];
+  if (!text && images.length === 0) throw new IntakeError('Send something to read.');
+  const signal = new AbortController().signal;
+  const linkSteps = {
+    detect: async (value: string) => detectUrlsDeterministically(value),
+    scrape: (urls: string[]) => mapWithConcurrency(urls, 2, (url) => scrapePage(url, signal)),
+  };
+
+  if (images.length === 0) {
+    const outcome = await readText<CalendarEvent>(text, {
+      ...linkSteps,
+      triage: (value, source) => triageForScan(value, source, signal),
+      scan: (value, { durationMinutes }) => scan({ kind: 'text', text: value }, durationMinutes, text.slice(0, 4_000)),
+    });
+    return {
+      events: outcome.kind === 'scanned' ? outcome.items : [],
+      original: { bytes: new TextEncoder().encode(text), name: 'original.txt', mimeType: 'text/plain' },
+    };
+  }
+
+  // The links are fetched while the first photo is read: neither waits on the other.
+  const [links, perImage] = await Promise.all([
+    text ? readLinks(text, linkSteps) : Promise.resolve(null),
+    mapWithConcurrency(images, IMAGE_SCAN_CONCURRENCY, async (image) => {
+      const dataUrl = `data:${image.mimeType};base64,${image.imageBase64}`;
+      try {
+        validateScannerImageDataUrl(dataUrl);
+      } catch {
+        throw new IntakeError('That is not a readable PNG, JPEG or WebP image.');
+      }
+      return scan({ kind: 'image', dataUrl }, null, image.filename ?? 'image');
+    }),
+  ]);
+  const first = images[0];
+  const bytes = decodeBase64(first.imageBase64);
+  return {
+    events: withTypedLink(perImage.flat(), links ? linkForPhotos(links) : null),
+    original: bytes
+      ? { bytes, name: first.filename ?? `original.${first.mimeType.split('/')[1]}`, mimeType: first.mimeType }
+      : null,
   };
 }

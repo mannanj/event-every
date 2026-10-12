@@ -1,20 +1,11 @@
 /**
- * Images go to a vision model that bills by pixels, and the text on a flyer
- * or screenshot stays legible well below phone-camera resolution. Measured
- * on real scans: a 2100 px screenshot cost 2,577 prompt tokens, the same
- * image at 1024 px cost 1,381, with no change in what was read. So the long
- * edge is capped before upload. PNG stays PNG so screenshot text keeps its
- * hard edges; camera formats become JPEG.
+ * The site's own photo path: the same pixel ceiling the embedded input uses
+ * (see SCAN_IMAGE_MAX_EDGE in packages/event-every-input for the measurement),
+ * returned as the data URL /api/scan takes.
  */
+import { scanDimensions, SCAN_IMAGE_MAX_EDGE } from '@event-every/input/input-kinds';
 
-export const SCAN_IMAGE_MAX_EDGE = 1024;
-
-export function scanDimensions(width: number, height: number, maxEdge = SCAN_IMAGE_MAX_EDGE): { width: number; height: number; scaled: boolean } {
-  const longest = Math.max(width, height);
-  if (!Number.isFinite(longest) || longest <= maxEdge || longest <= 0) return { width, height, scaled: false };
-  const ratio = maxEdge / longest;
-  return { width: Math.max(1, Math.round(width * ratio)), height: Math.max(1, Math.round(height * ratio)), scaled: true };
-}
+export { scanDimensions, SCAN_IMAGE_MAX_EDGE };
 
 function readAsDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {

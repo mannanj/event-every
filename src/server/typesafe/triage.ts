@@ -1,4 +1,4 @@
-import { askTypeSafe, noulOf, type TypeSafeAnswer, type TypeSafeQuestion } from './client';
+import { askTypeSafe, noulOf, typeSafeAvailable, type TypeSafeAnswer, type TypeSafeQuestion } from './client';
 
 /**
  * Pre-scan triage of text input: one fast call that decides WHEN and HOW MANY
@@ -169,4 +169,42 @@ export function decideTriage(verdict: TriageVerdict | null): TriageDecision {
     if (chunks.length >= 2) return { kind: 'split', chunks };
   }
   return { kind: 'single' };
+}
+
+/**
+ * What /api/triage answers, as a function, so the server's reading path (the
+ * MCP one) triages exactly as the browser's does. Null is "scan as before":
+ * no key, too long, slow, or failed.
+ */
+export async function triageForScan(
+  text: string,
+  source: TriageSource,
+  signal?: AbortSignal,
+): Promise<{
+  available: true;
+  decision: TriageDecision;
+  shape: TriageShape;
+  hasEvent: number;
+  complete: number | null;
+  durationMinutes: number | null;
+} | null> {
+  if (!typeSafeAvailable()) return null;
+  if (new TextEncoder().encode(text).byteLength > TRIAGE_MAX_BYTES) return null;
+  const startedAt = Date.now();
+  const verdict = await triageText(text, source, { signal });
+  const decision = decideTriage(verdict);
+  console.log(JSON.stringify({
+    event: 'triage', ms: Date.now() - startedAt, available: verdict !== null,
+    shape: verdict?.shape.choice ?? null, paragraphs: verdict?.paragraphs.length ?? 0,
+    decision: decision.kind, chunks: decision.kind === 'split' ? decision.chunks.length : 0,
+  }));
+  if (!verdict) return null;
+  return {
+    available: true,
+    decision,
+    shape: verdict.shape.choice,
+    hasEvent: verdict.hasEvent,
+    complete: verdict.complete,
+    durationMinutes: verdict.durationMinutes,
+  };
 }

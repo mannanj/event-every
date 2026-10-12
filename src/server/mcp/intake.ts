@@ -5,6 +5,8 @@ import {
   readCappedBody,
 } from '@/platform/resolver/url-policy';
 import { MAX_SCANNER_IMAGE_BYTES } from '@/server/scanner/image';
+import { sanitizeResolvedContent } from '@/platform/resolver/html-to-text';
+import type { ScrapedContent } from '@/services/webScraper';
 
 /**
  * Fetching something an assistant pointed at, rather than sent.
@@ -176,3 +178,56 @@ export function decodeBase64(value: string): Uint8Array | null {
 }
 
 export { base64 as encodeBase64 };
+
+/**
+ * A fetched page as the scraper reports it: its readable text and title, or
+ * null for a type that is not a page. /api/scrape-url and the server's own
+ * reading path both read pages through this, so a page reads the same either way.
+ */
+export async function readResolvedPage(
+  response: Response,
+  signal: AbortSignal,
+): Promise<Readonly<{ text: string; title?: string }> | null> {
+  const mediaType = response.headers.get('content-type')?.split(';', 1)[0]?.trim().toLowerCase();
+  if (mediaType !== 'text/html' && mediaType !== 'text/plain') {
+    await response.body?.cancel().catch(() => undefined);
+    return null;
+  }
+  const bytes: Uint8Array | string = await readCappedBody(response.body, RESOLVER_BODY_LIMIT, signal);
+  return sanitizeResolvedContent(typeof bytes === 'string' ? bytes : new TextDecoder().decode(bytes), mediaType);
+}
+
+/**
+ * The server's half of the site's scraper (services/webScraper): one link,
+ * fetched under the resolver policy, reported where it LANDED - a join link
+ * that redirects to the call reports the call. Never throws; a failure is an
+ * error result, as in the browser.
+ */
+export async function scrapePage(url: string, signal: AbortSignal): Promise<ScrapedContent> {
+  const failed = (error: string): ScrapedContent => ({ url, text: '', error, status: 'error' });
+  let safe: string;
+  try {
+    safe = assertAllowedResolverUrl(url);
+  } catch {
+    return failed('That link cannot be fetched.');
+  }
+  let result: Awaited<ReturnType<typeof fetchWithResolverPolicy>>;
+  try {
+    result = await fetchWithResolverPolicy(safe, signal);
+  } catch {
+    return failed('That page could not be fetched.');
+  }
+  try {
+    if (!result.response.ok) {
+      await result.response.body?.cancel().catch(() => undefined);
+      return failed(`That link answered ${result.response.status}.`);
+    }
+    const page = await readResolvedPage(result.response, result.signal);
+    if (!page) return failed('That link is not a page.');
+    return { url: result.canonicalUrl, text: page.text, ...(page.title ? { title: page.title } : {}), status: 'success' };
+  } catch {
+    return failed('That page could not be read.');
+  } finally {
+    result.close();
+  }
+}

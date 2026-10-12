@@ -9,12 +9,10 @@ import {
   utcDay,
   verifyResolverCapability,
 } from '@/platform/resolver/capability';
-import { sanitizeResolvedContent } from '@/platform/resolver/html-to-text';
+import { readResolvedPage } from '@/server/mcp/intake';
 import {
-  RESOLVER_BODY_LIMIT,
   assertAllowedResolverUrl,
   fetchWithResolverPolicy,
-  readCappedBody,
 } from '@/platform/resolver/url-policy';
 
 const STRICT_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -151,16 +149,8 @@ async function resolveScrapeRequest(request: NextRequest, dependencies: Dependen
       await response.body?.cancel().catch(() => undefined);
       return fixed('resolver_upstream_failed', 502);
     }
-    const mediaType = response.headers.get('content-type')?.split(';', 1)[0]?.trim().toLowerCase();
-    if (mediaType !== 'text/html' && mediaType !== 'text/plain') {
-      await response.body?.cancel().catch(() => undefined);
-      return fixed('resolver_unsupported_media_type', 415);
-    }
-    const bytes: Uint8Array | string = await readCappedBody(response.body, RESOLVER_BODY_LIMIT, signal);
-    const sanitized = sanitizeResolvedContent(
-      typeof bytes === 'string' ? bytes : new TextDecoder().decode(bytes),
-      mediaType,
-    );
+    const sanitized = await readResolvedPage(response, signal);
+    if (!sanitized) return fixed('resolver_unsupported_media_type', 415);
     outcome = 'success';
     return NextResponse.json({ url: fetchResult.canonicalUrl, ...sanitized, status: 'success' });
   } catch (error) {

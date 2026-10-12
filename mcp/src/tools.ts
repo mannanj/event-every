@@ -449,6 +449,39 @@ export function createEventEveryMcpServer(env: ToolEnv): McpServer {
     }),
   });
 
+  scanTool('read_into_events', {
+    title: 'Read events out of an input box',
+    description:
+      "Read what someone put in Event Every's input - words, links and photos " +
+      'together - through the same steps as Event Every\'s own site, and save the ' +
+      'events. Links in the text are fetched; a photo\'s event takes its link from ' +
+      'them (a join link that lands on a video call gives the call). For an app ' +
+      'that embeds the input; an assistant reading one thing should use the ' +
+      "single-kind tools. Spends the owner's daily budget.",
+    inputSchema: {
+      text: z.string().max(20_000).optional().describe('What was typed or pasted.'),
+      images: z
+        .array(
+          z.object({
+            imageBase64: z.string().min(1).max(16_000_000).describe('The raw bytes, base64, with no data-URL prefix.'),
+            mimeType: z.enum(['image/png', 'image/jpeg', 'image/webp']),
+            filename: z.string().max(300).optional(),
+          }),
+        )
+        .max(10)
+        .optional()
+        .describe('Photos attached beside the text.'),
+      timezone,
+    },
+    build: (args) => ({
+      kind: 'input',
+      text: args.text as string | undefined,
+      images: args.images as { imageBase64: string; mimeType: 'image/png' | 'image/jpeg' | 'image/webp'; filename?: string }[] | undefined,
+      timezone: args.timezone as string | undefined,
+      backupOriginal: args.backupOriginal as boolean | undefined,
+    }),
+  });
+
   scanTool('read_link_into_events', {
     title: 'Read events off a page',
     description:

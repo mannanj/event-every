@@ -18,7 +18,6 @@ import { useHistory } from '@/hooks/useHistory';
 import { useInputHistory } from '@/hooks/useInputHistory';
 import { useProcessingQueue } from '@/hooks/useProcessingQueue';
 import { useEventSelection } from '@/hooks/useEventSelection';
-import { buildEnrichedUrlText, detectURLs } from '@/services/urlDetector';
 import { summarizeInput } from '@/services/summarizer';
 import {
   acknowledgeProviderOperation,
@@ -29,7 +28,8 @@ import {
   type ProviderOperationRecord,
 } from '@/services/providerOperation';
 import { createHistoryEntryId } from '@/services/requestId';
-import { scrapeURLsBatch } from '@/services/webScraper';
+import { IMAGE_SCAN_CONCURRENCY, linkForPhotos, readLinks, readText, withTypedLink } from '@/services/readSources';
+import { siteLinkSteps } from '@/services/siteReadSteps';
 import { QueueItem } from '@/services/processingQueue';
 import { eventStorage } from '@/services/storage';
 import { inputStorage } from '@/services/inputStorage';
@@ -51,8 +51,6 @@ import AuthWrapper from '@/components/AuthWrapper';
 // pending record and throws on a second, so a higher limit fails the batch on
 // its second scan (caught by the two-image e2e test). Raising this needs a
 // per-operation record store first; the batch plumbing is already in place.
-const IMAGE_SCAN_CONCURRENCY = 1;
-const TEXT_SCAN_CONCURRENCY = 1;
 
 function providerScanDrafts(response: ReturnType<typeof ScanResponseSchema.parse>, operation: ProviderOperationRecord): ReviewDraft[] {
   const createdAt = new Date(operation.createdAtMs).toISOString();
@@ -124,7 +122,7 @@ function Home({ processingDisabled }: { processingDisabled: boolean }) {
     // Verification read the scanner's own words and judged this one event, so it
     // outranks the triage duration, which was one guess for the whole batch.
     const verifiedDuration = new Map((response.verification ?? []).map((one) => [one.candidateId, one.durationMinutes]));
-    const incoming = reviewDraftsToCalendarEvents(drafts).map((event, index) => {
+    const incoming = withTypedLink(reviewDraftsToCalendarEvents(drafts), batchLinkRef.current).map((event, index) => {
       const { candidate } = drafts[index];
       return withTypicalDuration(
         event,
@@ -191,6 +189,8 @@ function Home({ processingDisabled }: { processingDisabled: boolean }) {
   const abortRef = useRef<AbortController | null>(null);
   // Triage's typical-duration verdict for the batch being scanned, if any.
   const batchDurationRef = useRef<number | null>(null);
+  // The link typed beside the photos being read, for their events (see readSources).
+  const batchLinkRef = useRef<string | null>(null);
   const activeSubmissionRef = useRef<string | null>(null);
   const activeImageBatchRef = useRef<string | null>(null);
   const loadedSigRef = useRef<string | null>(null);
@@ -357,7 +357,7 @@ function Home({ processingDisabled }: { processingDisabled: boolean }) {
     pushProcessingNotice(type, error instanceof Error ? error.message : 'Unable to scan this input.');
   };
 
-  const handleImageSelect = async (files: File[], summaryEntryId?: string) => {
+  const handleImageSelect = async (files: File[], summaryEntryId?: string, typed?: string) => {
     if (files.length === 0) return;
     addToQueue('image', files, undefined, async (queueItem: QueueItem) => {
       const imageFiles = queueItem.payload as File[];
@@ -380,6 +380,17 @@ function Home({ processingDisabled }: { processingDisabled: boolean }) {
         // Each image is its own provider operation, so a batch no longer waits
         // on one slow scan at a time: up to IMAGE_SCAN_CONCURRENCY run together
         // and the titles are gathered in upload order.
+        // Words typed beside the photos: their links are fetched as for text,
+        // and the event takes the call or page they point at.
+        batchLinkRef.current = null;
+        if (typed?.trim()) {
+          const links = await readLinks(typed, {
+            ...siteLinkSteps(controller.signal),
+            cancelled: () => controller.signal.aborted || activeSubmissionRef.current !== batchId,
+          });
+          if (!links) return [];
+          batchLinkRef.current = linkForPhotos(links);
+        }
         let completed = 0;
         const perImage = await mapWithConcurrency(imageFiles, IMAGE_SCAN_CONCURRENCY, async (file, index) => {
           if (controller.signal.aborted || activeSubmissionRef.current !== batchId) return [];
@@ -412,6 +423,7 @@ function Home({ processingDisabled }: { processingDisabled: boolean }) {
           item.status === 'pending' || item.status === 'processing' ? { ...item, status: 'error' as const, error: message } : item,
         ));
       } finally {
+        batchLinkRef.current = null;
         const current = abortRef.current === controller;
         if (current) abortRef.current = null;
         setBatchProcessing((previous) => previous?.id === batchId ? { ...previous, isProcessing: false } : previous);
@@ -435,47 +447,43 @@ function Home({ processingDisabled }: { processingDisabled: boolean }) {
       setBatchProcessing({ id: batchId, events: [], isProcessing: true, source: 'text' });
 
       try {
-        setUrlProcessingStatus({ phase: 'detecting', message: 'Detecting URLs...' });
-        const detection = await detectURLs(inputText, controller.signal);
-        if (controller.signal.aborted || activeSubmissionRef.current !== batchId) return [];
-        let combinedText = inputText;
-        if (detection.hasUrls && detection.urls.length > 0) {
-          setUrlProcessingStatus({
-            phase: 'fetching',
-            urlCount: detection.urls.length,
-            message: `Fetching ${detection.urls.length} event page${detection.urls.length === 1 ? '' : 's'}...`,
-          });
-          updateProgress(queueItem.id, 30);
-          const scraped = await scrapeURLsBatch(detection.urls, controller.signal, detection.resolverCapability);
-          if (controller.signal.aborted || activeSubmissionRef.current !== batchId) return [];
-          combinedText = buildEnrichedUrlText(inputText, detection.urls, scraped.results);
-          if (!combinedText.trim()) {
-            throw new Error('Unable to extract content from the provided URLs. Please check the URLs and try again.');
-          }
-        }
-        if (!combinedText.trim()) throw new Error('Please enter some text or URLs to process.');
-
-        setUrlProcessingStatus({ phase: 'extracting', message: 'Extracting events...' });
-        updateProgress(queueItem.id, 50);
-        // Triage decides when and how many scans run, never what they return.
-        // A null outcome (no key, slow, or failed) is the single scan as before.
-        const triage = await requestTriage(combinedText, detection.hasUrls ? 'url-page' : 'paste', controller.signal);
-        if (controller.signal.aborted || activeSubmissionRef.current !== batchId) return [];
-        const decision = triage?.decision ?? { kind: 'single' as const };
-        batchDurationRef.current = decision.kind === 'single' ? triage?.durationMinutes ?? null : null;
+        const cancelled = () => controller.signal.aborted || activeSubmissionRef.current !== batchId;
+        const outcome = await readText<CalendarEvent>(inputText, {
+          ...siteLinkSteps(controller.signal),
+          triage: (text, source) => requestTriage(text, source, controller.signal),
+          scan: (text, { quietWhenEmpty, durationMinutes }) => {
+            batchDurationRef.current = durationMinutes;
+            return runScan({ kind: 'text', text }, controller.signal, { quietWhenEmpty });
+          },
+          onPhase: (phase) => {
+            if (phase.phase === 'detecting') setUrlProcessingStatus({ phase: 'detecting', message: 'Detecting URLs...' });
+            if (phase.phase === 'fetching') {
+              setUrlProcessingStatus({
+                phase: 'fetching',
+                urlCount: phase.urlCount,
+                message: `Fetching ${phase.urlCount} event page${phase.urlCount === 1 ? '' : 's'}...`,
+              });
+              updateProgress(queueItem.id, 30);
+            }
+            if (phase.phase === 'extracting') {
+              setUrlProcessingStatus({
+                phase: 'extracting',
+                message: phase.chunks ? `Extracting ${phase.chunks} events...` : 'Extracting events...',
+              });
+              if (!phase.chunks) updateProgress(queueItem.id, 50);
+            }
+          },
+          cancelled,
+        });
+        if (outcome.kind === 'cancelled') return [];
         let scanned: CalendarEvent[] = [];
-        if (decision.kind === 'skip') {
+        if (outcome.kind === 'skip') {
           pushProcessingNotice('text', 'No date or time found in that. Add when it happens and try again.');
-        } else if (decision.kind === 'split') {
-          setUrlProcessingStatus({ phase: 'extracting', message: `Extracting ${decision.chunks.length} events...` });
-          const perChunk = await mapWithConcurrency(decision.chunks, TEXT_SCAN_CONCURRENCY, (chunk) =>
-            runScan({ kind: 'text', text: chunk }, controller.signal, { quietWhenEmpty: true }));
-          scanned = perChunk.flat();
-          if (scanned.length === 0 && !controller.signal.aborted) {
+        } else {
+          scanned = outcome.items;
+          if (outcome.split && scanned.length === 0 && !controller.signal.aborted) {
             pushProcessingNotice('text', 'No event found in that. A date and a time are what it looks for.');
           }
-        } else {
-          scanned = await runScan({ kind: 'text', text: combinedText }, controller.signal);
         }
         if (controller.signal.aborted || activeSubmissionRef.current !== batchId) return [];
         const titles = scanned.map((event) => event.title);
@@ -618,7 +626,7 @@ function Home({ processingDisabled }: { processingDisabled: boolean }) {
       images.length === 0 && calendarFiles.length === 0 && text.trim().length > 0 ? entryId : undefined;
 
     if (images.length > 0) {
-      handleImageSelect(images, imageEntryId);
+      handleImageSelect(images, imageEntryId, text);
     }
 
     if (calendarFiles.length > 0) {

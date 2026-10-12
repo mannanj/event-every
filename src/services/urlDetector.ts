@@ -1,5 +1,6 @@
 import { normalizeUrl } from '@/utils/url';
 import type { ScrapedContent } from '@/services/webScraper';
+import { videoCallLink } from '@/utils/videoCall';
 
 export interface URLDetectionResult {
   urls: string[];
@@ -82,8 +83,15 @@ export function isLowSignalScrape(text: string): boolean {
 export function buildEnrichedUrlText(input: string, detectedUrls: readonly string[], results: readonly ScrapedContent[]): string {
   const alignedByPosition = results.length === detectedUrls.length;
   const blocks = results.flatMap((result, index) => {
-    if (result.status !== 'success' || isLowSignalScrape(result.text)) return [];
+    if (result.status !== 'success') return [];
     const sourceUrl = normalizeUrl(alignedByPosition ? detectedUrls[index] : result.url) ?? result.url;
+    if (isLowSignalScrape(result.text)) {
+      // A join link that lands on the call itself (Luma's /join/): the
+      // interstitial says nothing, but where it landed is the event's video
+      // link. Only when the source does not already name that call.
+      const call = videoCallLink(result.url);
+      return call && !input.includes(call) ? [`Original Event: ${sourceUrl}\nVideo call link: ${call}`] : [];
+    }
     const body = result.title ? `${result.title}\n${result.text}` : result.text;
     return [`Original Event: ${sourceUrl}\n${body}`];
   });
