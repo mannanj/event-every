@@ -48,6 +48,13 @@
   font-weight: 700;
 }
 
+.mcpc-lede {
+  margin: 0;
+  color: var(--mcpc-muted);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
 .mcpc-docs {
   flex: none;
   color: var(--mcpc-accent);
@@ -227,7 +234,7 @@
   visibility: visible;
 }
 
-/* ─── "Add this app" + status ─────────────────────────────────────────── */
+/* ─── "Add your AI" + status ─────────────────────────────────────────── */
 
 .mcpc-subhead {
   display: flex;
@@ -355,9 +362,9 @@
 /* ─── "Add other MCPs" ─────────────────────────────────────────────────── */
 
 .mcpc-apps {
-  margin-top: var(--mcpc-gap);
-  padding-top: 10px;
-  border-top: 1px solid var(--mcpc-line);
+  margin-bottom: var(--mcpc-gap);
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--mcpc-line);
 }
 
 .mcpc-apps__list {

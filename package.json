@@ -10,6 +10,7 @@
     "lint": "eslint . --ignore-pattern '.claude/**'",
     "type-check": "tsc --noEmit",
     "type-check:mcp": "cd mcp && bun run type-check",
+    "sync:mcp": "node ../mcp-connector/bin/sync.mjs src/vendor/mcp-connector",
     "test": "bun test src --parallel",
     "test:e2e": "bunx playwright test",
     "test:e2e:linked-apps": "bunx playwright test --config playwright.linked-apps.config.ts",

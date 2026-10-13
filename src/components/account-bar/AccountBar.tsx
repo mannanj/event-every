@@ -248,7 +248,7 @@ export default function AccountBar({
                   data-testid="menu-mcp"
                 >
                   <McpLogoIcon size={15} />
-                  MCP Connector
+                  Manage integrations
                 </button>
               )}
               {items?.map((item) => (

@@ -97,7 +97,7 @@ test('a cancelled consent leaves it signed out', async ({ page }) => {
 test('signed out of Event Every, the section is not offered', async ({ page, context }) => {
   await context.clearCookies();
   await page.goto('/');
-  await page.getByRole('button', { name: 'Connect your assistant' }).click();
+  await page.getByRole('button', { name: 'Connect integrations' }).click();
   await expect(page.getByTestId('mcp-panel')).toBeVisible();
   await expect(page.getByText('Add other MCPs')).toHaveCount(0);
 });

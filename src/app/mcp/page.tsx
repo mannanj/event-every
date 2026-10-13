@@ -56,7 +56,7 @@ export default function McpGuidePage() {
               endpoint={endpoint}
               claudeCodeCommand={mcpClaudeCodeCommand(endpoint)}
               agentInstruction={mcpAgentInstruction(endpoint)}
-              title="MCP Connector"
+              lede=""
             />
           </div>
 

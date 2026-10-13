@@ -7,19 +7,22 @@ import { useCallback, useEffect, useRef, useState, type ReactNode, type RefObjec
 /**
  * The MCP connector menu, shared by every app that hands someone a connection.
  *
- *   MCP Connector                                   Docs
- *   Add this app              Connected  (✳) (>_) (⋯)
+ *   Connect integrations and your AI                Docs
+ *   Add other MCPs
+ *   Event Every                                Sign in
+ *   Add your AI               Connected  (✳) (>_) (⋯)
  *   (✳)  https://…/mcp                               ⧉
  *   (>_) claude mcp add --transport http …           ⧉
  *   (⋯)  Connect to the MCP server at …              ⧉
- *   Add other MCPs
- *   Event Every                                Sign in
+ *
+ * The lede is the first line, and there is no main heading (the standard since
+ * 2026-10-12). The head is skipped when there is neither lede, title nor Docs.
  *
  * Each string is marked with the CLIENT it belongs to, as an icon of one fixed
  * size rather than a heading, so a person finds their own tool at a glance and
  * the panel stays three lines tall. The icon names its client on hover or tap.
  *
- * Signed in, the "Add this app" line carries the account's status: the same
+ * Signed in, the "Add your AI" line carries the account's status: the same
  * three icons, solid for a client that is connected and at half strength for
  * one that is not. Each opens a small menu under it - what is connected, when,
  * and Disconnect; or Connect when nothing is - so connecting and cutting off
@@ -75,6 +78,9 @@ export type McpConnectorProps = {
   docsHref?: string;
   /** Lets a Next app pass next/link so the docs link stays client-side. */
   renderDocsLink?: (href: string, children: ReactNode) => ReactNode;
+  /** The first line. Pass '' when the page around the panel already says it. */
+  lede?: string;
+  /** Pass a heading only if the page needs one; the standard panel has none. */
   title?: string;
   /** The heading over the three strings. */
   addTitle?: string;
@@ -83,7 +89,7 @@ export type McpConnectorProps = {
   locked?: boolean;
   /**
    * Signed in: what this account has connected, drawn as the status on the
-   * "Add this app" line with a menu per client to connect or disconnect.
+   * "Add your AI" line with a menu per client to connect or disconnect.
    * Omit when nobody is signed in - there is nothing to show.
    */
   connections?: McpConnectionsSource;
@@ -316,7 +322,7 @@ function MenuButton({
 }
 
 /**
- * The status on the "Add this app" line: Connected/Disconnected, then one
+ * The status on the "Add your AI" line: Connected/Disconnected, then one
  * mark per client, solid when that client is connected.
  */
 function ConnectionStatus({
@@ -515,8 +521,9 @@ export function McpConnector({
   agentInstruction,
   docsHref,
   renderDocsLink,
-  title = 'MCP Connector',
-  addTitle = 'Add this app',
+  lede = 'Connect integrations and your AI',
+  title = '',
+  addTitle = 'Add your AI',
   labels,
   locked = false,
   connections,
@@ -537,10 +544,13 @@ export function McpConnector({
 
   return (
     <div className={['mcp-connector', className].filter(Boolean).join(' ')}>
-      <div className="mcpc-head">
-        <span className="mcpc-title">{title}</span>
-        {docs}
-      </div>
+      {(lede || title || docs) && (
+        <div className="mcpc-head">
+          {lede ? <p className="mcpc-lede">{lede}</p> : title ? <span className="mcpc-title">{title}</span> : <span />}
+          {docs}
+        </div>
+      )}
+      {apps && apps.apps.length > 0 && !locked && <McpApps {...apps} />}
       <div className="mcpc-subhead">
         <span className="mcpc-section">{addTitle}</span>
         {connections && !locked && (
@@ -555,7 +565,6 @@ export function McpConnector({
           <CopySnippet key={kind} kind={kind} label={byKind[kind]} value={values[kind]} />
         ))}
       </div>
-      {apps && apps.apps.length > 0 && !locked && <McpApps {...apps} />}
     </div>
   );
 }

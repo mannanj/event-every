@@ -138,14 +138,13 @@ export default function SiteHeader({ showHow = false }: { showHow?: boolean }) {
               items={items}
               mcp={{
                 enabled: true,
-                tooltip: 'Connect your assistant',
+                tooltip: 'Connect integrations',
                 panel: (close) => (
                   <McpConnector
                     key={panelKey}
                     endpoint={DEFAULT_MCP_ENDPOINT}
                     claudeCodeCommand={mcpClaudeCodeCommand(DEFAULT_MCP_ENDPOINT)}
                     agentInstruction={mcpAgentInstruction(DEFAULT_MCP_ENDPOINT)}
-                    title="MCP Connector"
                     docsHref="/mcp"
                     renderDocsLink={(href, children) => (
                       <Link href={href} className="mcpc-docs" onClick={close}>
