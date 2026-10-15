@@ -107,7 +107,7 @@ describe('triageText fallback', () => {
     expect(result?.shape.choice).toBe('one_event');
     expect(result?.shape.probabilities.several_independent_events).toBe(0);
     expect((sent as { state: { referenceWeekday: string } }).state.referenceWeekday).toBe('Wednesday');
-    expect((sent as { model: string }).model).toBe('jev-latest');
+    expect((sent as { model: string }).model).toBe('jev-1.13.0');
   });
 });
 

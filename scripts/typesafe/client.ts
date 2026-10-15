@@ -1,6 +1,8 @@
 import { readFileSync } from 'node:fs';
 
 const ENDPOINT = 'https://api.typesafe.ai/v1/systemone';
+/** Same pin as the app; TYPESAFE_MODEL compares another release. */
+export const MODEL = process.env.TYPESAFE_MODEL ?? 'jev-1.13.0';
 
 export type Question =
   | { type: 'noul'; instructions: string; criteria?: { true: string; false: string } }
@@ -25,7 +27,7 @@ export async function ask(state: unknown, questions: Record<string, Question>): 
   const res = await fetch(ENDPOINT, {
     method: 'POST',
     headers: { Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: 'jev-latest', state, questions }),
+    body: JSON.stringify({ model: MODEL, state, questions }),
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
   const body = (await res.json()) as { answers: Record<string, Answer>; usage: { input_tokens: number; output_tokens: number } };

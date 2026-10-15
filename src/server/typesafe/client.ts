@@ -8,7 +8,9 @@ import { getCloudflareContext } from '@opennextjs/cloudflare';
  */
 
 const ENDPOINT = 'https://api.typesafe.ai/v1/systemone';
-const MODEL = 'jev-latest';
+// Pinned: triage and verification thresholds were tuned on 1.13, and
+// jev-latest moves to 1.14 on 2026-10-21. Move only after the eval reruns.
+const MODEL = 'jev-1.13.0';
 
 export type TypeSafeQuestion =
   | { type: 'noul'; instructions: string; criteria?: { true: string; false: string } }
