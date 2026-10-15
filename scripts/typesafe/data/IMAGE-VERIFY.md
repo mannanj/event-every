@@ -20,7 +20,7 @@ day is 12 or less), time +2 h, and time -4 h (the shipped bug: 10:30 Eastern exp
   as real-08", so that arm is a floor, not a fair rival.
 - 1.14 reads images better and text worse (see `JEV-1.14.md`), so an image check would pin
   `jev-1.14.0` on its own requests while text stays on 1.13.
-- Cost: about 3.7k input tokens per image question (~$0.00016). Images are a TypeSafe "danger zone"
+- Cost: about 5k input tokens per image request (the Box probe measured 4.2k-5.4k), ~$0.0002 at $0.042/Mtok. Images are a TypeSafe "danger zone"
   feature (`TypeSafe-Danger-Zone-Images: true`) and may change between releases.
 
 19 screenshots is small, and every one is legible. Before wiring this in, run it on the image scans
