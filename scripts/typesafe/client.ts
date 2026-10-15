@@ -22,12 +22,15 @@ const KEY = loadKey();
 
 export const usage = { calls: 0, tokens: 0, ms: 0 };
 
-export async function ask(state: unknown, questions: Record<string, Question>): Promise<Record<string, Answer>> {
+export interface ImageAsset { type: 'image'; format: 'png' | 'jpg'; data_base64: string }
+
+/** `assets` maps a reference written somewhere in `state` to its image; images need the danger-zone header. */
+export async function ask(state: unknown, questions: Record<string, Question>, assets?: Record<string, ImageAsset>): Promise<Record<string, Answer>> {
   const startedAt = Date.now();
   const res = await fetch(ENDPOINT, {
     method: 'POST',
-    headers: { Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: MODEL, state, questions }),
+    headers: { Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json', ...(assets ? { 'TypeSafe-Danger-Zone-Images': 'true' } : {}) },
+    body: JSON.stringify({ model: MODEL, state, questions, ...(assets ? { assets } : {}) }),
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
   const body = (await res.json()) as { answers: Record<string, Answer>; usage: { input_tokens: number; output_tokens: number } };

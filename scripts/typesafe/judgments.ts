@@ -47,7 +47,8 @@ export async function judgeTimed(text: string, extractedDate: string, extractedS
 
 export interface FieldVerdict { date: number; time: number | null; location: number | null }
 
-export async function verifyFields(text: string, referenceDate: string, extracted: Extracted): Promise<FieldVerdict> {
+/** The verification questions, reading the source from `text`, or from `image` when the source is a picture. */
+export function verifyQuestions(extracted: Extracted, source: 'text' | 'image' = 'text'): Record<string, Question> {
   const questions: Record<string, Question> = {
     date_ok: {
       type: 'noul',
@@ -62,6 +63,13 @@ export async function verifyFields(text: string, referenceDate: string, extracte
     type: 'noul',
     instructions: 'Is `extracted.location` the place `text` gives for this event, allowing for spelling and OCR noise? The last address in a thread supersedes "usual spot". Judge the location only; do not lower it because the date or time look wrong.',
   };
+  if (source === 'text') return questions;
+  for (const q of Object.values(questions)) q.instructions = q.instructions.replaceAll('`text`', '`image`');
+  return questions;
+}
+
+export async function verifyFields(text: string, referenceDate: string, extracted: Extracted): Promise<FieldVerdict> {
+  const questions = verifyQuestions(extracted);
   const needsCalendar = !/\b(?:19|20)\d{2}\b/.test(text) || /\b(?:mon|tue|wed|thu|fri|sat|sun)[a-z]*\b|\b(?:today|tonight|tomorrow|tmrw|next|this)\b/i.test(text);
   const a = await ask({ text, referenceDate, ...(needsCalendar ? { calendar: calendarState(referenceDate, extracted.startDate) } : {}), extracted }, questions);
   return { date: noul(a.date_ok), time: extracted.startTime ? noul(a.time_ok) : null, location: extracted.location ? noul(a.location_ok) : null };
