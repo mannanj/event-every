@@ -338,55 +338,131 @@ export async function readRpc(res: Response): Promise<{ result?: unknown; error?
 }
 
 const PROTOCOL = '2025-06-18';
+const MAX_TOOL_PAGES = 5;
+
+export interface ListedTool {
+  name: string;
+  description?: string;
+  inputSchema: Record<string, unknown>;
+}
 
 /**
- * initialize → notifications/initialized → tools/call, the handshake every
- * client does. A 401 anywhere means the token is no good: the caller refreshes
- * once or forgets the link.
+ * One MCP conversation: initialize + notifications/initialized happen once,
+ * lazily, then every request reuses the `mcp-session-id` and the protocol
+ * version the server negotiated. A 401/403 anywhere means the token is no good:
+ * the caller refreshes once or forgets the link.
  */
-export async function callTool<T = unknown>(
+export class McpSession {
+  private session: string | null = null;
+  private protocol = PROTOCOL;
+  private id = 0;
+  private ready: Promise<void> | null = null;
+
+  constructor(
+    private readonly server: LinkedAppServer,
+    private readonly accessToken: string,
+    private readonly f: typeof fetch = fetch,
+  ) {}
+
+  private async post(body: Record<string, unknown>): Promise<Response> {
+    const res = await this.f(this.server.mcpUrl, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        accept: 'application/json, text/event-stream',
+        authorization: `Bearer ${this.accessToken}`,
+        'mcp-protocol-version': this.protocol,
+        ...(this.session ? { 'mcp-session-id': this.session } : {}),
+      },
+      body: JSON.stringify({ jsonrpc: '2.0', ...body }),
+    });
+    if (res.status === 401 || res.status === 403) throw new LinkedAppError('unauthorized', 'signed out on the other side');
+    if (!res.ok && res.status !== 202) throw new LinkedAppError('transport', `MCP ${res.status}`);
+    this.session = res.headers.get('mcp-session-id') ?? this.session;
+    return res;
+  }
+
+  private async handshake(): Promise<void> {
+    const init = await readRpc(
+      await this.post({
+        id: ++this.id,
+        method: 'initialize',
+        params: { protocolVersion: PROTOCOL, capabilities: {}, clientInfo: { name: 'mcp-linked-app', version: '1' } },
+      }),
+    );
+    if (init.error) throw new LinkedAppError('transport', init.error.message ?? 'initialize failed');
+    const negotiated = (init.result as { protocolVersion?: string } | undefined)?.protocolVersion;
+    if (negotiated) this.protocol = negotiated;
+    await this.post({ method: 'notifications/initialized' });
+  }
+
+  /** Handshake once; a failed handshake is retried by the next call. */
+  private open(): Promise<void> {
+    if (!this.ready) {
+      this.ready = this.handshake().catch((e) => {
+        this.ready = null;
+        throw e;
+      });
+    }
+    return this.ready;
+  }
+
+  private async request(method: string, params: Record<string, unknown>) {
+    await this.open();
+    const answer = await readRpc(await this.post({ id: ++this.id, method, params }));
+    if (answer.error) throw new LinkedAppError('tool', answer.error.message ?? `${method} failed`);
+    return answer.result;
+  }
+
+  /** Every tool the server lists, following `nextCursor` for at most five pages. */
+  async listTools(): Promise<ListedTool[]> {
+    const tools: ListedTool[] = [];
+    let cursor: string | undefined;
+    for (let page = 0; page < MAX_TOOL_PAGES; page++) {
+      const result = (await this.request('tools/list', cursor ? { cursor } : {})) as
+        | { tools?: Partial<ListedTool>[]; nextCursor?: string }
+        | undefined;
+      for (const t of result?.tools ?? []) {
+        if (!t.name) continue;
+        tools.push({
+          name: t.name,
+          ...(t.description !== undefined ? { description: t.description } : {}),
+          inputSchema: t.inputSchema ?? { type: 'object' },
+        });
+      }
+      cursor = result?.nextCursor || undefined;
+      if (!cursor) break;
+    }
+    return tools;
+  }
+
+  async callTool<T = unknown>(name: string, args: Record<string, unknown>): Promise<{ structured: T | undefined; text: string }> {
+    const result = (await this.request('tools/call', { name, arguments: args })) as {
+      isError?: boolean;
+      structuredContent?: T;
+      content?: { type: string; text?: string }[];
+    };
+    const text = (result.content ?? []).map((c) => c.text ?? '').join('\n').trim();
+    if (result.isError) throw new LinkedAppError('tool', text || 'tool failed');
+    return { structured: result.structuredContent, text };
+  }
+}
+
+export function openSession(server: LinkedAppServer, accessToken: string, f: typeof fetch = fetch): McpSession {
+  return new McpSession(server, accessToken, f);
+}
+
+export function listTools(server: LinkedAppServer, accessToken: string, f: typeof fetch = fetch): Promise<ListedTool[]> {
+  return new McpSession(server, accessToken, f).listTools();
+}
+
+/** One tools/call on a fresh session: the handshake every client does, then the call. */
+export function callTool<T = unknown>(
   server: LinkedAppServer,
   accessToken: string,
   name: string,
   args: Record<string, unknown>,
   f: typeof fetch = fetch,
 ): Promise<{ structured: T | undefined; text: string }> {
-  let session: string | null = null;
-  let id = 0;
-  const post = async (body: Record<string, unknown>) => {
-    const res = await f(server.mcpUrl, {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        accept: 'application/json, text/event-stream',
-        authorization: `Bearer ${accessToken}`,
-        'mcp-protocol-version': PROTOCOL,
-        ...(session ? { 'mcp-session-id': session } : {}),
-      },
-      body: JSON.stringify({ jsonrpc: '2.0', ...body }),
-    });
-    if (res.status === 401 || res.status === 403) throw new LinkedAppError('unauthorized', 'signed out on the other side');
-    if (!res.ok && res.status !== 202) throw new LinkedAppError('transport', `MCP ${res.status}`);
-    session = res.headers.get('mcp-session-id') ?? session;
-    return res;
-  };
-
-  await readRpc(
-    await post({
-      id: ++id,
-      method: 'initialize',
-      params: { protocolVersion: PROTOCOL, capabilities: {}, clientInfo: { name: 'mcp-linked-app', version: '1' } },
-    }),
-  );
-  await post({ method: 'notifications/initialized' });
-  const answer = await readRpc(await post({ id: ++id, method: 'tools/call', params: { name, arguments: args } }));
-  if (answer.error) throw new LinkedAppError('tool', answer.error.message ?? 'tool failed');
-  const result = answer.result as {
-    isError?: boolean;
-    structuredContent?: T;
-    content?: { type: string; text?: string }[];
-  };
-  const text = (result.content ?? []).map((c) => c.text ?? '').join('\n').trim();
-  if (result.isError) throw new LinkedAppError('tool', text || 'tool failed');
-  return { structured: result.structuredContent, text };
+  return new McpSession(server, accessToken, f).callTool<T>(name, args);
 }
