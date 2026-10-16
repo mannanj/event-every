@@ -52,6 +52,10 @@ export interface McpLinkedApp {
   name: string;
   /** Its site, linked from the name. */
   href?: string;
+  /** Word on the button when not signed in. Default "Sign in". */
+  signInLabel?: string;
+  /** A public app needs no sign-in: the row shows this note instead of a button. */
+  publicNote?: string;
 }
 
 /** One live sign-in to a sister app. */
@@ -480,9 +484,12 @@ export function McpApps({ apps, load, signIn, signOut }: McpAppsSource) {
               )}
               {state.kind === 'loading' && <span className="mcpc-menu__note">Checking…</span>}
               {state.kind === 'failed' && <span className="mcpc-menu__note" role="alert">Unavailable</span>}
-              {state.kind === 'ready' && !link && (
+              {state.kind === 'ready' && !link && app.publicNote !== undefined && (
+                <span className="mcpc-menu__note">{app.publicNote}</span>
+              )}
+              {state.kind === 'ready' && !link && app.publicNote === undefined && (
                 <button type="button" className="mcpc-apps__action" onClick={() => signIn(app.id)}>
-                  Sign in
+                  {app.signInLabel ?? 'Sign in'}
                 </button>
               )}
               {state.kind === 'ready' && link && (
