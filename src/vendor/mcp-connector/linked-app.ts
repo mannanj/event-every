@@ -344,6 +344,27 @@ export interface ListedTool {
   name: string;
   description?: string;
   inputSchema: Record<string, unknown>;
+  /** Safety hints from tools/list; only the known keys, only booleans (title: string). */
+  annotations?: ToolAnnotations;
+}
+
+export interface ToolAnnotations {
+  readOnlyHint?: boolean;
+  destructiveHint?: boolean;
+  idempotentHint?: boolean;
+  openWorldHint?: boolean;
+  title?: string;
+}
+
+const BOOL_HINTS = ['readOnlyHint', 'destructiveHint', 'idempotentHint', 'openWorldHint'] as const;
+
+function pickAnnotations(raw: unknown): ToolAnnotations | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const src = raw as Record<string, unknown>;
+  const out: ToolAnnotations = {};
+  for (const k of BOOL_HINTS) if (typeof src[k] === 'boolean') out[k] = src[k] as boolean;
+  if (typeof src.title === 'string') out.title = src.title;
+  return Object.keys(out).length ? out : undefined;
 }
 
 /**
@@ -428,6 +449,7 @@ export class McpSession {
           name: t.name,
           ...(t.description !== undefined ? { description: t.description } : {}),
           inputSchema: t.inputSchema ?? { type: 'object' },
+          ...(pickAnnotations(t.annotations) ? { annotations: pickAnnotations(t.annotations)! } : {}),
         });
       }
       cursor = result?.nextCursor || undefined;
