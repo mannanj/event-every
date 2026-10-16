@@ -458,6 +458,16 @@ export class McpSession {
     return tools;
   }
 
+  /** One tools/call, returning the server's whole result untouched (content, structuredContent, isError). Throws only on transport or JSON-RPC errors. */
+  async callToolRaw(
+    name: string,
+    args: Record<string, unknown>,
+  ): Promise<{ content: Array<Record<string, unknown>>; structuredContent?: Record<string, unknown>; isError?: boolean }> {
+    const result = await this.request('tools/call', { name, arguments: args });
+    if (!result || typeof result !== 'object') throw new LinkedAppError('tool', 'tools/call returned no result');
+    return result as { content: Array<Record<string, unknown>>; structuredContent?: Record<string, unknown>; isError?: boolean };
+  }
+
   async callTool<T = unknown>(name: string, args: Record<string, unknown>): Promise<{ structured: T | undefined; text: string }> {
     const result = (await this.request('tools/call', { name, arguments: args })) as {
       isError?: boolean;
